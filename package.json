@@ -1,0 +1,35 @@
+{
+  "name": "asistcontrol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema empresarial de control de asistencia y sincronización con dispositivos biométricos",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build:packages": "npm run build -w @asistcontrol/shared && npm run build -w @asistcontrol/biometric-core",
+    "build": "npm run build:packages && npm run build -w apps --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.6.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "@types/node": "^22.18.0"
+  }
+}
