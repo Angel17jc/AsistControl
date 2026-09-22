@@ -21,7 +21,7 @@ classDiagram
     +onAttendanceLog(listener) Unsubscribe
   }
   BiometricDeviceAdapter <|.. MockDeviceAdapter
-  BiometricDeviceAdapter <|.. ZKTecoAdapter : roadmap
+  BiometricDeviceAdapter <|.. ZKTecoAdapter : experimental
   BiometricDeviceAdapter <|.. HikvisionAdapter : roadmap
   class AdapterRegistry {
     +register(driver, factory)
@@ -68,6 +68,35 @@ Todas las operaciones deben respetar `config.timeoutMs` (usar `withTimeout`). Er
 ## Credenciales
 
 Las credenciales (clave de comunicación, usuario/contraseña ISAPI) se envían al registrar el dispositivo, se guardan cifradas con AES-256-GCM (`DEVICE_SECRETS_KEY`) y **nunca se devuelven** por la API (`hasCredentials: true`). Solo `DeviceConnectionManager` las descifra, en memoria, al construir el adaptador.
+
+## Driver `ZKTECO` (experimental)
+
+Terminales ZKTeco _standalone_ (K40, F18, MB160…) por **TCP 4370**. El protocolo no es una especificación pública: la implementación sigue el trazado que usan los clientes de la comunidad (pyzk, zklib), está cubierta por tests byte a byte y se verifica contra un **servidor falso que habla el protocolo**. Falta validarla contra hardware real antes de usarla en producción.
+
+| Aspecto            | Detalle                                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transporte         | TCP, un comando a la vez por sesión; los timeouts salen de `config.timeoutMs`                                                                                   |
+| Handshake          | `CMD_CONNECT`; si el equipo responde `ACK_UNAUTH` se envía `CMD_AUTH` con la clave derivada                                                                     |
+| Credenciales       | `{ "commKey": "123456" }` al registrar el dispositivo (se guarda cifrada)                                                                                       |
+| Zona horaria       | El equipo entrega hora local **sin zona**: se usa `config.timezone` del dispositivo o, si falta, la de la empresa. Indispensable si el equipo está en otra sede |
+| Lecturas masivas   | `PREPARE_DATA` → `DATA` (varios trozos) → `ACK_OK`, reensamblados por el cliente                                                                                |
+| Cursor             | `<registros leídos>:<huella del último>`. Si la huella no coincide (memoria borrada, registros eliminados) se relee todo y la ingesta deduplica                 |
+| Tiempo real        | No: estos equipos no hacen _push_; la plataforma los consulta según `DEVICE_SYNC_INTERVAL_SECONDS`                                                              |
+| Tipos de marcación | Tecla 0 → entrada, 1 → salida, 2 → salida almuerzo, 3 → regreso; cualquier otra queda `UNKNOWN` (no se adivina)                                                 |
+| Verificación       | 0 → contraseña, 1 → huella, 2 → tarjeta, 15 → rostro; el resto `OTHER`                                                                                          |
+
+Registro de ejemplo:
+
+```bash
+curl -X POST localhost:3000/api/devices -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{
+  "name":"Entrada principal","driver":"ZKTECO","manufacturer":"ZKTeco","model":"K40",
+  "host":"192.168.1.201","port":4370,
+  "config":{"timeoutMs":10000,"timezone":"America/Guayaquil"},
+  "credentials":{"commKey":"0"}
+}'
+```
+
+Para validarlo con un equipo real: registrar el dispositivo, ejecutar `POST /devices/:id/test-connection` (debe devolver serie, modelo y desfase de reloj) y luego `POST /devices/:id/sync`. Revisar en el `DeviceSyncLog` que no haya registros rechazados y contrastar las horas con el reloj del equipo.
 
 ## Simulador (driver `MOCK`)
 

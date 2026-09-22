@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+### Added
+
+- Driver ZKTECO (TCP 4370, experimental): protocolo, cliente TCP, adaptador con cursor incremental y servidor falso para pruebas.
+- Zona horaria configurable por dispositivo (config.timezone).
+
 ## [0.1.0] - 2026-09-21
 
 ### Added
