@@ -224,8 +224,9 @@ export class ZKTecoAdapter implements BiometricDeviceAdapter {
   }
 }
 
+/** Short digest identifying a record; only used to detect that the device memory changed. */
 function fingerprint(log: AttendanceLog): string {
-  return createHash('sha1')
+  return createHash('sha256')
     .update(`${log.deviceUserId}|${log.timestamp.toISOString()}|${log.punchType}`)
     .digest('hex')
     .slice(0, 12);

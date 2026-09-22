@@ -68,7 +68,7 @@ describe('packet framing', () => {
       replyId: 1,
       data: Buffer.from('data'),
     });
-    packet[packet.length - 1] ^= 0xff;
+    packet.writeUInt8(packet.readUInt8(packet.length - 1) ^ 0xff, packet.length - 1);
     expect(() => decodePacket(packet)).toThrow(/checksum/);
   });
 
