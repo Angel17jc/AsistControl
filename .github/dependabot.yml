@@ -21,6 +21,13 @@ updates:
       # Types must match the Node.js runtime (22 LTS); bump together with the Node version.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # Framework majors are planned migrations (ADR 0001), not automatic bumps.
+      - dependency-name: '@nestjs/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'prisma'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@prisma/*'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'build(deps)'
 
@@ -39,5 +46,9 @@ updates:
     directory: /infra/docker
     schedule:
       interval: monthly
+    ignore:
+      # The runtime follows the Node.js LTS line used by CI and .nvmrc; changed deliberately.
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'build(deps)'
