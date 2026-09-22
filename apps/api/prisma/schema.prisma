@@ -1,0 +1,507 @@
+// AsistControl data model. See docs/database.md for the rationale behind each entity.
+// All timestamps are stored as timestamptz (UTC instants); calendar days use @db.Date and are
+// interpreted in the company timezone (setting `company.timezone`).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────── enums
+// Values mirror packages/shared/src/domain.ts (enforced by a unit test).
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  HR
+  SUPERVISOR
+  EMPLOYEE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  SYNCING
+  ERROR
+  DISABLED
+}
+
+enum DeviceDriver {
+  MOCK
+  ZKTECO
+  HIKVISION
+}
+
+enum PunchType {
+  CHECK_IN
+  CHECK_OUT
+  BREAK_OUT
+  BREAK_IN
+  UNKNOWN
+}
+
+enum VerifyMode {
+  FINGERPRINT
+  FACE
+  CARD
+  PASSWORD
+  OTHER
+}
+
+enum EventSource {
+  DEVICE
+  MANUAL
+  IMPORT
+}
+
+enum DayType {
+  WORKDAY
+  REST_DAY
+  HOLIDAY
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  INCOMPLETE
+  ABSENT
+  ON_LEAVE
+  REST_DAY
+  HOLIDAY
+  NO_SCHEDULE
+}
+
+enum AttendanceAnomaly {
+  LATE_ARRIVAL
+  EARLY_LEAVE
+  OVERTIME
+  MISSING_CHECK_IN
+  MISSING_CHECK_OUT
+  DUPLICATE_PUNCH
+  OUT_OF_SCHEDULE_PUNCH
+  SHORT_BREAK
+  WORKED_ON_REST_DAY
+  WORKED_ON_HOLIDAY
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum SyncTrigger {
+  MANUAL
+  SCHEDULED
+  REALTIME
+}
+
+enum LeaveType {
+  PERSONAL
+  MEDICAL
+  VACATION
+  OTHER
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum OvertimeKind {
+  REGULAR
+  REST_DAY
+  HOLIDAY
+}
+
+// ─────────────────────────────────────────────────────────────── identity & access
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         Role      @default(EMPLOYEE)
+  isActive     Boolean   @default(true) @map("is_active")
+  employeeId   String?   @unique @map("employee_id") @db.Uuid
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employee  Employee?  @relation(fields: [employeeId], references: [id])
+  sessions  Session[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+/// One row per login. The refresh token rotates in place; presenting an old token revokes the session.
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────── organization
+
+model Department {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique
+  name        String    @unique
+  description String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  description String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employees Employee[]
+
+  @@map("positions")
+}
+
+model Employee {
+  id             String         @id @default(uuid()) @db.Uuid
+  employeeCode   String         @unique @map("employee_code")
+  identification String         @unique
+  firstName      String         @map("first_name")
+  lastName       String         @map("last_name")
+  email          String?        @unique
+  phone          String?
+  departmentId   String?        @map("department_id") @db.Uuid
+  positionId     String?        @map("position_id") @db.Uuid
+  supervisorId   String?        @map("supervisor_id") @db.Uuid
+  hireDate       DateTime       @map("hire_date") @db.Date
+  status         EmployeeStatus @default(ACTIVE)
+  /// Id enrolled on the biometric terminals (shared across devices). Maps AttendanceEvent.deviceUserId.
+  biometricId    String?        @unique @map("biometric_id")
+  terminatedAt   DateTime?      @map("terminated_at") @db.Date
+  /// Soft delete: attendance, audit and payroll history must keep pointing to the employee.
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  department          Department?        @relation(fields: [departmentId], references: [id])
+  position            Position?          @relation(fields: [positionId], references: [id])
+  supervisor          Employee?          @relation("Supervision", fields: [supervisorId], references: [id])
+  subordinates        Employee[]         @relation("Supervision")
+  user                User?
+  scheduleAssignments EmployeeSchedule[]
+  attendanceEvents    AttendanceEvent[]
+  attendanceRecords   AttendanceRecord[]
+  overtimeRecords     OvertimeRecord[]
+  leaveRequests       LeaveRequest[]
+
+  @@index([departmentId])
+  @@index([supervisorId])
+  @@index([status])
+  @@map("employees")
+}
+
+// ─────────────────────────────────────────────────────────────── schedules
+
+/// Reusable shift template. Times are local "HH:mm"; end <= start means the shift crosses midnight.
+/// Tolerances override the global attendance policy when set.
+model WorkShift {
+  id                         String    @id @default(uuid()) @db.Uuid
+  name                       String    @unique
+  startTime                  String    @map("start_time") @db.VarChar(5)
+  endTime                    String    @map("end_time") @db.VarChar(5)
+  breakStart                 String?   @map("break_start") @db.VarChar(5)
+  breakEnd                   String?   @map("break_end") @db.VarChar(5)
+  lateToleranceMinutes       Int?      @map("late_tolerance_minutes")
+  earlyLeaveToleranceMinutes Int?      @map("early_leave_tolerance_minutes")
+  overtimeThresholdMinutes   Int?      @map("overtime_threshold_minutes")
+  deletedAt                  DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  scheduleDays WorkScheduleDay[]
+
+  @@map("work_shifts")
+}
+
+/// Weekly pattern. Weekdays without a WorkScheduleDay row are rest days.
+model WorkSchedule {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  description String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  days        WorkScheduleDay[]
+  assignments EmployeeSchedule[]
+
+  @@map("work_schedules")
+}
+
+model WorkScheduleDay {
+  id         String @id @default(uuid()) @db.Uuid
+  scheduleId String @map("schedule_id") @db.Uuid
+  /// ISO weekday: 1 = Monday … 7 = Sunday.
+  weekday    Int
+  shiftId    String @map("shift_id") @db.Uuid
+
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  shift    WorkShift    @relation(fields: [shiftId], references: [id])
+
+  @@unique([scheduleId, weekday])
+  @@map("work_schedule_days")
+}
+
+/// Assignment history: a schedule change never rewrites how past days were evaluated.
+model EmployeeSchedule {
+  id            String    @id @default(uuid()) @db.Uuid
+  employeeId    String    @map("employee_id") @db.Uuid
+  scheduleId    String    @map("schedule_id") @db.Uuid
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  employee Employee     @relation(fields: [employeeId], references: [id])
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id])
+
+  @@index([employeeId, effectiveFrom])
+  @@map("employee_schedules")
+}
+
+model Holiday {
+  id        String   @id @default(uuid()) @db.Uuid
+  date      DateTime @unique @db.Date
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("holidays")
+}
+
+// ─────────────────────────────────────────────────────────────── devices
+
+model Device {
+  id                   String       @id @default(uuid()) @db.Uuid
+  name                 String
+  driver               DeviceDriver
+  manufacturer         String
+  model                String
+  serialNumber         String?      @map("serial_number")
+  host                 String
+  port                 Int
+  location             String?
+  status               DeviceStatus @default(OFFLINE)
+  /// Non-secret driver options (timeoutMs, realtime, ...).
+  config               Json         @default("{}")
+  /// AES-256-GCM encrypted JSON. Never returned by the API.
+  credentialsEncrypted String?      @map("credentials_encrypted")
+  lastSyncAt           DateTime?    @map("last_sync_at") @db.Timestamptz(3)
+  /// Opaque adapter cursor (record index, sequence…) where the next sync resumes.
+  lastSyncCursor       String?      @map("last_sync_cursor")
+  lastSeenAt           DateTime?    @map("last_seen_at") @db.Timestamptz(3)
+  lastError            String?      @map("last_error")
+  /// Row-level lock preventing concurrent syncs of the same device across API instances.
+  syncLockedAt         DateTime?    @map("sync_locked_at") @db.Timestamptz(3)
+  deletedAt            DateTime?    @map("deleted_at") @db.Timestamptz(3)
+  registeredAt         DateTime     @default(now()) @map("registered_at") @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  syncLogs DeviceSyncLog[]
+  events   AttendanceEvent[]
+
+  @@index([host, port])
+  @@map("devices")
+}
+
+model DeviceSyncLog {
+  id                String      @id @default(uuid()) @db.Uuid
+  deviceId          String      @map("device_id") @db.Uuid
+  trigger           SyncTrigger
+  status            SyncStatus  @default(RUNNING)
+  startedAt         DateTime    @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt        DateTime?   @map("finished_at") @db.Timestamptz(3)
+  recordsReceived   Int         @default(0) @map("records_received")
+  recordsProcessed  Int         @default(0) @map("records_processed")
+  recordsDuplicated Int         @default(0) @map("records_duplicated")
+  recordsRejected   Int         @default(0) @map("records_rejected")
+  /// Stored but not linked to any employee (unknown biometric id).
+  recordsUnmatched  Int         @default(0) @map("records_unmatched")
+  errorMessage      String?     @map("error_message")
+  metadata          Json?
+
+  device Device            @relation(fields: [deviceId], references: [id])
+  events AttendanceEvent[]
+
+  @@index([deviceId, startedAt(sort: Desc)])
+  @@map("device_sync_logs")
+}
+
+// ─────────────────────────────────────────────────────────────── attendance
+
+/// Immutable raw punch. Corrections are new MANUAL events or voids, never edits.
+model AttendanceEvent {
+  id           String      @id @default(uuid()) @db.Uuid
+  employeeId   String?     @map("employee_id") @db.Uuid
+  deviceId     String?     @map("device_id") @db.Uuid
+  syncLogId    String?     @map("sync_log_id") @db.Uuid
+  deviceUserId String      @map("device_user_id")
+  occurredAt   DateTime    @map("occurred_at") @db.Timestamptz(3)
+  punchType    PunchType   @map("punch_type")
+  verifyMode   VerifyMode? @map("verify_mode")
+  source       EventSource
+  /// sha256(source|device|user|timestamp): makes re-syncing the same log idempotent.
+  dedupKey     String      @unique @map("dedup_key")
+  rawPayload   Json?       @map("raw_payload")
+  note         String?
+  createdById  String?     @map("created_by_id") @db.Uuid
+  voidedAt     DateTime?   @map("voided_at") @db.Timestamptz(3)
+  voidReason   String?     @map("void_reason")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  employee Employee?      @relation(fields: [employeeId], references: [id])
+  device   Device?        @relation(fields: [deviceId], references: [id])
+  syncLog  DeviceSyncLog? @relation(fields: [syncLogId], references: [id])
+
+  @@index([employeeId, occurredAt])
+  @@index([occurredAt])
+  @@index([deviceUserId])
+  @@map("attendance_events")
+}
+
+/// Derived daily summary, recomputed from events whenever they change. Safe to rebuild.
+model AttendanceRecord {
+  id                String              @id @default(uuid()) @db.Uuid
+  employeeId        String              @map("employee_id") @db.Uuid
+  workDate          DateTime            @map("work_date") @db.Date
+  dayType           DayType             @map("day_type")
+  status            AttendanceStatus
+  shiftId           String?             @map("shift_id") @db.Uuid
+  scheduledStart    DateTime?           @map("scheduled_start") @db.Timestamptz(3)
+  scheduledEnd      DateTime?           @map("scheduled_end") @db.Timestamptz(3)
+  firstIn           DateTime?           @map("first_in") @db.Timestamptz(3)
+  lastOut           DateTime?           @map("last_out") @db.Timestamptz(3)
+  workedMinutes     Int                 @default(0) @map("worked_minutes")
+  breakMinutes      Int                 @default(0) @map("break_minutes")
+  lateMinutes       Int                 @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int                 @default(0) @map("early_leave_minutes")
+  overtimeMinutes   Int                 @default(0) @map("overtime_minutes")
+  anomalies         AttendanceAnomaly[]
+  /// Worked intervals [{in, out}] in chronological order.
+  segments          Json                @default("[]")
+  /// False while the work day window is open; the finalizer job recomputes these rows.
+  isFinal           Boolean             @default(false) @map("is_final")
+  calculatedAt      DateTime            @default(now()) @map("calculated_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, workDate])
+  @@index([workDate, status])
+  @@index([isFinal, workDate])
+  @@map("attendance_records")
+}
+
+/// Overtime needs explicit approval before it reaches payroll.
+model OvertimeRecord {
+  id           String        @id @default(uuid()) @db.Uuid
+  employeeId   String        @map("employee_id") @db.Uuid
+  workDate     DateTime      @map("work_date") @db.Date
+  minutes      Int
+  kind         OvertimeKind
+  status       RequestStatus @default(PENDING)
+  reviewedById String?       @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  reviewNote   String?       @map("review_note")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, workDate])
+  @@index([status])
+  @@map("overtime_records")
+}
+
+/// Permissions (hours or days) and vacations share one workflow; `type` tells them apart.
+model LeaveRequest {
+  id            String        @id @default(uuid()) @db.Uuid
+  employeeId    String        @map("employee_id") @db.Uuid
+  type          LeaveType
+  startsAt      DateTime      @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime      @map("ends_at") @db.Timestamptz(3)
+  reason        String
+  status        RequestStatus @default(PENDING)
+  requestedById String        @map("requested_by_id") @db.Uuid
+  reviewedById  String?       @map("reviewed_by_id") @db.Uuid
+  reviewedAt    DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  reviewNote    String?       @map("review_note")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, startsAt])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+// ─────────────────────────────────────────────────────────────── platform
+
+/// Append-only. The application never updates or deletes audit rows.
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("system_settings")
+}
