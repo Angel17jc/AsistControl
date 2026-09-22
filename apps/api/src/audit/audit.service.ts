@@ -92,24 +92,31 @@ export class AuditService {
   }
 }
 
+/** Keys that would reach Object.prototype if copied into a plain object (prototype pollution). */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Defense in depth: never persist secrets in audit metadata even if a caller passes them. */
 export function redact(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redact);
   if (value && typeof value === 'object' && !(value instanceof Date)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, SENSITIVE_KEYS.test(k) ? '[REDACTED]' : redact(v)]),
-    );
+    const out: Record<string, unknown> = Object.create(null);
+    for (const [k, v] of Object.entries(value)) {
+      if (UNSAFE_KEYS.has(k)) continue;
+      out[k] = SENSITIVE_KEYS.test(k) ? '[REDACTED]' : redact(v);
+    }
+    return out;
   }
   return value;
 }
 
-/** Shallow diff used for "update" audit entries. */
+/** Shallow diff used for "update" audit entries. Keys come from request DTOs. */
 export function diff(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
 ): Record<string, { from: unknown; to: unknown }> {
-  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  const changes: Record<string, { from: unknown; to: unknown }> = Object.create(null);
   for (const key of Object.keys(after)) {
+    if (UNSAFE_KEYS.has(key)) continue;
     const a = before[key];
     const b = after[key];
     if (JSON.stringify(a) !== JSON.stringify(b)) changes[key] = { from: a, to: b };

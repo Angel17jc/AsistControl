@@ -8,7 +8,9 @@ import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
-const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'AsistControl2026';
+const DEFAULT_DEMO_PASSWORD = 'AsistControl2026';
+/** A password supplied through the environment is used but never printed. */
+const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? DEFAULT_DEMO_PASSWORD;
 
 const departments = [
   { code: 'ADM', name: 'Administración' },
@@ -300,7 +302,10 @@ async function main() {
     }
   }
 
-  console.log(`Seed completed. Demo users (password: ${DEMO_PASSWORD}):`);
+  const passwordHint = process.env.SEED_PASSWORD
+    ? 'the one set in SEED_PASSWORD'
+    : DEFAULT_DEMO_PASSWORD;
+  console.log(`Seed completed. Demo users (password: ${passwordHint}):`);
   for (const u of users) console.log(`  ${u.role.padEnd(12)} ${u.email}`);
 }
 
