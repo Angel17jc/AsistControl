@@ -3,6 +3,7 @@ import {
   AdapterRegistry,
   MockDeviceAdapter,
   MockDeviceNetwork,
+  ZKTecoAdapter,
 } from '@asistcontrol/biometric-core';
 import { AppConfigService } from '../config/app-config.service';
 
@@ -27,7 +28,7 @@ export const adapterProviders: Provider[] = [
           return new MockDeviceAdapter(connection, network);
         });
       }
-      // registry.register('ZKTECO', (c) => new ZKTecoAdapter(c));      → roadmap
+      registry.register('ZKTECO', (connection) => new ZKTecoAdapter(connection));
       // registry.register('HIKVISION', (c) => new HikvisionAdapter(c)); → roadmap
       return registry;
     },

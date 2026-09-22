@@ -4,7 +4,7 @@
 
 AsistControl recibe las marcaciones de los dispositivos biométricos de la empresa, las valida y deduplica, calcula cada jornada (horas trabajadas, atrasos, salidas anticipadas, ausencias, horas extra) según reglas **configurables**, y entrega esa información en tiempo real a un dashboard y en reportes listos para nómina.
 
-El sistema **no depende de ningún fabricante**: cada marca se integra mediante un adaptador (`BiometricDeviceAdapter`). Incluye un **simulador de dispositivo** completo, por lo que todo el producto funciona y se prueba sin hardware.
+El sistema **no depende de ningún fabricante**: cada marca se integra mediante un adaptador (`BiometricDeviceAdapter`). Incluye un **simulador de dispositivo** completo y un driver **ZKTeco** (TCP 4370, experimental), por lo que todo el producto funciona y se prueba sin hardware.
 
 [![CI](https://github.com/Angel17jc/AsistControl/actions/workflows/ci.yml/badge.svg)](https://github.com/Angel17jc/AsistControl/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Angel17jc/AsistControl/actions/workflows/codeql.yml/badge.svg)](https://github.com/Angel17jc/AsistControl/actions/workflows/codeql.yml)
@@ -49,7 +49,7 @@ El sistema **no depende de ningún fabricante**: cada marca se integra mediante 
 ```mermaid
 flowchart LR
   subgraph LAN
-    D1[Marcador ZKTeco] -.futuro.-> A2
+    D1[Marcador ZKTeco] --> A2
     D2[Marcador simulado] --> A1
   end
   subgraph API[API NestJS]
@@ -235,7 +235,8 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 ## Roadmap
 
 - [x] Núcleo: adaptadores, simulador, sincronización idempotente, motor de asistencia, RBAC, auditoría, reportes, dashboard en tiempo real
-- [ ] Adaptador **ZKTeco** (protocolo TCP/UDP 4370) y **Hikvision** (ISAPI)
+- [x] Adaptador **ZKTeco** (TCP 4370) — experimental, pendiente de validar con hardware
+- [ ] Adaptador **Hikvision** (ISAPI)
 - [ ] Recepción _push_ HTTP (ADMS/iclock) para equipos en la nube
 - [ ] Saldos de vacaciones y políticas por tipo de contrato
 - [ ] Notificaciones (dispositivo desconectado, solicitudes pendientes) por correo/in-app

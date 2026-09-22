@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import type { Device } from '@prisma/client';
 import type {
   AdapterRegistry,
@@ -9,6 +15,7 @@ import type {
 } from '@asistcontrol/biometric-core';
 import { SecretBox } from '../common/crypto/secret-box';
 import { AppConfigService } from '../config/app-config.service';
+import { SettingsService } from '../settings/settings.service';
 import { ADAPTER_REGISTRY } from './adapters.provider';
 
 export type RealtimeLogHandler = (deviceId: string, log: AttendanceLog) => void;
@@ -16,6 +23,8 @@ export type RealtimeLogHandler = (deviceId: string, log: AttendanceLog) => void;
 interface DeviceConfig {
   timeoutMs?: number;
   realtime?: boolean;
+  /** IANA timezone the terminal is configured with (defaults to the company timezone). */
+  timezone?: string;
 }
 
 /**
@@ -24,7 +33,7 @@ interface DeviceConfig {
  * in a single place.
  */
 @Injectable()
-export class DeviceConnectionManager implements OnModuleDestroy {
+export class DeviceConnectionManager implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DeviceConnectionManager.name);
   private readonly adapters = new Map<
     string,
@@ -32,13 +41,24 @@ export class DeviceConnectionManager implements OnModuleDestroy {
   >();
   private readonly subscriptions = new Map<string, Unsubscribe>();
   private readonly secrets: SecretBox;
+  private timezone: string;
   private realtimeHandler: RealtimeLogHandler | null = null;
 
   constructor(
     @Inject(ADAPTER_REGISTRY) private readonly registry: AdapterRegistry,
     config: AppConfigService,
+    private readonly settings: SettingsService,
   ) {
     this.secrets = new SecretBox(config.get('DEVICE_SECRETS_KEY'));
+    this.timezone = config.get('APP_TIMEZONE');
+  }
+
+  /**
+   * Default timezone handed to adapters whose devices do not declare their own.
+   * Read once at startup: changing the company timezone is rare and restarting applies it.
+   */
+  async onModuleInit(): Promise<void> {
+    this.timezone = await this.settings.getTimezone();
   }
 
   supportedDrivers(): string[] {
@@ -118,7 +138,8 @@ export class DeviceConnectionManager implements OnModuleDestroy {
       credentials: device.credentialsEncrypted
         ? this.secrets.decryptJson(device.credentialsEncrypted)
         : undefined,
-      options: { ...config },
+      // Terminals report local wall-clock time: the adapter needs the zone to build instants.
+      options: { ...config, timezone: config.timezone ?? this.timezone },
     };
   }
 }
