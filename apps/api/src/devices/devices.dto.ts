@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { isValidTimeZone } from '@asistcontrol/biometric-core';
 import { DEVICE_DRIVERS, type DeviceDriver } from '@asistcontrol/shared';
 import { Type } from 'class-transformer';
 import {
@@ -43,6 +44,22 @@ export class DeviceConfigDto {
   @IsOptional()
   @IsBoolean()
   realtime?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'America/Guayaquil',
+    description:
+      'IANA timezone the terminal is configured with. Devices report local wall-clock time; ' +
+      'defaults to the company timezone. Set it for a site in another zone.',
+  })
+  @IsOptional()
+  @ValidateBy({
+    name: 'isTimeZone',
+    validator: {
+      validate: (v: unknown) => typeof v === 'string' && isValidTimeZone(v),
+      defaultMessage: () => 'timezone must be a valid IANA timezone',
+    },
+  })
+  timezone?: string;
 }
 
 export class CreateDeviceDto {
