@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/dist-seed
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+docs
+**/playwright-report
+**/test-results
