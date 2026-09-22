@@ -17,6 +17,10 @@ updates:
         patterns: ['jest', 'ts-jest', '@types/jest', 'vitest', '@testing-library/*', 'supertest']
       lint:
         patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'eslint-*', 'prettier']
+    ignore:
+      # Types must match the Node.js runtime (22 LTS); bump together with the Node version.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'build(deps)'
 
@@ -26,3 +30,10 @@ updates:
       interval: monthly
     commit-message:
       prefix: 'ci(deps)'
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'build(deps)'
