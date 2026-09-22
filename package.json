@@ -23,7 +23,8 @@
     "dev:api": "npm run start:dev -w @asistcontrol/api",
     "test:e2e": "npm run test:e2e -w @asistcontrol/api",
     "db:migrate": "npm run prisma:migrate -w @asistcontrol/api",
-    "db:seed": "npm run prisma:seed -w @asistcontrol/api"
+    "db:seed": "npm run prisma:seed -w @asistcontrol/api",
+    "dev:web": "npm run dev -w @asistcontrol/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
