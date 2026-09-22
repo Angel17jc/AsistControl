@@ -1,0 +1,31 @@
+name: Integración de dispositivo
+description: Soporte para una nueva marca/modelo de marcador biométrico
+labels: [device-integration, enhancement]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Fabricante y modelo
+      placeholder: ZKTeco K40 / Hikvision DS-K1T804
+    validations:
+      required: true
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: Protocolo disponible
+      options: [SDK propietario, TCP/UDP binario, HTTP/ISAPI, Push HTTP (ADMS/iclock), Desconocido]
+    validations:
+      required: true
+  - type: checkboxes
+    id: capabilities
+    attributes:
+      label: Capacidades conocidas
+      options:
+        - label: Lectura de marcaciones por rango/índice
+        - label: Notificación en tiempo real (push)
+        - label: Lectura de usuarios enrolados
+        - label: Requiere clave de comunicación / credenciales
+  - type: textarea
+    id: docs
+    attributes:
+      label: Documentación o referencias del protocolo

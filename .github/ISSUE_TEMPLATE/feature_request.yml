@@ -1,0 +1,26 @@
+name: Propuesta de funcionalidad
+description: Una necesidad de negocio que el sistema aún no cubre
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema de negocio
+      description: ¿Quién lo necesita y qué no puede hacer hoy? (p. ej. "RRHH necesita exportar a su sistema de nómina…")
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+  - type: textarea
+    id: rules
+    attributes:
+      label: Reglas laborales involucradas
+      description: Si aplica, indica qué debe ser configurable y si depende de la legislación de un país.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      placeholder: |
+        - Dado… cuando… entonces…

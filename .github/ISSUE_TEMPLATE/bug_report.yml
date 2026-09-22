@@ -1,0 +1,44 @@
+name: Reporte de bug
+description: Algo no funciona como debería
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar. **No incluyas contraseñas, tokens, credenciales de dispositivos ni datos personales reales.**
+        Para vulnerabilidades de seguridad usa el proceso de `docs/security.md`, no un issue público.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Cálculo de asistencia / horas extra
+        - Sincronización con dispositivos
+        - Autenticación / permisos
+        - Reportes
+        - Dashboard / frontend
+        - Infraestructura / Docker
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      placeholder: |
+        1. Generar jornada con el simulador, escenario MISSING_EXIT
+        2. Sincronizar
+        3. Abrir Asistencia…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado vs. obtenido
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto
+      description: Versión/commit, navegador, driver del dispositivo, `requestId` del error si lo hay.

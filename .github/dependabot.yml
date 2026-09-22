@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Upgrade framework families together; they are released in lockstep.
+      nestjs:
+        patterns: ['@nestjs/*']
+      prisma:
+        patterns: ['prisma', '@prisma/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      testing:
+        patterns: ['jest', 'ts-jest', '@types/jest', 'vitest', '@testing-library/*', 'supertest']
+      lint:
+        patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'eslint-*', 'prettier']
+    commit-message:
+      prefix: 'build(deps)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'ci(deps)'

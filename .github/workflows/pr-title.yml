@@ -1,0 +1,42 @@
+name: PR title
+
+# PRs are squash-merged, so the PR title becomes the commit on main.
+# Enforcing Conventional Commits here keeps the history (and changelog) readable.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+          scopes: |
+            api
+            web
+            shared
+            biometric-core
+            attendance
+            devices
+            sync
+            auth
+            infra
+            deps
+            docs
+          requireScope: false

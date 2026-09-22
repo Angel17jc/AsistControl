@@ -1,0 +1,8 @@
+# Every change requires review from a code owner (enforced by branch protection on main).
+*                                   @Angel17jc
+
+# Areas where a mistake has payroll, security or data-integrity impact.
+/apps/api/src/attendance/domain/    @Angel17jc
+/apps/api/src/auth/                 @Angel17jc
+/apps/api/prisma/                   @Angel17jc
+/packages/biometric-core/           @Angel17jc
