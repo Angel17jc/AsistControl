@@ -13,7 +13,7 @@ RUN npm run build -w @asistcontrol/shared && npm run build -w @asistcontrol/web
 
 # Static files served by nginx, which also reverse-proxies the API and WebSocket so the
 # browser talks to a single origin (no CORS, SameSite=strict cookies keep working).
-FROM nginx:1.29-alpine AS runtime
+FROM nginx:1.31-alpine AS runtime
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 EXPOSE 80
