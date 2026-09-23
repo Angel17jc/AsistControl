@@ -14,6 +14,7 @@ import {
 import { NavLink, Outlet } from 'react-router';
 import { logout } from '../lib/api';
 import { type ConnectionState, useRealtime } from '../lib/realtime';
+import { NotificationBell } from './NotificationBell';
 import { useAuth } from '../stores/auth';
 
 const NAV: { to: string; label: string; icon: typeof Users; permission: Permission }[] = [
@@ -45,11 +46,8 @@ export function AppShell() {
         <div className="flex items-center gap-2 px-5 py-5 text-white">
           <Fingerprint className="size-6 text-[#86b6ef]" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">AsistControl</span>
-          <button
-            onClick={() => void logout()}
-            className="ml-auto lg:hidden"
-            aria-label="Cerrar sesión"
-          >
+          <NotificationBell className="ml-auto" />
+          <button onClick={() => void logout()} className="lg:hidden" aria-label="Cerrar sesión">
             <LogOut className="size-4" aria-hidden />
           </button>
         </div>

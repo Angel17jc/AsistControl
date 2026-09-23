@@ -18,16 +18,10 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
-import { formatDate, formatDateTime, formatMinutes } from '../lib/format';
+import { LEAVE_LABEL, formatDate, formatDateTime, formatMinutes } from '../lib/format';
 import type { LeaveRow, OvertimeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
-const LEAVE_LABEL: Record<LeaveType, string> = {
-  PERSONAL: 'Permiso personal',
-  MEDICAL: 'Médico',
-  VACATION: 'Vacaciones',
-  OTHER: 'Otro',
-};
 const OVERTIME_LABEL = { REGULAR: 'Ordinaria', REST_DAY: 'Día libre', HOLIDAY: 'Feriado' } as const;
 
 export function RequestsPage() {
