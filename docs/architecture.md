@@ -138,6 +138,7 @@ Socket.IO en el namespace `/realtime`, autenticado con el mismo access token. Ca
 - Access token solo en memoria; al recargar se restaura con la cookie httpOnly. Los `401` concurrentes comparten **un único refresh** (el servidor rota el token y trataría un segundo uso como robo).
 - Tokens de diseño en CSS (`--surface-*`, `--ink-*`, estados), modo claro y oscuro propios.
 - Gráficos: una sola serie (marcaciones por hora) con un solo color; los estados (presente/atraso/ausencia) usan la paleta de estados reservada y siempre van con icono + etiqueta; cada gráfico ofrece vista de tabla.
+- Los recorridos completos (sesión y cookie de refresco, rutas por rol, ciclo de un marcador, tiempo real, descarga de CSV, uso en teléfono) se verifican en un navegador real con Playwright sobre el bundle de producción: [`apps/e2e/`](../apps/e2e/README.md).
 
 ## Observabilidad
 

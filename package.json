@@ -22,6 +22,7 @@
     "test": "npm run test --workspaces --if-present",
     "dev:api": "npm run start:dev -w @asistcontrol/api",
     "test:e2e": "npm run test:e2e -w @asistcontrol/api",
+    "test:ui": "npm run build:packages && npm run build -w @asistcontrol/api && npm run build -w @asistcontrol/web && npm run test:ui -w @asistcontrol/e2e",
     "db:migrate": "npm run prisma:migrate -w @asistcontrol/api",
     "db:seed": "npm run prisma:seed -w @asistcontrol/api",
     "dev:web": "npm run dev -w @asistcontrol/web"

@@ -178,6 +178,7 @@ npm run dev:web                              # http://localhost:5173  (proxy a l
 | `npm run typecheck`                     | TypeScript estricto en todos los workspaces |
 | `npm test`                              | Tests unitarios de todo el monorepo         |
 | `npm run test:e2e`                      | Tests e2e de la API contra PostgreSQL       |
+| `npm run test:ui`                       | Tests de navegador (Playwright)             |
 | `npm run build`                         | Build de producción de todo                 |
 
 ## Testing
@@ -190,12 +191,21 @@ npm run dev:web                              # http://localhost:5173  (proxy a l
 | Simulador / adaptador | Vitest                        | Conexión, timeouts, pérdida de conexión, errores de protocolo, cursor incremental, memoria borrada, reloj retrasado, push en tiempo real                                                                                                                                                                       |
 | API e2e               | Jest + Supertest + PostgreSQL | Login, rotación y robo de refresh token, 401/403, alcance por rol, sincronización completa con fallos inyectados, sync concurrente, empleados no enrolados, correcciones, permisos, horas extra, reportes CSV                                                                                                  |
 | Web                   | Vitest + Testing Library      | Cliente API (refresh único ante 401 concurrentes), login, componentes del dashboard                                                                                                                                                                                                                            |
+| Navegador (UI e2e)    | Playwright + Chromium         | Sesión con cookie de refresco y recarga, menú y rutas por rol, alta de marcador, prueba de conexión, generación y descarga de jornada, idempotencia, equipo desconectado, marcaciones en vivo por WebSocket, descarga de CSV, uso en teléfono                                                                  |
 
 ```bash
 npm test
 docker compose up -d postgres && docker compose exec postgres createdb -U asistcontrol asistcontrol_test
 TEST_DATABASE_URL=postgresql://asistcontrol:asistcontrol@localhost:5432/asistcontrol_test npm run test:e2e
+
+# Navegador: compila, levanta API + bundle web y ejecuta Chromium contra una base propia
+npx playwright install chromium
+npm run test:ui
 ```
+
+Los tests de navegador usan su propia base de datos (`asistcontrol_ui_test`), la migran y la
+siembran antes de arrancar la API; nunca tocan la de desarrollo. Detalles en
+[`apps/e2e/README.md`](apps/e2e/README.md).
 
 ## API
 
