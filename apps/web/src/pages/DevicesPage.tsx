@@ -1,7 +1,8 @@
 import type { PaginatedResponse } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlaskConical, Plug, Plus, RefreshCw, Unplug, Zap } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { useState } from 'react';
+import { DeviceForm } from '../components/devices/DeviceForm';
 import { DEVICE_STATUS, SYNC_STATUS } from '../components/status';
 import {
   Button,
@@ -19,6 +20,7 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
+import { explainDeviceError } from '../lib/device-drivers';
 import { formatDateTime, relativeTime, todayIso } from '../lib/format';
 import type { DeviceRow, SimulatorState, SyncLogRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
@@ -155,7 +157,7 @@ function DeviceCard({ device }: { device: DeviceRow }) {
       setMessage(
         r.reachable
           ? `Conectado en ${r.latencyMs} ms · desfase de reloj ${r.info?.clockDriftSeconds ?? 0} s`
-          : `Sin respuesta: ${r.error}`,
+          : `No se pudo conectar. ${explainDeviceError(r.error)}`,
       );
       await refresh();
     },
@@ -165,7 +167,7 @@ function DeviceCard({ device }: { device: DeviceRow }) {
     onSuccess: async (l) => {
       setMessage(
         l.status === 'FAILED'
-          ? `Sincronización fallida: ${l.errorMessage}`
+          ? `Sincronización fallida. ${explainDeviceError(l.errorMessage)}`
           : `${l.recordsProcessed} nuevas · ${l.recordsDuplicated} duplicadas · ${l.recordsRejected} rechazadas`,
       );
       await refresh();
@@ -196,7 +198,7 @@ function DeviceCard({ device }: { device: DeviceRow }) {
         </dl>
         {device.lastError && (
           <p className="rounded-lg bg-critical/10 px-3 py-2 text-xs text-ink-1">
-            {device.lastError}
+            {explainDeviceError(device.lastError)}
           </p>
         )}
         {canSync && (
@@ -341,99 +343,5 @@ function SimulatorPanel({
         </p>
       )}
     </div>
-  );
-}
-
-function DeviceForm({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient();
-  const drivers = useQuery({
-    queryKey: ['devices', 'drivers'],
-    queryFn: () => api<string[]>('/devices/drivers'),
-  });
-  const [form, setForm] = useState({
-    name: '',
-    driver: 'MOCK',
-    manufacturer: 'AsistControl',
-    model: 'AC-SIM-100',
-    host: '192.168.1.210',
-    port: '4370',
-    location: '',
-  });
-  const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-  const create = useMutation({
-    mutationFn: () =>
-      api('/devices', {
-        method: 'POST',
-        body: {
-          ...form,
-          port: Number(form.port),
-          location: form.location || undefined,
-          config: { realtime: true },
-        },
-      }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['devices'] });
-      onDone();
-    },
-  });
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    create.mutate();
-  }
-
-  return (
-    <Card className="mb-6">
-      <form onSubmit={submit} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Nombre">
-          <Input required value={form.name} onChange={set('name')} placeholder="Entrada planta 2" />
-        </Field>
-        <Field label="Driver">
-          <Select value={form.driver} onChange={set('driver')}>
-            {drivers.data?.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Fabricante">
-          <Input required value={form.manufacturer} onChange={set('manufacturer')} />
-        </Field>
-        <Field label="Modelo">
-          <Input required value={form.model} onChange={set('model')} />
-        </Field>
-        <Field label="IP / host">
-          <Input required value={form.host} onChange={set('host')} />
-        </Field>
-        <Field label="Puerto">
-          <Input
-            required
-            type="number"
-            min={1}
-            max={65535}
-            value={form.port}
-            onChange={set('port')}
-          />
-        </Field>
-        <Field label="Ubicación">
-          <Input value={form.location} onChange={set('location')} />
-        </Field>
-        <div className="flex items-end gap-2">
-          <Button type="submit" variant="primary" loading={create.isPending}>
-            Registrar
-          </Button>
-          <Button type="button" variant="ghost" onClick={onDone}>
-            Cancelar
-          </Button>
-        </div>
-        {create.error && (
-          <p role="alert" className="text-sm text-critical sm:col-span-2 lg:col-span-4">
-            {create.error.message}
-          </p>
-        )}
-      </form>
-    </Card>
   );
 }
