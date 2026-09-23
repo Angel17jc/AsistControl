@@ -65,6 +65,14 @@ export type LeaveType = (typeof LEAVE_TYPES)[number];
 export const REQUEST_STATUSES = values('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED');
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
+/** How vacation days are earned: credited on each anniversary, or a twelfth per month. */
+export const VACATION_ACCRUALS = values('ANNUAL', 'MONTHLY');
+export type VacationAccrual = (typeof VACATION_ACCRUALS)[number];
+
+/** Which days a vacation takes from the balance. */
+export const VACATION_DAY_COUNTINGS = values('CALENDAR_DAYS', 'WORKING_DAYS');
+export type VacationDayCounting = (typeof VACATION_DAY_COUNTINGS)[number];
+
 /** What a notification is about. The text is rendered by the client from `type` + data. */
 export const NOTIFICATION_TYPES = values(
   'DEVICE_DOWN',
