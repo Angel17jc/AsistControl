@@ -219,7 +219,8 @@ function DeviceCard({ device }: { device: DeviceRow }) {
             </div>
             <div>
               <dt className="text-xs text-ink-3">Driver / serie</dt>
-              <dd className="text-ink-1">
+              {/* Hikvision serials run to ~36 characters with no spaces: let them wrap. */}
+              <dd className="break-all text-ink-1">
                 {device.driver} · {device.serialNumber ?? '—'}
               </dd>
             </div>
