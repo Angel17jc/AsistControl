@@ -76,6 +76,27 @@ describe('digest authentication', () => {
     });
   });
 
+  it('parses hostile headers in linear time', () => {
+    // The header comes from a device on the network: no input may make parsing blow up.
+    const hostile = [
+      'A'.repeat(100_000),
+      `Digest ${' '.repeat(100_000)}x`,
+      `Digest realm="${'\\'.repeat(50_000)}`,
+      'a='.repeat(50_000),
+    ];
+    const started = performance.now();
+    for (const header of hostile) parseAuthChallenge(header);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it('ignores parameters it does not know, including prototype keys', () => {
+    const parsed = parseDigestAuthorization(
+      'Digest username="u", __proto__="x", constructor="y", injected="z", nonce="n"',
+    );
+    expect(parsed).toEqual({ username: 'u', nonce: 'n' });
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+  });
+
   it('builds a header the server can parse back, escaping quotes', () => {
     const challenge = parseAuthChallenge(
       'Digest realm="r", nonce="n", qop="auth", opaque="o"',

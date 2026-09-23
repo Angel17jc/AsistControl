@@ -38,16 +38,13 @@ const SUPPORTED_ALGORITHMS: readonly DigestAlgorithm[] = [
 
 /**
  * Parses a `WWW-Authenticate` value. A server may offer several challenges, and `fetch`
- * joins repeated headers with commas, so the value is split on scheme names first.
- * Returns the strongest supported challenge: Digest SHA-256, then Digest MD5, then Basic.
+ * joins repeated headers with commas. Returns the strongest supported challenge: Digest
+ * SHA-256, then Digest MD5, then Basic.
  */
 export function parseAuthChallenge(header: string | null): AuthChallenge | null {
   if (!header) return null;
-  const challenges = header
-    .split(/,?\s*(?=\b(?:Digest|Basic)\s)/i)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map(parseOne)
+  const challenges = tokenizeAuthHeader(header)
+    .map(toChallenge)
     .filter((c): c is AuthChallenge => c !== null);
 
   const rank = (c: AuthChallenge) =>
@@ -55,36 +52,103 @@ export function parseAuthChallenge(header: string | null): AuthChallenge | null 
   return challenges.sort((a, b) => rank(b) - rank(a))[0] ?? null;
 }
 
-function parseOne(challenge: string): AuthChallenge | null {
-  const [scheme = ''] = challenge.split(/\s/, 1);
-  const params = parseParams(challenge.slice(scheme.length));
-  if (/^basic$/i.test(scheme)) return { scheme: 'Basic', realm: params.realm ?? '' };
-  if (!/^digest$/i.test(scheme) || !params.nonce) return null;
+function toChallenge({ scheme, params }: AuthHeaderPart): AuthChallenge | null {
+  if (/^basic$/i.test(scheme)) return { scheme: 'Basic', realm: params.get('realm') ?? '' };
+  const nonce = params.get('nonce');
+  if (!/^digest$/i.test(scheme) || !nonce) return null;
 
-  const algorithm = (params.algorithm ?? 'MD5').toUpperCase();
+  const algorithm = (params.get('algorithm') ?? 'MD5').toUpperCase();
   const normalized = SUPPORTED_ALGORITHMS.find((a) => a.toUpperCase() === algorithm);
   if (!normalized) return null;
 
-  const qops = (params.qop ?? '').split(',').map((q) => q.trim().toLowerCase());
+  const qops = (params.get('qop') ?? '').split(',').map((q) => q.trim().toLowerCase());
   return {
     scheme: 'Digest',
-    realm: params.realm ?? '',
-    nonce: params.nonce,
+    realm: params.get('realm') ?? '',
+    nonce,
     qop: qops.includes('auth') ? 'auth' : undefined,
-    opaque: params.opaque,
+    opaque: params.get('opaque'),
     algorithm: normalized,
-    stale: (params.stale ?? '').toLowerCase() === 'true',
+    stale: (params.get('stale') ?? '').toLowerCase() === 'true',
   };
 }
 
-function parseParams(input: string): Record<string, string> {
-  const params: Record<string, string> = {};
-  const pattern = /([a-zA-Z][\w-]*)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^\s,]+))/g;
-  for (const match of input.matchAll(pattern)) {
-    const key = match[1]!.toLowerCase();
-    params[key] = match[2] !== undefined ? match[2].replace(/\\(.)/g, '$1') : match[3]!;
+/** Parameters of RFC 7616 challenges and responses; anything else is ignored. */
+const KNOWN_PARAMS = new Set([
+  'realm',
+  'nonce',
+  'qop',
+  'opaque',
+  'algorithm',
+  'stale',
+  'domain',
+  'charset',
+  'userhash',
+  'username',
+  'uri',
+  'response',
+  'nc',
+  'cnonce',
+]);
+
+interface AuthHeaderPart {
+  scheme: string;
+  params: Map<string, string>;
+}
+
+const TOKEN_CHAR = /[A-Za-z0-9!#$%&'*+.^_`|~-]/;
+
+/**
+ * Splits an authentication header into schemes and their parameters in a single pass.
+ * The header comes from a device on the network, so parsing must stay linear in its length
+ * (no backtracking regular expressions) and only keep the parameters it knows.
+ */
+function tokenizeAuthHeader(input: string): AuthHeaderPart[] {
+  const parts: AuthHeaderPart[] = [];
+  let current: AuthHeaderPart | null = null;
+  let i = 0;
+  const skip = (chars: string) => {
+    while (i < input.length && chars.includes(input[i]!)) i++;
+  };
+  const token = () => {
+    const begin = i;
+    while (i < input.length && TOKEN_CHAR.test(input[i]!)) i++;
+    return input.slice(begin, i);
+  };
+
+  while (i < input.length) {
+    skip(' \t,');
+    const name = token();
+    if (!name) {
+      i++; // an unexpected character: step over it so the loop always advances
+      continue;
+    }
+    skip(' \t');
+    if (input[i] !== '=') {
+      current = { scheme: name, params: new Map() };
+      parts.push(current);
+      continue;
+    }
+    i++;
+    skip(' \t');
+    let value = '';
+    if (input[i] === '"') {
+      i++;
+      while (i < input.length && input[i] !== '"') {
+        if (input[i] === '\\' && i + 1 < input.length) i++;
+        value += input[i];
+        i++;
+      }
+      i++;
+    } else {
+      const begin = i;
+      while (i < input.length && input[i] !== ',' && input[i] !== ' ' && input[i] !== '\t') i++;
+      value = input.slice(begin, i);
+    }
+    const key = name.toLowerCase();
+    if (current && KNOWN_PARAMS.has(key)) current.params.set(key, value);
   }
-  return params;
+  return parts;
 }
 
 export interface DigestRequest {
@@ -140,8 +204,9 @@ export function digestAuthorization(challenge: DigestChallenge, request: DigestR
 
 /** Parses the `Authorization` header a client sent (used by the fake device to verify it). */
 export function parseDigestAuthorization(header: string | undefined): Record<string, string> {
-  if (!header || !/^digest\s/i.test(header)) return {};
-  return parseParams(header.slice('Digest'.length));
+  const [part] = header ? tokenizeAuthHeader(header) : [];
+  if (!part || !/^digest$/i.test(part.scheme)) return {};
+  return Object.fromEntries(part.params);
 }
 
 function formatNonceCount(count: number): string {
