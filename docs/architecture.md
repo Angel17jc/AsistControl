@@ -59,7 +59,7 @@ sequenceDiagram
   participant S as Scheduler / Usuario / Push
   participant Sync as DeviceSyncService
   participant CM as DeviceConnectionManager
-  participant A as Adapter (Mock/ZKTeco…)
+  participant A as Adapter (Mock/ZKTeco/Hikvision)
   participant P as Pipeline (puro)
   participant DB as PostgreSQL
   participant AP as AttendanceProcessing

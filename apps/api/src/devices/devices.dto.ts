@@ -3,6 +3,9 @@ import { isValidTimeZone } from '@asistcontrol/biometric-core';
 import { DEVICE_DRIVERS, type DeviceDriver } from '@asistcontrol/shared';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -60,6 +63,53 @@ export class DeviceConfigDto {
     },
   })
   timezone?: string;
+
+  @ApiPropertyOptional({
+    enum: ['http', 'https'],
+    default: 'http',
+    description:
+      'HIKVISION: transport for ISAPI. HTTPS needs a certificate the API trusts ' +
+      '(NODE_EXTRA_CA_CERTS); verification is never switched off.',
+  })
+  @IsOptional()
+  @IsIn(['http', 'https'])
+  protocol?: 'http' | 'https';
+
+  @ApiPropertyOptional({
+    type: [Number],
+    example: [75, 38, 1],
+    description:
+      'HIKVISION: event minor codes treated as punches. Default: face (75), fingerprint (38) ' +
+      'and card (1) authentication passed.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(65_535, { each: true })
+  eventMinors?: number[];
+
+  @ApiPropertyOptional({
+    default: 31,
+    description: 'HIKVISION: days read on the first sync, or when the cursor cannot be trusted.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(366)
+  initialLookbackDays?: number;
+
+  @ApiPropertyOptional({
+    default: 60,
+    description: 'HIKVISION: minutes re-read before the newest event already downloaded.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_440)
+  overlapMinutes?: number;
 }
 
 export class CreateDeviceDto {
@@ -106,8 +156,10 @@ export class CreateDeviceDto {
   config?: DeviceConfigDto;
 
   @ApiPropertyOptional({
-    description: 'Driver credentials (e.g. comm key). Stored encrypted, never returned.',
-    example: { commKey: '0' },
+    description:
+      'Driver credentials, stored encrypted and never returned. ' +
+      'ZKTECO: { commKey }. HIKVISION: { username, password } of an ISAPI user.',
+    example: { username: 'admin', password: '********' },
   })
   @IsOptional()
   @IsObject()

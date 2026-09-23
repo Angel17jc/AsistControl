@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localTimeToInstant, timezoneOffsetMinutes } from './device-time';
+import { localTimeToInstant, timezoneOffsetMinutes } from '../device-time';
 import {
   ZK_COMMAND,
   buildPacket,
