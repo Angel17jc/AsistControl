@@ -16,6 +16,7 @@ import { addDays, localDateOf, todayIn } from '../common/utils/date-only';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { VacationsService } from '../vacations/vacations.service';
 import type { CreateLeaveRequestDto, LeaveQueryDto } from './leave-requests.dto';
 
 const MAX_LEAVE_DAYS = 90;
@@ -34,6 +35,7 @@ export class LeaveRequestsService {
     private readonly settings: SettingsService,
     private readonly processing: AttendanceProcessingService,
     private readonly notifications: NotificationsService,
+    private readonly vacations: VacationsService,
   ) {}
 
   async list(query: LeaveQueryDto, user: AuthenticatedUser) {
@@ -80,6 +82,9 @@ export class LeaveRequestsService {
     });
     if (overlapping > 0)
       throw new ConflictException('The employee already has a request overlapping these dates');
+    if (dto.type === 'VACATION') {
+      await this.vacations.assertAffordable({ employeeId, startsAt, endsAt });
+    }
 
     const created = await this.prisma.$transaction(async (tx) => {
       const request = await tx.leaveRequest.create({
@@ -115,6 +120,11 @@ export class LeaveRequestsService {
       throw new ConflictException(`Request is already ${request.status}`);
     if (request.employeeId === actor.employeeId)
       throw new ForbiddenException('You cannot review your own request');
+    // The balance may have changed since the request was filed (another approval, an
+    // adjustment, a new contract type): it must still fit when it is approved.
+    if (dto.decision === 'APPROVED' && request.type === 'VACATION') {
+      await this.vacations.assertAffordable(request);
+    }
 
     const reviewed = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.leaveRequest.update({

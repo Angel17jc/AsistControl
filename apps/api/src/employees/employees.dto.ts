@@ -62,6 +62,14 @@ export class CreateEmployeeDto {
   @IsUUID()
   positionId?: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Decides the vacation entitlement; without one there is no vacation balance',
+  })
+  @IsOptional()
+  @IsUUID()
+  contractTypeId?: string;
+
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

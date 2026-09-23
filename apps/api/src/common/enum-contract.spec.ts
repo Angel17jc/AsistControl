@@ -22,6 +22,8 @@ const pairs: [string, Record<string, string>, readonly string[]][] = [
   ['RequestStatus', Prisma.RequestStatus, Shared.REQUEST_STATUSES],
   ['OvertimeKind', Prisma.OvertimeKind, Shared.OVERTIME_KINDS],
   ['NotificationType', Prisma.NotificationType, Shared.NOTIFICATION_TYPES],
+  ['VacationAccrual', Prisma.VacationAccrual, Shared.VACATION_ACCRUALS],
+  ['VacationDayCounting', Prisma.VacationDayCounting, Shared.VACATION_DAY_COUNTINGS],
 ];
 
 describe('shared enums ↔ Prisma enums', () => {
