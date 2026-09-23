@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, X } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { REQUEST_STATUS } from '../components/status';
+import { VacationBalanceCard } from '../components/vacations/VacationBalanceCard';
 import {
   Button,
   Card,
@@ -26,6 +27,7 @@ const OVERTIME_LABEL = { REGULAR: 'Ordinaria', REST_DAY: 'Día libre', HOLIDAY: 
 
 export function RequestsPage() {
   const canRequest = useAuth((s) => s.can('leave:request'));
+  const ownEmployeeId = useAuth((s) => s.user?.employeeId);
   const [creating, setCreating] = useState(false);
   return (
     <>
@@ -44,6 +46,10 @@ export function RequestsPage() {
           )
         }
       />
+      {/* What is left, before asking for more. */}
+      {ownEmployeeId && (
+        <VacationBalanceCard className="mb-6" employeeId={ownEmployeeId} title="Mis vacaciones" />
+      )}
       {creating && <LeaveForm onDone={() => setCreating(false)} />}
       <div className="grid gap-6">
         <LeaveTable />
@@ -99,6 +105,7 @@ function LeaveTable() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['leave'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['vacation-balance'] }),
       ]),
   });
 
@@ -219,7 +226,10 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
         },
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['leave'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leave'] }),
+        queryClient.invalidateQueries({ queryKey: ['vacation-balance'] }),
+      ]);
       onDone();
     },
   });

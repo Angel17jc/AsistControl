@@ -16,6 +16,9 @@ const AttendancePage = lazy(() =>
   import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })),
 );
 const AuditPage = lazy(() => import('./pages/AuditPage').then((m) => ({ default: m.AuditPage })));
+const ContractTypesPage = lazy(() =>
+  import('./pages/ContractTypesPage').then((m) => ({ default: m.ContractTypesPage })),
+);
 const DashboardPage = lazy(() =>
   import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
@@ -74,6 +77,14 @@ export function App() {
             element={
               <Guard permission="employees:read">
                 <EmployeesPage />
+              </Guard>
+            }
+          />
+          <Route
+            path="contratos"
+            element={
+              <Guard permission="organization:read">
+                <ContractTypesPage />
               </Guard>
             }
           />
