@@ -1,4 +1,5 @@
-import { type DeviceLocalTime, encodeTime } from './protocol';
+import type { DeviceLocalTime } from '../device-time';
+import { encodeTime } from './protocol';
 
 /** Builders for byte-level fixtures shared by the protocol and adapter tests. */
 

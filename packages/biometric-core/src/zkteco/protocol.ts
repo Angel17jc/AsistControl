@@ -8,6 +8,7 @@
  * Packet (payload of the TCP envelope):
  *   uint16 command | uint16 checksum | uint16 sessionId | uint16 replyId | data…
  */
+import type { DeviceLocalTime } from '../device-time';
 
 export const ZK_COMMAND = {
   CONNECT: 1000,
@@ -101,19 +102,6 @@ export function decodePacket(stream: Buffer): DecodeResult | null {
     },
     consumed: total,
   };
-}
-
-/**
- * Device timestamps are a single integer of *local* wall-clock time, with no timezone.
- * The caller converts it to an instant using the device's timezone.
- */
-export interface DeviceLocalTime {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
 }
 
 export function decodeTime(value: number): DeviceLocalTime {

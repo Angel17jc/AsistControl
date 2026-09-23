@@ -11,7 +11,7 @@ import type {
   SyncOptions,
   SyncResult,
 } from '../types';
-import { isValidTimeZone, localTimeToInstant } from './device-time';
+import { isValidTimeZone, localTimeToInstant } from '../device-time';
 import {
   ZK_COMMAND,
   type RawAttendanceRecord,

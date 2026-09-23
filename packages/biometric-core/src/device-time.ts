@@ -1,4 +1,15 @@
-import type { DeviceLocalTime } from './protocol';
+/**
+ * Wall-clock time as a terminal reports it, with no timezone. The caller turns it into an
+ * instant with the timezone the device is configured with.
+ */
+export interface DeviceLocalTime {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
 
 /** Offset of a timezone at a given instant, in minutes (positive east of UTC). */
 export function timezoneOffsetMinutes(instant: number, timeZone: string): number {
