@@ -63,3 +63,19 @@ export function isValidTimeZone(timeZone: string): boolean {
     return false;
   }
 }
+
+/**
+ * An instant as the wall-clock time of a timezone, with its offset:
+ * `2026-09-21T08:02:00-05:00`. This is how HTTP-based terminals (Hikvision ISAPI) expect
+ * the bounds of a search.
+ */
+export function formatLocalIso(instant: Date, timeZone: string): string {
+  // Rounded: the offset helper works at second precision and the instant may carry millis.
+  const offset = Math.round(timezoneOffsetMinutes(instant.getTime(), timeZone));
+  const local = new Date(instant.getTime() + offset * 60_000).toISOString().slice(0, 19);
+  const sign = offset < 0 ? '-' : '+';
+  const abs = Math.abs(offset);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${local}${sign}${hh}:${mm}`;
+}

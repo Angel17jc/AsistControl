@@ -8,6 +8,10 @@ export * from './mock/mock-device-network';
 export * from './mock/mock-device.adapter';
 export * from './zkteco/protocol';
 export * from './zkteco/zkteco.adapter';
-// Testing helpers: a fake terminal that speaks the ZKTeco protocol, used by adapter and API tests.
+export * from './hikvision/digest-auth';
+export * from './hikvision/isapi';
+export * from './hikvision/hikvision.adapter';
+// Testing helpers: fake terminals speaking each protocol, used by adapter and API tests.
 export * from './zkteco/test-fixtures';
 export * from './zkteco/fake-device';
+export * from './hikvision/fake-device';
