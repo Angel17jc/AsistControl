@@ -204,9 +204,8 @@ export function digestAuthorization(challenge: DigestChallenge, request: DigestR
 
 /** Parses the `Authorization` header a client sent (used by the fake device to verify it). */
 export function parseDigestAuthorization(header: string | undefined): Record<string, string> {
-  const [part] = header ? tokenizeAuthHeader(header) : [];
-  if (!part || !/^digest$/i.test(part.scheme)) return {};
-  return Object.fromEntries(part.params);
+  const digest = tokenizeAuthHeader(header ?? '').find((part) => /^digest$/i.test(part.scheme));
+  return Object.fromEntries(digest?.params ?? []);
 }
 
 function formatNonceCount(count: number): string {
