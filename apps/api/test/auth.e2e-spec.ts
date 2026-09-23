@@ -1,7 +1,15 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { PASSWORD, bearer, createApp, createFixture, type Fixture, login } from './utils';
+import {
+  PASSWORD,
+  bearer,
+  createApp,
+  createFixture,
+  eventually,
+  type Fixture,
+  login,
+} from './utils';
 
 describe('Auth, RBAC and API contract (e2e)', () => {
   let app: NestExpressApplication;
@@ -55,10 +63,17 @@ describe('Auth, RBAC and API contract (e2e)', () => {
       await http()
         .post('/api/auth/login')
         .send({ email: fx.emails.hr, password: 'bad-password-123' });
-      await new Promise((r) => setTimeout(r, 100));
-      const entries = await prisma.auditLog.count({
-        where: { action: 'auth.login_failed', metadata: { path: ['email'], equals: fx.emails.hr } },
-      });
+      // The audit entry is written in the background, so the login answers first.
+      const entries = await eventually(
+        () =>
+          prisma.auditLog.count({
+            where: {
+              action: 'auth.login_failed',
+              metadata: { path: ['email'], equals: fx.emails.hr },
+            },
+          }),
+        (count) => count > 0,
+      );
       expect(entries).toBeGreaterThan(0);
     });
 
