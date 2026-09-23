@@ -28,13 +28,13 @@ export const envSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
-  COOKIE_SECURE: bool.default('false'),
+  COOKIE_SECURE: bool.default(false),
 
   DEVICE_SECRETS_KEY: z
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes encoded as base64'),
   DEVICE_SYNC_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(300),
-  ENABLE_MOCK_DEVICES: bool.default('true'),
+  ENABLE_MOCK_DEVICES: bool.default(true),
 
   APP_TIMEZONE: z
     .string()
@@ -42,7 +42,7 @@ export const envSchema = z.object({
     .refine(isValidTimeZone, 'must be a valid IANA timezone'),
 
   /** Only meant to be disabled by the e2e test suite. */
-  THROTTLE_ENABLED: bool.default('true'),
+  THROTTLE_ENABLED: bool.default(true),
   THROTTLE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
 });
