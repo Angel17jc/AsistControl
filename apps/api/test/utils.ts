@@ -103,6 +103,24 @@ export async function login(app: NestExpressApplication, email: string): Promise
 
 export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
+/**
+ * Waits for a write the API makes in the background (fire-and-forget audit entries) instead
+ * of sleeping a fixed time, which fails on a slow CI runner. Resolves with the last value.
+ */
+export async function eventually<T>(
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  timeoutMs = 5_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let value = await read();
+  while (!done(value) && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    value = await read();
+  }
+  return value;
+}
+
 /** Local wall-clock time on WORK_DATE as ISO instant. */
 export const at = (hhmm: string, date = WORK_DATE) =>
   new Date(`${date}T${hhmm}:00${TZ_OFFSET}`).toISOString();
