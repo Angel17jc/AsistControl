@@ -11,6 +11,7 @@ import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { DeviceConnectionManager } from './device-connection.manager';
 import { describeDeviceError, statusAfterFailure } from './device-errors';
 import type { CreateDeviceDto, UpdateDeviceDto } from './devices.dto';
@@ -30,6 +31,7 @@ export class DevicesService implements OnApplicationBootstrap {
     private readonly connections: DeviceConnectionManager,
     private readonly realtime: RealtimeService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Re-establish live subscriptions after a restart. */
@@ -253,11 +255,16 @@ export class DevicesService implements OnApplicationBootstrap {
       Pick<Device, 'lastSeenAt' | 'lastSyncAt' | 'lastSyncCursor' | 'serialNumber'>
     > = {},
   ): Promise<Device> {
+    const before = await this.prisma.device.findUnique({
+      where: { id },
+      select: { status: true, lastSeenAt: true },
+    });
     const device = await this.prisma.device.update({
       where: { id },
       data: { status, lastError, ...extra },
     });
     this.emitStatus(device);
+    await this.notifications.deviceStatusChanged(before, device);
     return device;
   }
 
