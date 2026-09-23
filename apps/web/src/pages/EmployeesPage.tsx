@@ -1,6 +1,6 @@
 import type { EmployeeStatus, PaginatedResponse } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
+import { Palmtree, Plus, Search } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import {
   Button,
@@ -17,8 +17,9 @@ import {
   Td,
   type Tone,
 } from '../components/ui';
+import { VacationBalanceCard } from '../components/vacations/VacationBalanceCard';
 import { api } from '../lib/api';
-import type { EmployeeRow, NamedRef } from '../lib/types';
+import type { ContractTypeRow, EmployeeRow, NamedRef } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
 const STATUS: Record<EmployeeStatus, { label: string; tone: Tone }> = {
@@ -31,7 +32,9 @@ export function EmployeesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [vacationsOf, setVacationsOf] = useState<EmployeeRow | null>(null);
   const canWrite = useAuth((s) => s.can('employees:write'));
+  const canReadLeave = useAuth((s) => s.can('leave:read'));
   const { data, isLoading, error } = useQuery({
     queryKey: ['employees', search, page],
     queryFn: () =>
@@ -56,6 +59,19 @@ export function EmployeesPage() {
         }
       />
       {creating && <EmployeeForm onDone={() => setCreating(false)} />}
+      {vacationsOf && (
+        <div className="mb-6">
+          <VacationBalanceCard
+            key={vacationsOf.id}
+            employeeId={vacationsOf.id}
+            title={`Vacaciones de ${vacationsOf.firstName} ${vacationsOf.lastName}`}
+            manage={canWrite}
+          />
+          <Button variant="ghost" className="mt-2" onClick={() => setVacationsOf(null)}>
+            Cerrar vacaciones
+          </Button>
+        </div>
+      )}
       <Card>
         <div className="border-b border-line px-4 py-3">
           <div className="relative max-w-sm">
@@ -83,8 +99,10 @@ export function EmployeesPage() {
                 'Departamento',
                 'Cargo',
                 'Supervisor',
+                'Contrato',
                 'ID biométrico',
                 'Estado',
+                '',
               ]}
               empty={data.data.length === 0}
             >
@@ -102,11 +120,25 @@ export function EmployeesPage() {
                   <Td className="text-ink-2">
                     {e.supervisor ? `${e.supervisor.firstName} ${e.supervisor.lastName}` : '—'}
                   </Td>
+                  <Td className="text-ink-2">{e.contractType?.name ?? '—'}</Td>
                   <Td className="tabular">
                     {e.biometricId ?? <span className="text-ink-3">sin enrolar</span>}
                   </Td>
                   <Td>
                     <StatusBadge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</StatusBadge>
+                  </Td>
+                  <Td>
+                    {canReadLeave && (
+                      <Button
+                        variant="ghost"
+                        className="px-2 py-1 text-xs"
+                        icon={<Palmtree className="size-3.5" />}
+                        aria-label={`Vacaciones de ${e.firstName} ${e.lastName}`}
+                        onClick={() => setVacationsOf(e)}
+                      >
+                        Vacaciones
+                      </Button>
+                    )}
                   </Td>
                 </tr>
               ))}
@@ -133,6 +165,10 @@ function EmployeeForm({ onDone }: { onDone: () => void }) {
     queryKey: ['positions'],
     queryFn: () => api<NamedRef[]>('/positions'),
   });
+  const contractTypes = useQuery({
+    queryKey: ['contract-types'],
+    queryFn: () => api<ContractTypeRow[]>('/contract-types'),
+  });
   const [form, setForm] = useState({
     employeeCode: '',
     identification: '',
@@ -142,6 +178,7 @@ function EmployeeForm({ onDone }: { onDone: () => void }) {
     hireDate: new Date().toISOString().slice(0, 10),
     departmentId: '',
     positionId: '',
+    contractTypeId: '',
     biometricId: '',
   });
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
@@ -211,10 +248,20 @@ function EmployeeForm({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
         </Field>
+        <Field label="Tipo de contrato" hint="Decide sus vacaciones">
+          <Select value={form.contractTypeId} onChange={set('contractTypeId')}>
+            <option value="">—</option>
+            {contractTypes.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="ID biométrico" hint="El mismo número enrolado en los marcadores">
           <Input value={form.biometricId} onChange={set('biometricId')} />
         </Field>
-        <div className="flex items-end gap-2 lg:col-span-3">
+        <div className="flex items-end gap-2 lg:col-span-2">
           <Button type="submit" variant="primary" loading={create.isPending}>
             Guardar
           </Button>

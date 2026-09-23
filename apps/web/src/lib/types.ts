@@ -9,6 +9,8 @@ import type {
   RequestStatus,
   SyncStatus,
   SyncTrigger,
+  VacationAccrual,
+  VacationDayCounting,
 } from '@asistcontrol/shared';
 
 /** Response shapes of the endpoints the web client consumes. */
@@ -57,7 +59,39 @@ export interface EmployeeRow {
   biometricId: string | null;
   department: { id: string; name: string } | null;
   position: { id: string; name: string } | null;
+  contractType: { id: string; name: string } | null;
   supervisor: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface ContractTypeRow {
+  id: string;
+  name: string;
+  vacationDaysPerYear: number;
+  vacationAccrual: VacationAccrual;
+  vacationDayCounting: VacationDayCounting;
+  seniority: { afterYears: number; extraDaysPerYear: number; maxExtraDays: number } | null;
+  allowNegativeVacationBalance: boolean;
+  /** How many employees use it (list only). */
+  employees?: number;
+}
+
+/** GET /employees/:id/vacation-balance. The balance is computed by the API on every read. */
+export interface VacationBalance {
+  employeeId: string;
+  asOf: string;
+  contractType: ContractTypeRow | null;
+  accrual: {
+    completedServiceYears: number;
+    currentYearEntitlement: number;
+    nextCreditOn: string | null;
+  } | null;
+  accruedDays: number;
+  adjustmentDays: number;
+  usedDays: number;
+  scheduledDays: number;
+  pendingDays: number;
+  availableDays: number;
+  adjustments: { id: string; days: number; reason: string; createdAt: string }[];
 }
 
 export interface DeviceRow {

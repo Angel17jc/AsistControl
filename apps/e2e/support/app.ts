@@ -93,6 +93,19 @@ export class ApiClient {
     return this.send('post', `/devices/${deviceId}/simulate/auto`, { intervalMs });
   }
 
+  /** Cancels the signed-in employee's pending vacations, so a run starts from a known state. */
+  async cancelPendingVacations(): Promise<void> {
+    const mine = await this.send<{ data: { id: string; type: string; status: string }[] }>(
+      'get',
+      '/leave-requests?pageSize=100',
+    );
+    for (const leave of mine.data) {
+      if (leave.type === 'VACATION' && leave.status === 'PENDING') {
+        await this.send('post', `/leave-requests/${leave.id}/cancel`);
+      }
+    }
+  }
+
   /** A punch registered by hand, the way an operator corrects a missing one. */
   async manualPunch(): Promise<void> {
     const employees = await this.send<{ data: { id: string }[] }>('get', '/employees?pageSize=1');

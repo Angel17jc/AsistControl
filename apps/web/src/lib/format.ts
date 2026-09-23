@@ -55,6 +55,22 @@ export function relativeTime(iso: string | null | undefined, now = Date.now()): 
   return `hace ${Math.round(hours / 24)} d`;
 }
 
+/** "1 día", "15 días", "7,5 días", "-2 días": balances can be fractional and negative. */
+export function formatDays(days: number): string {
+  const value = new Intl.NumberFormat('es-EC', { maximumFractionDigits: 2 }).format(days);
+  return `${value} ${Math.abs(days) === 1 ? 'día' : 'días'}`;
+}
+
+export const VACATION_ACCRUAL_LABEL = {
+  ANNUAL: 'Anual, en cada aniversario',
+  MONTHLY: 'Mensual, 1/12 por mes',
+} as const;
+
+export const VACATION_COUNTING_LABEL = {
+  WORKING_DAYS: 'Días hábiles',
+  CALENDAR_DAYS: 'Días corridos',
+} as const;
+
 export const LEAVE_LABEL: Record<LeaveType, string> = {
   PERSONAL: 'Permiso personal',
   MEDICAL: 'Médico',
