@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake, type PaginationQueryDto } from '../common/dto/pagination.dto';
 import { DeviceConnectionManager } from '../devices/device-connection.manager';
+import { describeDeviceError, statusAfterFailure } from '../devices/device-errors';
 import { DevicesService } from '../devices/devices.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -100,9 +101,8 @@ export class DeviceSyncService implements OnModuleInit {
         serialNumber: info.serialNumber,
       });
     } catch (error) {
-      errorMessage = describe(error);
-      const unreachable = error instanceof BiometricDeviceError && error.retryable;
-      await this.devices.setStatus(deviceId, unreachable ? 'OFFLINE' : 'ERROR', errorMessage);
+      errorMessage = describeDeviceError(error);
+      await this.devices.setStatus(deviceId, statusAfterFailure(error), errorMessage);
       this.logger.warn({ deviceId, err: error }, `Device sync failed: ${errorMessage}`);
     } finally {
       await this.prisma.device.update({ where: { id: deviceId }, data: { syncLockedAt: null } });
@@ -286,9 +286,4 @@ export async function withRetry<T>(
     }
   }
   throw lastError;
-}
-
-function describe(error: unknown): string {
-  if (error instanceof BiometricDeviceError) return `${error.code}: ${error.message}`;
-  return 'Unexpected error during sync';
 }

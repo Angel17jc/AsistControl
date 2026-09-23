@@ -7,12 +7,12 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common';
 import type { Device, DeviceStatus, Prisma } from '@prisma/client';
-import { BiometricDeviceError } from '@asistcontrol/biometric-core';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { DeviceConnectionManager } from './device-connection.manager';
+import { describeDeviceError, statusAfterFailure } from './device-errors';
 import type { CreateDeviceDto, UpdateDeviceDto } from './devices.dto';
 
 /** Public representation: secrets are replaced by a flag, internals are hidden. */
@@ -178,7 +178,11 @@ export class DevicesService implements OnApplicationBootstrap {
     await this.connections.release(id);
   }
 
-  /** Probes the device and records the outcome as its current status. */
+  /**
+   * Probes the device and records the outcome as its current status. It connects directly,
+   * instead of through the adapter's boolean testConnection(), to keep the reason of a
+   * failure: a rejected password must not be reported as a network problem.
+   */
   async testConnection(id: string) {
     const device = await this.getEntity(id);
     if (device.status === 'DISABLED') throw new BadRequestException('Device is disabled');
@@ -186,27 +190,26 @@ export class DevicesService implements OnApplicationBootstrap {
 
     const adapter = this.connections.adapterFor(device);
     const startedAt = Date.now();
-    const reachable = await adapter.testConnection();
+    let info: Awaited<ReturnType<typeof adapter.getDeviceInfo>> | null = null;
+    let error: string | null = null;
+    let status: DeviceStatus = 'ONLINE';
+    try {
+      if (!adapter.isConnected()) await adapter.connect();
+      info = await adapter.getDeviceInfo();
+    } catch (e) {
+      error = describeDeviceError(e);
+      status = statusAfterFailure(e);
+    }
     const latencyMs = Date.now() - startedAt;
 
-    let info: Awaited<ReturnType<typeof adapter.getDeviceInfo>> | null = null;
-    let error: string | null = reachable ? null : 'Device unreachable';
-    if (reachable) {
-      try {
-        info = await adapter.getDeviceInfo();
-      } catch (e) {
-        error = e instanceof BiometricDeviceError ? e.message : 'Unexpected device error';
-      }
-    }
-
-    const updated = await this.setStatus(id, reachable && !error ? 'ONLINE' : 'OFFLINE', error, {
-      lastSeenAt: reachable ? new Date() : undefined,
+    const updated = await this.setStatus(id, status, error, {
+      lastSeenAt: error ? undefined : new Date(),
       serialNumber: info?.serialNumber,
     });
-    if (reachable) await this.connections.startRealtime(updated);
+    if (!error) await this.connections.startRealtime(updated);
 
     return {
-      reachable: reachable && !error,
+      reachable: error === null,
       latencyMs,
       error,
       info: info && {
