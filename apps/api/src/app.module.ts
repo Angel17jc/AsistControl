@@ -21,6 +21,7 @@ import { DevicesModule } from './devices/devices.module';
 import { EmployeesModule } from './employees/employees.module';
 import { HealthModule } from './health/health.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OvertimeModule } from './overtime/overtime.module';
 import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -69,6 +70,7 @@ import { WorkSchedulesModule } from './work-schedules/work-schedules.module';
     AuditModule,
     SettingsModule,
     RealtimeModule,
+    NotificationsModule,
     AuthModule,
     HealthModule,
     UsersModule,

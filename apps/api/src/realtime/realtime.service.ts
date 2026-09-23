@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type AppNotification,
   type AttendanceEventCreatedPayload,
   type AttendanceRecordUpdatedPayload,
   type DeviceStatusChangedPayload,
@@ -42,6 +43,12 @@ export class RealtimeService {
 
   deviceSyncFinished(payload: DeviceSyncFinishedPayload): void {
     this.gateway.server?.to(ROOMS.DEVICES).emit(REALTIME_EVENTS.DEVICE_SYNC_FINISHED, payload);
+  }
+
+  notificationCreated(userId: string, notification: AppNotification): void {
+    this.gateway.server
+      ?.to(ROOMS.user(userId))
+      .emit(REALTIME_EVENTS.NOTIFICATION_CREATED, notification);
   }
 
   private emitAttendance(event: string, payload: unknown, audience: AttendanceAudience): void {

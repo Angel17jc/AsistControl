@@ -65,5 +65,14 @@ export type LeaveType = (typeof LEAVE_TYPES)[number];
 export const REQUEST_STATUSES = values('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED');
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
+/** What a notification is about. The text is rendered by the client from `type` + data. */
+export const NOTIFICATION_TYPES = values(
+  'DEVICE_DOWN',
+  'DEVICE_RECOVERED',
+  'LEAVE_REQUESTED',
+  'LEAVE_REVIEWED',
+);
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
 export const OVERTIME_KINDS = values('REGULAR', 'REST_DAY', 'HOLIDAY');
 export type OvertimeKind = (typeof OVERTIME_KINDS)[number];

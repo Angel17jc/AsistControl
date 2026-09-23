@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, hasPermission } from './rbac';
+import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, hasPermission, rolesWith } from './rbac';
 import { formatMinutes } from './time';
 
 describe('RBAC matrix', () => {
@@ -7,6 +7,11 @@ describe('RBAC matrix', () => {
     for (const role of ROLES) {
       for (const p of ROLE_PERMISSIONS[role]) expect(PERMISSIONS).toContain(p);
     }
+  });
+
+  it('lists the roles holding a permission, straight from the matrix', () => {
+    expect(rolesWith('devices:sync').sort()).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    expect(rolesWith('leave:approve').sort()).toEqual(['ADMIN', 'HR', 'SUPERVISOR', 'SUPER_ADMIN']);
   });
 
   it('keeps employees away from administrative permissions', () => {

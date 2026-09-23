@@ -16,6 +16,8 @@ export const ROOMS = {
   DEVICES: 'devices',
   supervisor: (employeeId: string) => `attendance:supervisor:${employeeId}`,
   employee: (employeeId: string) => `attendance:employee:${employeeId}`,
+  /** Every socket of one user: what is addressed to that person only (notifications). */
+  user: (userId: string) => `user:${userId}`,
 } as const;
 
 /**
@@ -50,6 +52,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
       if (!token) throw new Error('missing token');
       const user = await this.auth.verify(token);
       client.data.user = user;
+      await client.join(ROOMS.user(user.id));
 
       if (hasPermission(user.role, 'devices:read')) await client.join(ROOMS.DEVICES);
       if (['SUPER_ADMIN', 'ADMIN', 'HR'].includes(user.role)) {

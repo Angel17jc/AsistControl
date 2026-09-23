@@ -1,4 +1,5 @@
 import type { AttendanceStatus, DeviceStatus, PunchType, SyncStatus } from './domain';
+import type { AppNotification } from './notifications';
 
 /** Socket.IO namespace and event names used between the API and the dashboard. */
 export const REALTIME_NAMESPACE = '/realtime';
@@ -8,6 +9,8 @@ export const REALTIME_EVENTS = Object.freeze({
   ATTENDANCE_RECORD_UPDATED: 'attendance.record.updated',
   DEVICE_STATUS_CHANGED: 'device.status.changed',
   DEVICE_SYNC_FINISHED: 'device.sync.finished',
+  /** Sent only to the recipient's own socket. */
+  NOTIFICATION_CREATED: 'notification.created',
 } as const);
 
 export interface AttendanceEventCreatedPayload {
@@ -51,4 +54,5 @@ export interface RealtimeEventMap {
   [REALTIME_EVENTS.ATTENDANCE_RECORD_UPDATED]: AttendanceRecordUpdatedPayload;
   [REALTIME_EVENTS.DEVICE_STATUS_CHANGED]: DeviceStatusChangedPayload;
   [REALTIME_EVENTS.DEVICE_SYNC_FINISHED]: DeviceSyncFinishedPayload;
+  [REALTIME_EVENTS.NOTIFICATION_CREATED]: AppNotification;
 }

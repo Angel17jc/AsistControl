@@ -13,6 +13,7 @@ import type { AuthenticatedUser, RequestContext } from '../common/auth/authentic
 import { paginate, skipTake } from '../common/dto/pagination.dto';
 import type { ReviewDto } from '../common/dto/review.dto';
 import { addDays, localDateOf, todayIn } from '../common/utils/date-only';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import type { CreateLeaveRequestDto, LeaveQueryDto } from './leave-requests.dto';
@@ -32,6 +33,7 @@ export class LeaveRequestsService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly processing: AttendanceProcessingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(query: LeaveQueryDto, user: AuthenticatedUser) {
@@ -79,7 +81,7 @@ export class LeaveRequestsService {
     if (overlapping > 0)
       throw new ConflictException('The employee already has a request overlapping these dates');
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const request = await tx.leaveRequest.create({
         data: {
           employeeId,
@@ -103,6 +105,8 @@ export class LeaveRequestsService {
       );
       return request;
     });
+    await this.notifications.leaveRequested(created, actor.id);
+    return created;
   }
 
   async review(id: string, dto: ReviewDto, actor: AuthenticatedUser, ctx: RequestContext) {
@@ -136,6 +140,7 @@ export class LeaveRequestsService {
       return updated;
     });
     if (dto.decision === 'APPROVED') await this.recomputeAffectedDays(reviewed);
+    await this.notifications.leaveReviewed(reviewed, actor.id);
     return reviewed;
   }
 

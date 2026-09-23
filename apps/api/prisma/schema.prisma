@@ -42,6 +42,13 @@ enum DeviceDriver {
   HIKVISION
 }
 
+enum NotificationType {
+  DEVICE_DOWN
+  DEVICE_RECOVERED
+  LEAVE_REQUESTED
+  LEAVE_REVIEWED
+}
+
 enum PunchType {
   CHECK_IN
   CHECK_OUT
@@ -140,9 +147,10 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  employee  Employee?  @relation(fields: [employeeId], references: [id])
-  sessions  Session[]
-  auditLogs AuditLog[]
+  employee      Employee?      @relation(fields: [employeeId], references: [id])
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -478,6 +486,28 @@ model LeaveRequest {
 // ─────────────────────────────────────────────────────────────── platform
 
 /// Append-only. The application never updates or deletes audit rows.
+/// Something a person needs to know, addressed to one user. The audit log records what
+/// happened; this records who must act on it. Stores data, not text: clients render it.
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  /// Shape depends on `type` (NotificationDataByType in packages/shared).
+  data      Json             @default("{}")
+  entity    String?
+  entityId  String?          @map("entity_id")
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The bell: a user's unread notifications, newest first.
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  /// Incident deduplication: "was this device already reported down?".
+  @@index([type, entityId, createdAt])
+  @@map("notifications")
+}
+
 model AuditLog {
   id        String   @id @default(uuid()) @db.Uuid
   actorId   String?  @map("actor_id") @db.Uuid

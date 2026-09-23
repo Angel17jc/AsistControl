@@ -88,3 +88,8 @@ export const PRIVILEGED_ROLES: readonly Role[] = ['SUPER_ADMIN', 'ADMIN'];
 export function hasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
+
+/** Roles granted a permission, e.g. to decide who must hear about something. */
+export function rolesWith(permission: Permission): Role[] {
+  return ROLES.filter((role) => hasPermission(role, permission));
+}
