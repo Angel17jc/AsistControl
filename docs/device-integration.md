@@ -72,6 +72,21 @@ Las credenciales (clave de comunicación, usuario/contraseña ISAPI) se envían 
 
 El formulario web pide las que necesita cada driver (usuario y contraseña ISAPI para Hikvision, clave opcional para ZKTeco) con `autocomplete="new-password"`, para que el navegador no las confunda con la contraseña de quien opera. Al cambiar de driver se descartan: una contraseña nunca viaja a un equipo de otra marca.
 
+## Editar un dispositivo
+
+Desde su tarjeta (`Editar`, permiso `devices:write`) o con `PATCH /devices/:id`. Qué pasa según lo que cambie:
+
+| Cambio                          | Efecto                                                                                                                                                                                    |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nombre, ubicación, fabricante…  | Solo eso: cursor, número de serie y estado se conservan                                                                                                                                   |
+| **Driver, host o puerto**       | Es **otro terminal**: se borran el cursor, el número de serie y el último error, y el estado pasa a `OFFLINE`. La próxima sincronización relee la memoria completa y la ingesta deduplica |
+| Driver, sin credenciales nuevas | Se **descartan** las guardadas: pertenecen al protocolo de otra marca                                                                                                                     |
+| `credentials: {…}`              | Se reemplazan **completas** (la interfaz exige todos los campos del driver en cuanto se escribe uno)                                                                                      |
+| `credentials: null`             | Se quitan (p. ej. una clave ZKTeco retirada del equipo). Queda auditado como `device.credentials_changed` con `removed: true`                                                             |
+| `enabled: false` / `true`       | `DISABLED` (sin sincronización ni tiempo real) / vuelve a `OFFLINE` hasta la próxima prueba                                                                                               |
+
+Conservar el cursor al cambiar de terminal sería peligroso: el cursor de Hikvision es un número de serie de evento, y aplicado a la memoria de otro equipo descartaría todas sus marcaciones con serie menor. Releer, en cambio, es siempre seguro.
+
 ## Diagnóstico de conexión
 
 `POST /devices/:id/test-connection` conecta directamente y **conserva el motivo** del fallo (`CODIGO: detalle`), con la misma regla de estado que una sincronización:

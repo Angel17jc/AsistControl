@@ -1,6 +1,6 @@
 import type { PaginatedResponse } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FlaskConical, Plug, Plus, RefreshCw, Unplug, Zap } from 'lucide-react';
+import { FlaskConical, Pencil, Plug, Plus, RefreshCw, Unplug, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { DeviceForm } from '../components/devices/DeviceForm';
 import { DEVICE_STATUS, SYNC_STATUS } from '../components/status';
@@ -63,7 +63,11 @@ export function DevicesPage() {
           )
         }
       />
-      {creating && <DeviceForm onDone={() => setCreating(false)} />}
+      {creating && (
+        <Card className="mb-6">
+          <DeviceForm onDone={() => setCreating(false)} />
+        </Card>
+      )}
       {devices.isLoading && <Spinner />}
       {devices.error && <ErrorState error={devices.error} />}
       {devices.data?.length === 0 && (
@@ -138,6 +142,7 @@ function DeviceCard({ device }: { device: DeviceRow }) {
   const canSync = useAuth((s) => s.can('devices:sync'));
   const canWrite = useAuth((s) => s.can('devices:write'));
   const [message, setMessage] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const refresh = () =>
     Promise.all(
       ['devices', 'sync-logs', 'dashboard'].map((k) =>
@@ -181,61 +186,85 @@ function DeviceCard({ device }: { device: DeviceRow }) {
       <CardHeader
         title={device.name}
         subtitle={`${device.manufacturer} ${device.model} · ${device.host}:${device.port}${device.location ? ` · ${device.location}` : ''}`}
-        actions={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+            {canWrite && !editing && (
+              <Button
+                variant="ghost"
+                icon={<Pencil className="size-4" />}
+                aria-label={`Editar ${device.name}`}
+                onClick={() => setEditing(true)}
+              >
+                Editar
+              </Button>
+            )}
+          </div>
+        }
       />
-      <div className="space-y-4 p-5">
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs text-ink-3">Última sincronización</dt>
-            <dd className="text-ink-1">{relativeTime(device.lastSyncAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-ink-3">Driver / serie</dt>
-            <dd className="text-ink-1">
-              {device.driver} · {device.serialNumber ?? '—'}
-            </dd>
-          </div>
-        </dl>
-        {device.lastError && (
-          <p className="rounded-lg bg-critical/10 px-3 py-2 text-xs text-ink-1">
-            {explainDeviceError(device.lastError)}
-          </p>
-        )}
-        {canSync && (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              icon={<Plug className="size-4" />}
-              loading={test.isPending}
-              onClick={() => test.mutate()}
-              disabled={device.status === 'DISABLED'}
-            >
-              Probar conexión
-            </Button>
-            <Button
-              variant="primary"
-              icon={<RefreshCw className="size-4" />}
-              loading={sync.isPending}
-              onClick={() => sync.mutate()}
-              disabled={device.status === 'DISABLED'}
-            >
-              Sincronizar
-            </Button>
-          </div>
-        )}
-        {message && (
-          <p className="text-sm text-ink-2" aria-live="polite">
-            {message}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-critical">
-            {error.message}
-          </p>
-        )}
-        {device.driver === 'MOCK' && canWrite && (
-          <SimulatorPanel deviceId={device.id} onChange={setMessage} />
-        )}
-      </div>
+      {editing ? (
+        <DeviceForm
+          device={device}
+          onDone={() => {
+            setEditing(false);
+            setMessage(null);
+          }}
+        />
+      ) : (
+        <div className="space-y-4 p-5">
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-xs text-ink-3">Última sincronización</dt>
+              <dd className="text-ink-1">{relativeTime(device.lastSyncAt)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-3">Driver / serie</dt>
+              <dd className="text-ink-1">
+                {device.driver} · {device.serialNumber ?? '—'}
+              </dd>
+            </div>
+          </dl>
+          {device.lastError && (
+            <p className="rounded-lg bg-critical/10 px-3 py-2 text-xs text-ink-1">
+              {explainDeviceError(device.lastError)}
+            </p>
+          )}
+          {canSync && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                icon={<Plug className="size-4" />}
+                loading={test.isPending}
+                onClick={() => test.mutate()}
+                disabled={device.status === 'DISABLED'}
+              >
+                Probar conexión
+              </Button>
+              <Button
+                variant="primary"
+                icon={<RefreshCw className="size-4" />}
+                loading={sync.isPending}
+                onClick={() => sync.mutate()}
+                disabled={device.status === 'DISABLED'}
+              >
+                Sincronizar
+              </Button>
+            </div>
+          )}
+          {message && (
+            <p className="text-sm text-ink-2" aria-live="polite">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-critical">
+              {error.message}
+            </p>
+          )}
+          {device.driver === 'MOCK' && canWrite && (
+            <SimulatorPanel deviceId={device.id} onChange={setMessage} />
+          )}
+        </div>
+      )}
     </Card>
   );
 }

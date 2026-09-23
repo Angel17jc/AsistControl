@@ -71,6 +71,8 @@ export interface DeviceRow {
   port: number;
   location: string | null;
   status: DeviceStatus;
+  /** Non-secret driver options (timeoutMs, timezone, protocol…). */
+  config: Record<string, unknown>;
   lastSyncAt: string | null;
   lastSeenAt: string | null;
   lastError: string | null;

@@ -75,7 +75,7 @@ test.describe('Terminal Hikvision', () => {
     expect(await page.content()).not.toContain(PASSWORD);
   });
 
-  test('explica una contraseña rechazada en lugar de culpar a la red', async () => {
+  test('explica una contraseña rechazada y se corrige editando el equipo', async () => {
     const name = `Hikvision mal configurado ${Date.now().toString().slice(-6)}`;
     const device = await register(name, await startTerminal(), 'contrasena-equivocada');
 
@@ -84,5 +84,19 @@ test.describe('Terminal Hikvision', () => {
       device.getByText(/No se pudo conectar\. El equipo rechazó las credenciales/),
     ).toBeVisible();
     await expect(device.getByText('Error', { exact: true })).toBeVisible();
+
+    // Fix it where it failed. Credentials are replaced as a whole: user and new password.
+    await device.getByRole('button', { name: `Editar ${name}` }).click();
+    const form = page.getByRole('form', { name: `Editar ${name}` });
+    await expect(form.getByLabel('Usuario ISAPI')).toHaveValue('');
+    await form.getByLabel('Usuario ISAPI').fill('admin');
+    await form.getByLabel('Contraseña ISAPI').fill(PASSWORD);
+    await form.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(form).toHaveCount(0);
+
+    await device.getByRole('button', { name: 'Probar conexión' }).click();
+    await expect(device.getByText(/Conectado en \d+ ms/)).toBeVisible();
+    await expect(device.getByText('En línea', { exact: true })).toBeVisible();
+    expect(await page.content()).not.toContain(PASSWORD);
   });
 });
