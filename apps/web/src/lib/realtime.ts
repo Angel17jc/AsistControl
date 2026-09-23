@@ -45,6 +45,10 @@ export function useRealtime(): ConnectionState {
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     };
     socket.on(REALTIME_EVENTS.DEVICE_STATUS_CHANGED, refreshDevices);
+    // A notification for this user: refresh the bell (count and, when open, the list).
+    socket.on(REALTIME_EVENTS.NOTIFICATION_CREATED, () => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    });
     socket.on(REALTIME_EVENTS.DEVICE_SYNC_FINISHED, () => {
       refreshDevices();
       void queryClient.invalidateQueries({ queryKey: ['sync-logs'] });

@@ -188,6 +188,12 @@ const TONE_STYLE: Record<Tone, { dot: string; icon: typeof CheckCircle2 }> = {
   info: { dot: 'text-accent', icon: CircleDashed },
 };
 
+/** The icon of a tone, for places that show state without a badge (e.g. notifications). */
+export function ToneIcon({ tone, className }: { tone: Tone; className?: string }) {
+  const { dot, icon: Icon } = TONE_STYLE[tone];
+  return <Icon className={clsx('size-4 shrink-0', dot, className)} aria-hidden />;
+}
+
 export function StatusBadge({ tone, children }: { tone: Tone; children: ReactNode }) {
   const { dot, icon: Icon } = TONE_STYLE[tone];
   return (

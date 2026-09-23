@@ -1,4 +1,4 @@
-import { formatMinutes } from '@asistcontrol/shared';
+import { type LeaveType, formatMinutes } from '@asistcontrol/shared';
 
 export { formatMinutes };
 
@@ -54,6 +54,13 @@ export function relativeTime(iso: string | null | undefined, now = Date.now()): 
   if (hours < 24) return `hace ${hours} h`;
   return `hace ${Math.round(hours / 24)} d`;
 }
+
+export const LEAVE_LABEL: Record<LeaveType, string> = {
+  PERSONAL: 'Permiso personal',
+  MEDICAL: 'Médico',
+  VACATION: 'Vacaciones',
+  OTHER: 'Otro',
+};
 
 export const PUNCH_LABEL: Record<string, string> = {
   CHECK_IN: 'Entrada',

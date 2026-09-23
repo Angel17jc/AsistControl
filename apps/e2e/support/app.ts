@@ -80,6 +80,15 @@ export class ApiClient {
     return { id: device.id, name };
   }
 
+  sync(deviceId: string): Promise<{ status: string }> {
+    return this.send('post', `/devices/${deviceId}/sync`);
+  }
+
+  /** Unplugs (or plugs back) a simulated terminal from the network. */
+  setOnline(deviceId: string, online: boolean): Promise<unknown> {
+    return this.send('post', `/devices/${deviceId}/simulate/faults`, { online });
+  }
+
   autoPunches(deviceId: string, intervalMs: number): Promise<unknown> {
     return this.send('post', `/devices/${deviceId}/simulate/auto`, { intervalMs });
   }
