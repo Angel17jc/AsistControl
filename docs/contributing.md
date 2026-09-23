@@ -38,7 +38,12 @@ Tipos: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 ```bash
 npm run lint && npm run format:check && npm run typecheck && npm test
 npm run test:e2e   # si tocaste API, base de datos o sincronización
+npm run test:ui    # si tocaste la interfaz, rutas, sesión o tiempo real
 ```
+
+`npm run test:ui` levanta la API y el bundle web contra una base propia y los recorre con
+Chromium (ver [`apps/e2e/README.md`](../apps/e2e/README.md)); la primera vez hace falta
+`npx playwright install chromium`.
 
 La CI ejecuta lo mismo (más e2e con PostgreSQL, verificación de migraciones, build de imágenes y CodeQL) y **bloquea el merge** si algo falla. No se usan `--no-verify`, `eslint-disable` injustificados ni tests `skip`.
 
@@ -61,7 +66,7 @@ El revisor verifica: corrección (casos límite, zonas horarias, concurrencia), 
 
 ## Configuración recomendada del repositorio en GitHub
 
-- Branch protection en `main`: _Require a pull request_, _Require status checks_ (`Lint · Typecheck · Unit tests · Build`, `conventional-title`, y `API e2e (PostgreSQL)` / `Docker images` cuando existan), _Require branches to be up to date_, _Require linear history_, sin force-push ni borrado.
+- Branch protection en `main`: _Require a pull request_, _Require status checks_ (`Lint · Typecheck · Unit tests · Build`, `conventional-title`, `API e2e (PostgreSQL)`, `UI e2e (Playwright)` y `Docker images`), _Require branches to be up to date_, _Require linear history_, sin force-push ni borrado.
 - Mientras haya un solo mantenedor no se exigen aprobaciones (GitHub no permite aprobar el PR propio); al sumar colaboradores se activa _Require approvals (1)_ + _Require review from Code Owners_.
 - _Allow squash merging_ únicamente; _Automatically delete head branches_.
 - Secret scanning y push protection activados.
