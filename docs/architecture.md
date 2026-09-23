@@ -130,7 +130,11 @@ Todas viven en `SystemSetting["attendance.policy"]` (editable vía `PATCH /api/s
 
 ## Tiempo real
 
-Socket.IO en el namespace `/realtime`, autenticado con el mismo access token. Cada socket se une a salas según lo que puede ver: `attendance:all` (RRHH/Admin), `attendance:supervisor:<id>` y `attendance:employee:<id>`, `devices`. Así un supervisor solo recibe eventos de su equipo. El frontend agrega los eventos nuevos directamente a la caché de TanStack Query (sin refetch) y refresca los agregados en segundo plano.
+Socket.IO en el namespace `/realtime`, autenticado con el mismo access token. Cada socket se une a salas según lo que puede ver: `attendance:all` (RRHH/Admin), `attendance:supervisor:<id>` y `attendance:employee:<id>`, `devices`, y `user:<id>` para lo dirigido a una sola persona (notificaciones). Así un supervisor solo recibe eventos de su equipo. El frontend agrega los eventos nuevos directamente a la caché de TanStack Query (sin refetch) y refresca los agregados en segundo plano.
+
+## Notificaciones
+
+Los hechos que alguien debe atender (un marcador caído o recuperado, una solicitud por revisar o ya resuelta) se guardan como una notificación **por destinatario**, con tipo y datos, y se envían en vivo a la sala `user:<id>`. Los destinatarios salen de la matriz RBAC y del alcance por fila; un corte de un equipo produce **un** aviso aunque falle en cada sondeo. Notificar es de mejor esfuerzo: nunca bloquea la acción que lo provocó. Ver [ADR 0007](adr/0007-notifications.md).
 
 ## Frontend
 
@@ -148,11 +152,12 @@ Socket.IO en el namespace `/realtime`, autenticado con el mismo access token. Ca
 
 ## Decisiones registradas (ADR)
 
-| #                                           | Decisión                                                   |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| [0001](adr/0001-monorepo-and-stack.md)      | Monorepo con npm workspaces y versiones estables           |
-| [0002](adr/0002-adapter-pattern-devices.md) | Patrón Adapter + registro de drivers para dispositivos     |
-| [0003](adr/0003-rbac-in-code.md)            | Roles fijos y permisos en código + alcance por fila        |
-| [0004](adr/0004-opaque-sync-cursor.md)      | Cursor de sincronización opaco por adaptador               |
-| [0005](adr/0005-events-vs-records.md)       | Marcaciones inmutables, jornadas derivadas y recalculables |
-| [0006](adr/0006-unified-leave-requests.md)  | Permisos y vacaciones en un único flujo                    |
+| #                                           | Decisión                                                       |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| [0001](adr/0001-monorepo-and-stack.md)      | Monorepo con npm workspaces y versiones estables               |
+| [0002](adr/0002-adapter-pattern-devices.md) | Patrón Adapter + registro de drivers para dispositivos         |
+| [0003](adr/0003-rbac-in-code.md)            | Roles fijos y permisos en código + alcance por fila            |
+| [0004](adr/0004-opaque-sync-cursor.md)      | Cursor de sincronización opaco por adaptador                   |
+| [0005](adr/0005-events-vs-records.md)       | Marcaciones inmutables, jornadas derivadas y recalculables     |
+| [0006](adr/0006-unified-leave-requests.md)  | Permisos y vacaciones en un único flujo                        |
+| [0007](adr/0007-notifications.md)           | Notificaciones: datos por destinatario, un aviso por incidente |

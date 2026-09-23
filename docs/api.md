@@ -73,6 +73,7 @@ Todas las respuestas de error tienen la misma forma:
 | Horas extra           | `GET /overtime`, `POST /overtime/:id/review`                                                                                                                                                                                     |
 | Reportes              | `GET /reports/{daily,monthly,late,absences,overtime,events,sync}?from&to&departmentId&format=csv`                                                                                                                                |
 | Dashboard             | `GET /dashboard/summary`                                                                                                                                                                                                         |
+| Notificaciones        | `GET /notifications` (`unread`, paginación), `GET /notifications/unread-count`, `POST /notifications/:id/read`, `POST /notifications/read-all`. Siempre las del usuario autenticado; la de otro responde `404`                   |
 | Auditoría             | `GET /audit-logs`                                                                                                                                                                                                                |
 | Configuración         | `GET /settings`, `PATCH /settings/attendance-policy`                                                                                                                                                                             |
 
@@ -110,5 +111,17 @@ socket.on('attendance.event.created', (e) => …);
 | `attendance.record.updated` | `{ employeeId, workDate, status, lateMinutes, workedMinutes }`                                           |
 | `device.status.changed`     | `{ deviceId, name, status, lastError, lastSyncAt }`                                                      |
 | `device.sync.finished`      | `{ deviceId, syncLogId, status, recordsReceived, recordsProcessed, recordsDuplicated, recordsRejected }` |
+| `notification.created`      | `{ id, type, data, entity, entityId, readAt, createdAt }` — solo al destinatario                         |
 
 Tipos en [`packages/shared/src/realtime.ts`](../packages/shared/src/realtime.ts). Cada cliente recibe solo los eventos que su rol y alcance permiten.
+
+### Notificaciones
+
+Una notificación trae **datos, no texto**: `type` más `data` con forma fija por tipo ([`packages/shared/src/notifications.ts`](../packages/shared/src/notifications.ts)); cada cliente la redacta. Quién recibe cada tipo y por qué hay un solo aviso por corte de un equipo: [ADR 0007](adr/0007-notifications.md).
+
+| `type`             | `data`                                                          | Destinatarios                                 |
+| ------------------ | --------------------------------------------------------------- | --------------------------------------------- |
+| `DEVICE_DOWN`      | `{ deviceName, status: "OFFLINE" \| "ERROR", error }`           | Con `devices:sync` (administradores)          |
+| `DEVICE_RECOVERED` | `{ deviceName }`                                                | Con `devices:sync`                            |
+| `LEAVE_REQUESTED`  | `{ employeeName, leaveType, startsAt, endsAt }`                 | RRHH, administradores y el supervisor directo |
+| `LEAVE_REVIEWED`   | `{ employeeName, leaveType, startsAt, endsAt, decision, note }` | El empleado y quien presentó la solicitud     |
