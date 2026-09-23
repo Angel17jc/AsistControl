@@ -154,6 +154,19 @@ describe('Hikvision device sync (e2e)', () => {
     );
   });
 
+  it('explains a rejected password when testing the connection', async () => {
+    const res = await http()
+      .post(`/api/devices/${deviceId}/test-connection`)
+      .set(bearer(admin))
+      .expect(200);
+    // The terminal answered: this is a credentials problem, not a network one.
+    expect(res.body).toMatchObject({ reachable: false, info: null });
+    expect(res.body.error).toMatch(/^AUTHENTICATION_FAILED: .*username or password/);
+    expect((await prisma.device.findUniqueOrThrow({ where: { id: deviceId } })).status).toBe(
+      'ERROR',
+    );
+  });
+
   it('marks the device OFFLINE when the terminal stops answering', async () => {
     await http()
       .patch(`/api/devices/${deviceId}`)

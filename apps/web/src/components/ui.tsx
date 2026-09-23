@@ -8,11 +8,15 @@ import {
   MinusCircle,
   XCircle,
 } from 'lucide-react';
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
+import {
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  cloneElement,
+  isValidElement,
+  useId,
 } from 'react';
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
@@ -107,12 +111,26 @@ export function Field({
   hint?: string;
   children: ReactNode;
 }) {
+  const hintId = useId();
+  // The hint describes the control; inside the <label> it would become part of its name.
+  const control =
+    hint && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ 'aria-describedby'?: string }>, {
+          'aria-describedby': hintId,
+        })
+      : children;
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-ink-2">{label}</span>
-      {children}
-      {hint && <span className="text-xs text-ink-3">{hint}</span>}
-    </label>
+    <div className="flex flex-col gap-1.5 text-sm">
+      <label className="flex flex-col gap-1.5">
+        <span className="font-medium text-ink-2">{label}</span>
+        {control}
+      </label>
+      {hint && (
+        <span id={hintId} className="text-xs text-ink-3">
+          {hint}
+        </span>
+      )}
+    </div>
   );
 }
 

@@ -59,7 +59,8 @@ Todas las operaciones deben respetar `config.timeoutMs` (con `withTimeout`, o co
    registry.register('ZKTECO', (connection) => new ZKTecoAdapter(connection));
    ```
 5. Si es un driver nuevo, añadir el valor al enum `DeviceDriver` (Prisma **y** `packages/shared` — un test verifica que coincidan) con su migración.
-6. Documentar aquí particularidades (puertos, clave de comunicación, límites de memoria).
+6. Declarar su _preset_ de formulario (fabricante, modelo, puerto y campos de credenciales) en [`apps/web/src/lib/device-drivers.ts`](../apps/web/src/lib/device-drivers.ts). TypeScript lo exige para cada valor del enum.
+7. Documentar aquí particularidades (puertos, clave de comunicación, límites de memoria).
 
 ## Identificación de empleados
 
@@ -68,6 +69,20 @@ Todas las operaciones deben respetar `config.timeoutMs` (con `withTimeout`, o co
 ## Credenciales
 
 Las credenciales (clave de comunicación, usuario/contraseña ISAPI) se envían al registrar el dispositivo, se guardan cifradas con AES-256-GCM (`DEVICE_SECRETS_KEY`) y **nunca se devuelven** por la API (`hasCredentials: true`). Solo `DeviceConnectionManager` las descifra, en memoria, al construir el adaptador.
+
+El formulario web pide las que necesita cada driver (usuario y contraseña ISAPI para Hikvision, clave opcional para ZKTeco) con `autocomplete="new-password"`, para que el navegador no las confunda con la contraseña de quien opera. Al cambiar de driver se descartan: una contraseña nunca viaja a un equipo de otra marca.
+
+## Diagnóstico de conexión
+
+`POST /devices/:id/test-connection` conecta directamente y **conserva el motivo** del fallo (`CODIGO: detalle`), con la misma regla de estado que una sincronización:
+
+| Resultado                                 | Estado    | Qué revisar                                   |
+| ----------------------------------------- | --------- | --------------------------------------------- |
+| Conecta y lee la identidad                | `ONLINE`  | —                                             |
+| `CONNECTION_FAILED`, `TIMEOUT`            | `OFFLINE` | IP, puerto, red, que el equipo esté encendido |
+| `AUTHENTICATION_FAILED`, `PROTOCOL_ERROR` | `ERROR`   | Credenciales, driver o modelo configurado     |
+
+La interfaz traduce el código a una indicación accionable ("El equipo rechazó las credenciales", "Sin respuesta del equipo: revise la IP, el puerto y la red"…).
 
 ## Driver `ZKTECO` (experimental)
 
