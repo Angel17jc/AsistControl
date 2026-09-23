@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { isValidTimeZone } from '@asistcontrol/biometric-core';
 import { DEVICE_DRIVERS, type DeviceDriver } from '@asistcontrol/shared';
 import { Type } from 'class-transformer';
@@ -166,9 +166,20 @@ export class CreateDeviceDto {
   credentials?: Record<string, string>;
 }
 
-export class UpdateDeviceDto extends PartialType(CreateDeviceDto) {
+export class UpdateDeviceDto extends PartialType(OmitType(CreateDeviceDto, ['credentials'])) {
   @ApiPropertyOptional({ description: 'false = DISABLED (no sync, no realtime)' })
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'New credentials, stored encrypted and never returned. Omit to keep the current ones, ' +
+      'null to remove them. Changing the driver without sending new ones removes them too.',
+    example: { username: 'asistencia', password: '********' },
+  })
+  @IsOptional()
+  @IsObject()
+  credentials?: Record<string, string> | null;
 }
