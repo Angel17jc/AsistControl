@@ -1,6 +1,7 @@
 import type { Provider } from '@nestjs/common';
 import {
   AdapterRegistry,
+  HikvisionAdapter,
   MockDeviceAdapter,
   MockDeviceNetwork,
   ZKTecoAdapter,
@@ -29,7 +30,7 @@ export const adapterProviders: Provider[] = [
         });
       }
       registry.register('ZKTECO', (connection) => new ZKTecoAdapter(connection));
-      // registry.register('HIKVISION', (c) => new HikvisionAdapter(c)); → roadmap
+      registry.register('HIKVISION', (connection) => new HikvisionAdapter(connection));
       return registry;
     },
   },

@@ -4,7 +4,7 @@
 
 AsistControl recibe las marcaciones de los dispositivos biométricos de la empresa, las valida y deduplica, calcula cada jornada (horas trabajadas, atrasos, salidas anticipadas, ausencias, horas extra) según reglas **configurables**, y entrega esa información en tiempo real a un dashboard y en reportes listos para nómina.
 
-El sistema **no depende de ningún fabricante**: cada marca se integra mediante un adaptador (`BiometricDeviceAdapter`). Incluye un **simulador de dispositivo** completo y un driver **ZKTeco** (TCP 4370, experimental), por lo que todo el producto funciona y se prueba sin hardware.
+El sistema **no depende de ningún fabricante**: cada marca se integra mediante un adaptador (`BiometricDeviceAdapter`). Incluye un **simulador de dispositivo** completo y drivers **ZKTeco** (TCP 4370) y **Hikvision** (ISAPI sobre HTTP con Digest), ambos experimentales, por lo que todo el producto funciona y se prueba sin hardware.
 
 [![CI](https://github.com/Angel17jc/AsistControl/actions/workflows/ci.yml/badge.svg)](https://github.com/Angel17jc/AsistControl/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Angel17jc/AsistControl/actions/workflows/codeql.yml/badge.svg)](https://github.com/Angel17jc/AsistControl/actions/workflows/codeql.yml)
@@ -50,11 +50,13 @@ El sistema **no depende de ningún fabricante**: cada marca se integra mediante 
 flowchart LR
   subgraph LAN
     D1[Marcador ZKTeco] --> A2
+    D3[Terminal Hikvision] --> A3
     D2[Marcador simulado] --> A1
   end
   subgraph API[API NestJS]
     A1[MockDeviceAdapter] --> CM[DeviceConnectionManager]
     A2[ZKTecoAdapter] --> CM
+    A3[HikvisionAdapter] --> CM
     CM --> SYNC[DeviceSyncService<br/>validar · normalizar · deduplicar]
     SYNC --> ATT[AttendanceProcessingService]
     ATT --> CALC[[calculateAttendance<br/>dominio puro]]
@@ -246,7 +248,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 
 - [x] Núcleo: adaptadores, simulador, sincronización idempotente, motor de asistencia, RBAC, auditoría, reportes, dashboard en tiempo real
 - [x] Adaptador **ZKTeco** (TCP 4370) — experimental, pendiente de validar con hardware
-- [ ] Adaptador **Hikvision** (ISAPI)
+- [x] Adaptador **Hikvision** (ISAPI + Digest) — experimental, pendiente de validar con hardware
 - [ ] Recepción _push_ HTTP (ADMS/iclock) para equipos en la nube
 - [ ] Saldos de vacaciones y políticas por tipo de contrato
 - [ ] Notificaciones (dispositivo desconectado, solicitudes pendientes) por correo/in-app

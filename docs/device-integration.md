@@ -22,7 +22,7 @@ classDiagram
   }
   BiometricDeviceAdapter <|.. MockDeviceAdapter
   BiometricDeviceAdapter <|.. ZKTecoAdapter : experimental
-  BiometricDeviceAdapter <|.. HikvisionAdapter : roadmap
+  BiometricDeviceAdapter <|.. HikvisionAdapter : experimental
   class AdapterRegistry {
     +register(driver, factory)
     +create(driver, config) BiometricDeviceAdapter
@@ -42,7 +42,7 @@ Código: [`packages/biometric-core`](../packages/biometric-core/src).
 | `sync({ cursor })`  | Devolver los registros nuevos desde `cursor` y un nuevo cursor opaco. Si no sabe continuar (memoria borrada, cursor inválido) debe **releer todo**: la plataforma deduplica. |
 | `onAttendanceLog()` | Solo si `capabilities.realtime`. Debe entregar marcaciones únicamente mientras hay conexión real.                                                                            |
 
-Todas las operaciones deben respetar `config.timeoutMs` (usar `withTimeout`). Errores:
+Todas las operaciones deben respetar `config.timeoutMs` (con `withTimeout`, o con `AbortSignal.timeout` en drivers HTTP). Errores:
 
 | Error                                                                    | `retryable` | Efecto en la plataforma                                  |
 | ------------------------------------------------------------------------ | ----------- | -------------------------------------------------------- |
@@ -97,6 +97,60 @@ curl -X POST localhost:3000/api/devices -H "authorization: Bearer $TOKEN" -H 'co
 ```
 
 Para validarlo con un equipo real: registrar el dispositivo, ejecutar `POST /devices/:id/test-connection` (debe devolver serie, modelo y desfase de reloj) y luego `POST /devices/:id/sync`. Revisar en el `DeviceSyncLog` que no haya registros rechazados y contrastar las horas con el reloj del equipo.
+
+## Driver `HIKVISION` (experimental)
+
+Terminales de control de acceso Hikvision (serie DS-K1T: reconocimiento facial, huella y tarjeta) por **ISAPI**: HTTP con autenticación **Digest** y búsquedas JSON paginadas. La implementación sigue la documentación pública de ISAPI y se verifica contra un **terminal falso que habla ISAPI** (Digest real, nonces que expiran, paginación, filtrado por tipo de evento y rango horario). Falta validarla contra hardware real antes de usarla en producción.
+
+| Aspecto            | Detalle                                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transporte         | HTTP (puerto 80) o HTTPS (`config.protocol: "https"`, puerto 443). Con HTTPS el certificado debe ser de confianza para Node (`NODE_EXTRA_CA_CERTS`); **la verificación nunca se desactiva**           |
+| Autenticación      | Digest RFC 7616: se prefiere SHA-256 si el equipo lo ofrece; si no, MD5 (lo impone el equipo). Un terminal que solo ofrece Basic sobre HTTP se **rechaza**: la contraseña viajaría en claro           |
+| Credenciales       | `{ "username": "…", "password": "…" }` de un usuario ISAPI con permiso de lectura de eventos (se guardan cifradas)                                                                                    |
+| Contraseña errónea | Falla **una sola vez** y sin reintento (`AUTHENTICATION_FAILED`, estado `ERROR`): estos equipos **bloquean la cuenta** tras varios intentos fallidos, y reintentar dejaría el terminal inaccesible    |
+| Marcaciones        | Eventos `major 5` de identificación correcta: rostro (`minor 75`), huella (`38`) y tarjeta (`1`), configurable con `config.eventMinors`. Los intentos fallidos no son asistencia y no se leen         |
+| Tipo de marcación  | `attendanceStatus`: `checkIn`/`checkOut`/`breakOut`/`breakIn`. Las teclas de horas extra se leen como entrada/salida: las horas extra las calcula el motor según el horario, nunca el equipo          |
+| Hora               | Con offset (`…-05:00`) se toma tal cual; sin offset (firmware antiguo) se interpreta en `config.timezone`, igual que ZKTeco                                                                           |
+| Cursor             | `hik1:<serialNo más alto>:<hora del evento más reciente>`. Cada sincronización busca desde **una hora antes** (`config.overlapMinutes`) del último evento y se queda con los de número de serie mayor |
+| Reloj atrasado     | Si la hora del equipo es anterior al último evento descargado, el cursor deja de ser fiable y se relee toda la ventana (`config.initialLookbackDays`, 31 días)                                        |
+| Memoria borrada    | Un evento **más nuevo con número de serie menor** revela que el contador se reinició: se devuelve toda la ventana y la ingesta deduplica                                                              |
+| Sin `serialNo`     | Firmware muy antiguo: se devuelve la ventana de solapamiento completa y la deduplicación de la plataforma descarta lo repetido                                                                        |
+| Tiempo real        | No por ahora (el _stream_ `alertStream` de ISAPI queda en el roadmap); la plataforma consulta según `DEVICE_SYNC_INTERVAL_SECONDS`                                                                    |
+
+```mermaid
+flowchart TD
+  A[Hora del equipo<br/>GET /ISAPI/System/time] --> B{¿Hay cursor y la hora<br/>del equipo es posterior<br/>al último evento?}
+  B -- sí --> C[Buscar desde último evento − 1 h]
+  B -- no --> D[Buscar toda la ventana<br/>initialLookbackDays]
+  C --> E[POST /ISAPI/AccessControl/AcsEvent<br/>una búsqueda paginada por minor]
+  D --> E
+  E --> F{¿Algún evento más nuevo<br/>con serie menor?}
+  F -- sí: contador reiniciado --> G[Devolver todo lo leído<br/>la ingesta deduplica]
+  F -- no --> H[Devolver serie > cursor]
+  G --> I[Nuevo cursor]
+  H --> I
+```
+
+**Límite conocido:** si alguien atrasa el reloj del equipo y lo corrige **entre dos sincronizaciones**, las marcaciones hechas mientras estuvo atrasado quedan fuera de la ventana de búsqueda. Con el intervalo por defecto (5 min) el riesgo es bajo; `POST /devices/:id/sync` tras corregir un reloj, o ampliar `overlapMinutes`, lo cubre.
+
+Registro de ejemplo:
+
+```bash
+curl -X POST localhost:3000/api/devices -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{
+  "name":"Acceso principal","driver":"HIKVISION","manufacturer":"Hikvision","model":"DS-K1T671M",
+  "host":"192.168.1.64","port":80,
+  "config":{"timeoutMs":10000,"timezone":"America/Guayaquil","protocol":"http"},
+  "credentials":{"username":"asistencia","password":"********"}
+}'
+```
+
+Para validarlo con un equipo real:
+
+1. Crear en el terminal un **usuario ISAPI dedicado** (no `admin`) con permiso de consulta de eventos; así un error de configuración nunca bloquea la cuenta de administración.
+2. Registrar el dispositivo y ejecutar `POST /devices/:id/test-connection`: debe devolver modelo, serie y desfase de reloj.
+3. Marcar con rostro, huella y tarjeta, y ejecutar `POST /devices/:id/sync`. Contrastar en `/asistencia → Marcaciones` la hora, el tipo y el método de cada marcación con el registro del equipo.
+4. Sincronizar de nuevo: `recordsReceived` debe ser 0.
+5. Si el firmware usa otros códigos `minor` para las identificaciones correctas, ajustarlos en `config.eventMinors` y documentarlos aquí.
 
 ## Simulador (driver `MOCK`)
 
