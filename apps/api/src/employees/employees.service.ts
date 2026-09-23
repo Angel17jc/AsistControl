@@ -12,6 +12,7 @@ import type { CreateEmployeeDto, EmployeeQueryDto, UpdateEmployeeDto } from './e
 const EMPLOYEE_INCLUDE = {
   department: { select: { id: true, name: true, code: true } },
   position: { select: { id: true, name: true } },
+  contractType: { select: { id: true, name: true } },
   supervisor: { select: { id: true, firstName: true, lastName: true } },
 } satisfies Prisma.EmployeeInclude;
 
@@ -180,6 +181,14 @@ export class EmployeesService {
         this.exists(
           this.prisma.department.count({ where: { id: dto.departmentId, deletedAt: null } }),
           'Department',
+        ),
+      );
+    }
+    if (dto.contractTypeId) {
+      checks.push(
+        this.exists(
+          this.prisma.contractType.count({ where: { id: dto.contractTypeId } }),
+          'Contract type',
         ),
       );
     }

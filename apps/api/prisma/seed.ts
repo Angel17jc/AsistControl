@@ -216,6 +216,32 @@ async function main() {
     },
   });
 
+  // Example vacation rules. They are company settings, not law: set them to the organization's
+  // contracts (and to whatever legislation applies to it) from the contract types screen.
+  const fullTime = await prisma.contractType.upsert({
+    where: { name: 'Tiempo completo' },
+    update: {},
+    create: {
+      name: 'Tiempo completo',
+      vacationDaysPerYear: 15,
+      vacationAccrual: 'ANNUAL',
+      vacationDayCounting: 'WORKING_DAYS',
+      seniorityAfterYears: 5,
+      seniorityExtraDaysPerYear: 1,
+      seniorityMaxExtraDays: 15,
+    },
+  });
+  const partTime = await prisma.contractType.upsert({
+    where: { name: 'Medio tiempo' },
+    update: {},
+    create: {
+      name: 'Medio tiempo',
+      vacationDaysPerYear: 7.5,
+      vacationAccrual: 'MONTHLY',
+      vacationDayCounting: 'WORKING_DAYS',
+    },
+  });
+
   const employeeIds = new Map<string, string>();
   for (const e of employees) {
     const row = await prisma.employee.upsert({
@@ -250,6 +276,11 @@ async function main() {
     }
   }
   for (const e of employees) {
+    // Only employees without one: re-running the seed never overrides a real assignment.
+    await prisma.employee.updateMany({
+      where: { employeeCode: e.code, contractTypeId: null },
+      data: { contractTypeId: e.code === 'EMP-0005' ? partTime.id : fullTime.id },
+    });
     if ('supervisor' in e) {
       await prisma.employee.update({
         where: { employeeCode: e.code },

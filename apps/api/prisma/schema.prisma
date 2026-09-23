@@ -42,6 +42,16 @@ enum DeviceDriver {
   HIKVISION
 }
 
+enum VacationAccrual {
+  ANNUAL
+  MONTHLY
+}
+
+enum VacationDayCounting {
+  CALENDAR_DAYS
+  WORKING_DAYS
+}
+
 enum NotificationType {
   DEVICE_DOWN
   DEVICE_RECOVERED
@@ -214,6 +224,8 @@ model Employee {
   positionId     String?        @map("position_id") @db.Uuid
   supervisorId   String?        @map("supervisor_id") @db.Uuid
   hireDate       DateTime       @map("hire_date") @db.Date
+  /// Decides vacation entitlement. Without one, the employee has no vacation balance.
+  contractTypeId String?        @map("contract_type_id") @db.Uuid
   status         EmployeeStatus @default(ACTIVE)
   /// Id enrolled on the biometric terminals (shared across devices). Maps AttendanceEvent.deviceUserId.
   biometricId    String?        @unique @map("biometric_id")
@@ -223,10 +235,12 @@ model Employee {
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  department          Department?        @relation(fields: [departmentId], references: [id])
-  position            Position?          @relation(fields: [positionId], references: [id])
-  supervisor          Employee?          @relation("Supervision", fields: [supervisorId], references: [id])
-  subordinates        Employee[]         @relation("Supervision")
+  department          Department?          @relation(fields: [departmentId], references: [id])
+  contractType        ContractType?        @relation(fields: [contractTypeId], references: [id])
+  vacationAdjustments VacationAdjustment[]
+  position            Position?            @relation(fields: [positionId], references: [id])
+  supervisor          Employee?            @relation("Supervision", fields: [supervisorId], references: [id])
+  subordinates        Employee[]           @relation("Supervision")
   user                User?
   scheduleAssignments EmployeeSchedule[]
   attendanceEvents    AttendanceEvent[]
@@ -461,6 +475,44 @@ model OvertimeRecord {
 }
 
 /// Permissions (hours or days) and vacations share one workflow; `type` tells them apart.
+/// Employment terms that decide vacation entitlement. Every value is company policy: the
+/// platform encodes no country's labor law (see docs/adr/0008-vacation-balances.md).
+model ContractType {
+  id                           String              @id @default(uuid()) @db.Uuid
+  name                         String              @unique
+  vacationDaysPerYear          Decimal             @map("vacation_days_per_year") @db.Decimal(5, 2)
+  vacationAccrual              VacationAccrual     @default(ANNUAL) @map("vacation_accrual")
+  vacationDayCounting          VacationDayCounting @default(WORKING_DAYS) @map("vacation_day_counting")
+  /// Seniority bonus: extra days per service year beyond `seniorityAfterYears`, capped.
+  seniorityAfterYears          Int?                @map("seniority_after_years")
+  seniorityExtraDaysPerYear    Decimal?            @map("seniority_extra_days_per_year") @db.Decimal(4, 2)
+  seniorityMaxExtraDays        Decimal?            @map("seniority_max_extra_days") @db.Decimal(5, 2)
+  /// Whether a vacation may be requested beyond the available balance (an advance).
+  allowNegativeVacationBalance Boolean             @default(false) @map("allow_negative_vacation_balance")
+  createdAt                    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  employees Employee[]
+
+  @@map("contract_types")
+}
+
+/// Manual correction of a vacation balance: an opening balance carried over from another
+/// system, days granted or withdrawn. Positive adds, negative subtracts; always justified.
+model VacationAdjustment {
+  id          String   @id @default(uuid()) @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  days        Decimal  @db.Decimal(6, 2)
+  reason      String
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, createdAt])
+  @@map("vacation_adjustments")
+}
+
 model LeaveRequest {
   id            String        @id @default(uuid()) @db.Uuid
   employeeId    String        @map("employee_id") @db.Uuid

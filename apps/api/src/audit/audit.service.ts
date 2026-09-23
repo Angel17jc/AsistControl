@@ -21,6 +21,7 @@ export type AuditAction =
   | 'attendance.event_voided'
   | 'attendance.recompute'
   | 'leave.reviewed'
+  | 'vacation.adjusted'
   | 'overtime.reviewed'
   | 'settings.updated';
 
