@@ -32,29 +32,33 @@ erDiagram
   Employee ||--o{ AttendanceRecord : "jornada diaria"
   Employee ||--o{ OvertimeRecord : "horas extra"
   Employee ||--o{ LeaveRequest : solicita
+  ContractType ||--o{ Employee : "reglas de vacaciones"
+  Employee ||--o{ VacationAdjustment : "ajustes de saldo"
 ```
 
 ## Entidades y por qué existen
 
-| Entidad                            | Razón de negocio                                                                                                                                                                                         |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`                             | Cuenta de acceso con un rol; opcionalmente vinculada a un empleado (para alcance "mis datos").                                                                                                           |
-| `Session`                          | Una por login. Guarda el **hash** del refresh token actual para rotarlo y revocarlo (logout, desactivación, robo).                                                                                       |
-| `Department`, `Position`           | Organización; filtros de reportes.                                                                                                                                                                       |
-| `Employee`                         | Persona. `biometric_id` único enlaza las marcaciones de los equipos. `supervisor_id` define el equipo de un supervisor.                                                                                  |
-| `WorkShift`                        | Plantilla de turno (horas locales `HH:mm`, almuerzo, tolerancias propias). `end <= start` ⇒ cruza medianoche.                                                                                            |
-| `WorkSchedule` + `WorkScheduleDay` | Patrón semanal; los días sin fila son días libres.                                                                                                                                                       |
-| `EmployeeSchedule`                 | **Historial** de asignaciones con vigencia. Un cambio de horario no altera cómo se evaluaron los días anteriores.                                                                                        |
-| `Holiday`                          | Feriados (fecha única).                                                                                                                                                                                  |
-| `Device`                           | Marcador en la LAN: driver, host/puerto, estado, `config` (no secreta), `credentials_encrypted`, cursor de sincronización y lock.                                                                        |
-| `DeviceSyncLog`                    | Auditoría operativa de cada descarga: recibidos, procesados, duplicados, rechazados, sin empleado, error.                                                                                                |
-| `AttendanceEvent`                  | Marcación **cruda e inmutable** (dispositivo o manual). `dedup_key` UNIQUE garantiza idempotencia. Las correcciones son eventos nuevos o anulaciones (`voided_at`), nunca ediciones.                     |
-| `AttendanceRecord`                 | Jornada **derivada** (única por empleado y fecha): horario vigente, entrada/salida, minutos trabajados, atraso, extra, novedades, `is_final`. Se puede reconstruir en cualquier momento.                 |
-| `OvertimeRecord`                   | Propuesta de horas extra con aprobación; una decisión humana nunca se sobrescribe por un recálculo.                                                                                                      |
-| `LeaveRequest`                     | Permisos (por horas o días) y vacaciones con flujo de aprobación.                                                                                                                                        |
-| `AuditLog`                         | Bitácora _append-only_: actor, acción, entidad, IP, user-agent, metadata (secretos redactados).                                                                                                          |
-| `Notification`                     | Aviso para **un** usuario (dispositivo caído o recuperado, solicitud por revisar o resuelta). Guarda `type` + `data` JSON, no texto; `read_at` por destinatario ([ADR 0007](adr/0007-notifications.md)). |
-| `SystemSetting`                    | Política laboral y zona horaria editables en caliente.                                                                                                                                                   |
+| Entidad                            | Razón de negocio                                                                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`                             | Cuenta de acceso con un rol; opcionalmente vinculada a un empleado (para alcance "mis datos").                                                                                                                       |
+| `Session`                          | Una por login. Guarda el **hash** del refresh token actual para rotarlo y revocarlo (logout, desactivación, robo).                                                                                                   |
+| `Department`, `Position`           | Organización; filtros de reportes.                                                                                                                                                                                   |
+| `Employee`                         | Persona. `biometric_id` único enlaza las marcaciones de los equipos. `supervisor_id` define el equipo de un supervisor.                                                                                              |
+| `WorkShift`                        | Plantilla de turno (horas locales `HH:mm`, almuerzo, tolerancias propias). `end <= start` ⇒ cruza medianoche.                                                                                                        |
+| `WorkSchedule` + `WorkScheduleDay` | Patrón semanal; los días sin fila son días libres.                                                                                                                                                                   |
+| `EmployeeSchedule`                 | **Historial** de asignaciones con vigencia. Un cambio de horario no altera cómo se evaluaron los días anteriores.                                                                                                    |
+| `Holiday`                          | Feriados (fecha única).                                                                                                                                                                                              |
+| `Device`                           | Marcador en la LAN: driver, host/puerto, estado, `config` (no secreta), `credentials_encrypted`, cursor de sincronización y lock.                                                                                    |
+| `DeviceSyncLog`                    | Auditoría operativa de cada descarga: recibidos, procesados, duplicados, rechazados, sin empleado, error.                                                                                                            |
+| `AttendanceEvent`                  | Marcación **cruda e inmutable** (dispositivo o manual). `dedup_key` UNIQUE garantiza idempotencia. Las correcciones son eventos nuevos o anulaciones (`voided_at`), nunca ediciones.                                 |
+| `AttendanceRecord`                 | Jornada **derivada** (única por empleado y fecha): horario vigente, entrada/salida, minutos trabajados, atraso, extra, novedades, `is_final`. Se puede reconstruir en cualquier momento.                             |
+| `OvertimeRecord`                   | Propuesta de horas extra con aprobación; una decisión humana nunca se sobrescribe por un recálculo.                                                                                                                  |
+| `LeaveRequest`                     | Permisos (por horas o días) y vacaciones con flujo de aprobación.                                                                                                                                                    |
+| `ContractType`                     | Reglas de vacaciones de un tipo de contrato: días por año, devengo anual o mensual, días hábiles o corridos, bono de antigüedad, anticipos. Datos de la empresa, no ley ([ADR 0008](adr/0008-vacation-balances.md)). |
+| `VacationAdjustment`               | Corrección manual del saldo (saldo inicial de otro sistema, días otorgados o retirados), con motivo y autor. El saldo en sí **no se guarda**: se calcula.                                                            |
+| `AuditLog`                         | Bitácora _append-only_: actor, acción, entidad, IP, user-agent, metadata (secretos redactados).                                                                                                                      |
+| `Notification`                     | Aviso para **un** usuario (dispositivo caído o recuperado, solicitud por revisar o resuelta). Guarda `type` + `data` JSON, no texto; `read_at` por destinatario ([ADR 0007](adr/0007-notifications.md)).             |
+| `SystemSetting`                    | Política laboral y zona horaria editables en caliente.                                                                                                                                                               |
 
 ### Diferencias respecto a la lista inicial de entidades (y por qué)
 
