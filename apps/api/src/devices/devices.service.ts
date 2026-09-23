@@ -105,9 +105,31 @@ export class DevicesService implements OnApplicationBootstrap {
       await this.assertAddressFree(dto.host ?? before.host, dto.port ?? before.port, id);
 
     const { credentials, config, enabled, ...data } = dto;
+    // Driver, host and port say which terminal this is. When they change, what the platform
+    // knew about the old one no longer applies: its sync cursor would be read against another
+    // device's memory (Hikvision would skip punches with lower serial numbers), so the next
+    // sync starts over. Re-reading is always safe: ingestion deduplicates.
+    const newTerminal =
+      (dto.driver !== undefined && dto.driver !== before.driver) ||
+      (dto.host !== undefined && dto.host !== before.host) ||
+      (dto.port !== undefined && dto.port !== before.port);
+    const driverChanged = dto.driver !== undefined && dto.driver !== before.driver;
+
     let status: DeviceStatus | undefined;
     if (enabled === false) status = 'DISABLED';
     else if (enabled === true && before.status === 'DISABLED') status = 'OFFLINE';
+    else if (newTerminal && before.status !== 'DISABLED') status = 'OFFLINE';
+
+    // Credentials belong to one vendor's protocol: a new driver never inherits the old ones.
+    const credentialsEncrypted =
+      credentials === null || (credentials === undefined && driverChanged)
+        ? null
+        : credentials
+          ? this.connections.encryptCredentials(credentials)
+          : undefined;
+    const credentialsChanged =
+      credentialsEncrypted !== undefined &&
+      (credentialsEncrypted !== null || before.credentialsEncrypted !== null);
 
     const device = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.device.update({
@@ -118,9 +140,8 @@ export class DevicesService implements OnApplicationBootstrap {
           config: config
             ? ({ ...(before.config as object), ...config } as Prisma.InputJsonValue)
             : undefined,
-          credentialsEncrypted: credentials
-            ? this.connections.encryptCredentials(credentials)
-            : undefined,
+          credentialsEncrypted,
+          ...(newTerminal && { lastSyncCursor: null, serialNumber: null, lastError: null }),
         },
       });
       await this.audit.record(
@@ -130,11 +151,14 @@ export class DevicesService implements OnApplicationBootstrap {
           entity: 'Device',
           entityId: id,
           context: ctx,
-          metadata: diff(toDeviceResponse(before), { ...data, config, status }),
+          metadata: {
+            ...diff(toDeviceResponse(before), { ...data, config, status }),
+            ...(newTerminal && { syncCursorReset: true }),
+          },
         },
         tx,
       );
-      if (credentials) {
+      if (credentialsChanged) {
         await this.audit.record(
           {
             actorId: actor.id,
@@ -142,6 +166,7 @@ export class DevicesService implements OnApplicationBootstrap {
             entity: 'Device',
             entityId: id,
             context: ctx,
+            metadata: { removed: credentialsEncrypted === null },
           },
           tx,
         );
