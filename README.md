@@ -185,15 +185,15 @@ npm run dev:web                              # http://localhost:5173  (proxy a l
 
 ## Testing
 
-| Suite                 | Herramienta                   | Cubre                                                                                                                                                                                                                                                                                                          |
-| --------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Motor de asistencia   | Jest                          | Ejemplo del enunciado, tolerancias, atrasos, salida anticipada, horas extra (dos bases de cálculo), almuerzo no marcado, dobles marcaciones, entrada sin salida, salida sin entrada, jornada en curso, ausencia, permisos parciales y totales, días libres, feriados, empleado sin horario, **turno nocturno** |
-| Pipeline de ingesta   | Jest                          | Validación, normalización, duplicados en lote e idempotencia entre lotes, relojes adelantados, datos corruptos                                                                                                                                                                                                 |
-| Seguridad             | Jest                          | RBAC, cifrado de credenciales, validación de entorno, CSV injection                                                                                                                                                                                                                                            |
-| Simulador / adaptador | Vitest                        | Conexión, timeouts, pérdida de conexión, errores de protocolo, cursor incremental, memoria borrada, reloj retrasado, push en tiempo real                                                                                                                                                                       |
-| API e2e               | Jest + Supertest + PostgreSQL | Login, rotación y robo de refresh token, 401/403, alcance por rol, sincronización completa con fallos inyectados, sync concurrente, empleados no enrolados, correcciones, permisos, horas extra, reportes CSV                                                                                                  |
-| Web                   | Vitest + Testing Library      | Cliente API (refresh único ante 401 concurrentes), login, componentes del dashboard                                                                                                                                                                                                                            |
-| Navegador (UI e2e)    | Playwright + Chromium         | Sesión con cookie de refresco y recarga, menú y rutas por rol, alta de marcador, prueba de conexión, generación y descarga de jornada, idempotencia, equipo desconectado, marcaciones en vivo por WebSocket, descarga de CSV, uso en teléfono                                                                  |
+| Suite                 | Herramienta                   | Cubre                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Motor de asistencia   | Jest                          | Ejemplo del enunciado, tolerancias, atrasos, salida anticipada, horas extra (dos bases de cálculo), almuerzo no marcado, dobles marcaciones, entrada sin salida, salida sin entrada, jornada en curso, ausencia, permisos parciales y totales, días libres, feriados, empleado sin horario, **turno nocturno**                                                                      |
+| Pipeline de ingesta   | Jest                          | Validación, normalización, duplicados en lote e idempotencia entre lotes, relojes adelantados, datos corruptos                                                                                                                                                                                                                                                                      |
+| Seguridad             | Jest                          | RBAC, cifrado de credenciales, validación de entorno, CSV injection                                                                                                                                                                                                                                                                                                                 |
+| Simulador / adaptador | Vitest                        | Conexión, timeouts, pérdida de conexión, errores de protocolo, cursor incremental, memoria borrada, reloj retrasado, push en tiempo real                                                                                                                                                                                                                                            |
+| API e2e               | Jest + Supertest + PostgreSQL | Login, rotación y robo de refresh token, 401/403, alcance por rol, sincronización completa con fallos inyectados (MOCK, ZKTeco y Hikvision contra terminales falsos), sync concurrente, edición de dispositivos, empleados no enrolados, alta/baja/reincorporación, correcciones, permisos, saldos de vacaciones, asignación de horarios, notificaciones, horas extra, reportes CSV |
+| Web                   | Vitest + Testing Library      | Cliente API (refresh único ante 401 concurrentes), login, dashboard, formularios de empleado y dispositivo, campana de notificaciones, saldo de vacaciones, tipos de contrato, horarios del empleado                                                                                                                                                                                |
+| Navegador (UI e2e)    | Playwright + Chromium         | Sesión con cookie de refresco y recarga, menú y rutas por rol, alta de marcador (MOCK y Hikvision), prueba de conexión, generación y descarga de jornada, idempotencia, equipo desconectado, marcaciones en vivo por WebSocket, notificaciones, vacaciones, ciclo de vida del empleado, horarios, descarga de CSV, uso en teléfono                                                  |
 
 ```bash
 npm test
@@ -250,12 +250,16 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] Adaptador **ZKTeco** (TCP 4370) — experimental, pendiente de validar con hardware
 - [x] Adaptador **Hikvision** (ISAPI + Digest) — experimental, pendiente de validar con hardware
 - [ ] Recepción _push_ HTTP (ADMS/iclock) para equipos en la nube
-- [ ] Saldos de vacaciones y políticas por tipo de contrato
-- [ ] Notificaciones (dispositivo desconectado, solicitudes pendientes) por correo/in-app
+- [x] Saldos de vacaciones y políticas por tipo de contrato
+- [x] Notificaciones in-app en tiempo real (dispositivo desconectado/recuperado, solicitudes por revisar/resueltas)
+- [x] Gestión de horarios por empleado desde la web
+- [x] E2E de interfaz con Playwright
+- [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real
+- [ ] Vacaciones: caducidad de días no usados y medios días
+- [ ] Notificaciones por correo
 - [ ] Exportación directa a formatos de nómina y PDF firmado
 - [ ] Multi-empresa / multi-sede con zonas horarias por sede
 - [ ] Métricas Prometheus y trazas OpenTelemetry
-- [ ] E2E de interfaz con Playwright
 
 ## Licencia
 
