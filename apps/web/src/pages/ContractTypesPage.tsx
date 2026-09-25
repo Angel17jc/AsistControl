@@ -20,7 +20,12 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
-import { VACATION_ACCRUAL_LABEL, VACATION_COUNTING_LABEL, formatDays } from '../lib/format';
+import {
+  VACATION_ACCRUAL_LABEL,
+  VACATION_COUNTING_LABEL,
+  describeExpiry,
+  formatDays,
+} from '../lib/format';
 import type { ContractTypeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
@@ -79,6 +84,7 @@ export function ContractTypesPage() {
               'Devengo',
               'Descuenta',
               'Antigüedad',
+              'Días no usados',
               'Anticipos',
               'Empleados',
               '',
@@ -96,6 +102,7 @@ export function ContractTypesPage() {
                     ? `+${formatDays(t.seniority.extraDaysPerYear)}/año desde el año ${t.seniority.afterYears + 1}, máx. ${formatDays(t.seniority.maxExtraDays)}`
                     : '—'}
                 </Td>
+                <Td className="text-ink-2">{describeExpiry(t.vacationExpiryMonths)}</Td>
                 <Td className="text-ink-2">{t.allowNegativeVacationBalance ? 'Sí' : 'No'}</Td>
                 <Td className="tabular">{t.employees ?? 0}</Td>
                 <Td>
@@ -150,6 +157,8 @@ function ContractTypeForm({
     vacationDayCounting:
       contractType?.vacationDayCounting ?? ('WORKING_DAYS' as VacationDayCounting),
     allowNegativeVacationBalance: contractType?.allowNegativeVacationBalance ?? false,
+    // Empty = the days never expire.
+    vacationExpiryMonths: String(contractType?.vacationExpiryMonths ?? ''),
   });
   const [seniority, setSeniority] = useState(
     contractType?.seniority !== null && contractType !== undefined,
@@ -165,6 +174,8 @@ function ContractTypeForm({
       const body = {
         ...form,
         vacationDaysPerYear: Number(form.vacationDaysPerYear),
+        vacationExpiryMonths:
+          form.vacationExpiryMonths === '' ? null : Number(form.vacationExpiryMonths),
         seniority: seniority
           ? {
               afterYears: Number(bonus.afterYears),
@@ -243,6 +254,21 @@ function ContractTypeForm({
             </option>
           ))}
         </Select>
+      </Field>
+
+      <Field
+        label="Los días no usados caducan a los (meses)"
+        hint="Contados desde el aniversario del año en que se ganaron. Vacío: no caducan."
+      >
+        <Input
+          type="number"
+          min={1}
+          max={120}
+          step="1"
+          placeholder="No caducan"
+          value={form.vacationExpiryMonths}
+          onChange={(e) => setForm((f) => ({ ...f, vacationExpiryMonths: e.target.value }))}
+        />
       </Field>
 
       <div className="space-y-2 text-sm sm:col-span-2 lg:col-span-4">

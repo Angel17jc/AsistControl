@@ -1,9 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
-import { VACATION_COUNTING_LABEL, formatDate, formatDateTime, formatDays } from '../../lib/format';
+import {
+  VACATION_COUNTING_LABEL,
+  formatDate,
+  formatDateTime,
+  formatDateWithYear,
+  formatDays,
+} from '../../lib/format';
 import type { ContractTypeRow, VacationBalance } from '../../lib/types';
-import { Button, Card, CardHeader, ErrorState, Field, Input, Select, Spinner } from '../ui';
+import {
+  Button,
+  Card,
+  CardHeader,
+  ErrorState,
+  Field,
+  Input,
+  Select,
+  Spinner,
+  ToneIcon,
+} from '../ui';
 
 /**
  * An employee's vacation balance, broken down so it can be checked by hand:
@@ -26,6 +42,11 @@ export function VacationBalanceCard({
     queryFn: () => api<VacationBalance>(`/employees/${employeeId}/vacation-balance`),
   });
   const b = balance.data;
+  // Shown whenever the contract makes days expire, or some already did under an earlier rule.
+  const expires =
+    b !== undefined &&
+    ((b.contractType !== null && b.contractType.vacationExpiryMonths !== null) ||
+      b.expiredDays > 0);
 
   return (
     <Card className={className}>
@@ -55,12 +76,26 @@ export function VacationBalanceCard({
             </span>{' '}
             <span className="text-sm text-ink-2">disponibles hoy</span>
           </p>
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+          {b.nextExpiry && (
+            <p className="flex items-center gap-2 text-sm text-ink-1">
+              <ToneIcon tone="warning" />
+              {formatDays(b.nextExpiry.days)} caducan el {formatDateWithYear(b.nextExpiry.date)} si
+              no se usan antes
+            </p>
+          )}
+          <dl
+            className={
+              expires
+                ? 'grid grid-cols-2 gap-3 text-sm sm:grid-cols-6'
+                : 'grid grid-cols-2 gap-3 text-sm sm:grid-cols-5'
+            }
+          >
             <Figure label="Devengados" value={b.accruedDays} />
             <Figure label="Ajustes" value={b.adjustmentDays} signed />
             <Figure label="Usados" value={b.usedDays} />
             <Figure label="Programados" value={b.scheduledDays} />
             <Figure label="Pendientes" value={b.pendingDays} />
+            {expires && <Figure label="Caducados" value={b.expiredDays} />}
           </dl>
           {b.accrual && b.contractType && (
             <p className="text-xs text-ink-3">

@@ -16,6 +16,7 @@ const TYPES: ContractTypeRow[] = [
     vacationAccrual: 'ANNUAL',
     vacationDayCounting: 'WORKING_DAYS',
     seniority: { afterYears: 5, extraDaysPerYear: 1, maxExtraDays: 15 },
+    vacationExpiryMonths: 24,
     allowNegativeVacationBalance: false,
     employees: 9,
   },
@@ -26,6 +27,7 @@ const TYPES: ContractTypeRow[] = [
     vacationAccrual: 'MONTHLY',
     vacationDayCounting: 'CALENDAR_DAYS',
     seniority: null,
+    vacationExpiryMonths: null,
     allowNegativeVacationBalance: true,
     employees: 0,
   },
@@ -66,10 +68,12 @@ describe('ContractTypesPage', () => {
     expect(within(row).getByText('15 días')).toBeVisible();
     expect(within(row).getByText('Anual, en cada aniversario')).toBeVisible();
     expect(within(row).getByText('+1 día/año desde el año 6, máx. 15 días')).toBeVisible();
+    expect(within(row).getByText('24 meses después de cada aniversario')).toBeVisible();
 
     const temporal = screen.getByText('Temporal').closest('tr')!;
     expect(within(temporal).getByText('7,5 días')).toBeVisible();
     expect(within(temporal).getByText('Días corridos')).toBeVisible();
+    expect(within(temporal).getByText('No caducan')).toBeVisible();
   });
 
   it('only offers to delete the types nobody uses', async () => {
@@ -87,6 +91,10 @@ describe('ContractTypesPage', () => {
     await userEvent.type(within(form).getByLabelText('Nombre'), 'Pasantía');
     await userEvent.clear(within(form).getByLabelText('Días de vacaciones por año'));
     await userEvent.type(within(form).getByLabelText('Días de vacaciones por año'), '10');
+    await userEvent.type(
+      within(form).getByLabelText('Los días no usados caducan a los (meses)'),
+      '12',
+    );
     expect(within(form).queryByLabelText('Máximo de días extra')).toBeNull();
 
     await userEvent.click(within(form).getByLabelText('Días extra por antigüedad'));
@@ -103,6 +111,7 @@ describe('ContractTypesPage', () => {
           vacationAccrual: 'ANNUAL',
           vacationDayCounting: 'WORKING_DAYS',
           allowNegativeVacationBalance: false,
+          vacationExpiryMonths: 12,
           seniority: { afterYears: 5, extraDaysPerYear: 1, maxExtraDays: 5 },
         },
       }),
@@ -115,10 +124,14 @@ describe('ContractTypesPage', () => {
     const form = screen.getByRole('form', { name: 'Editar Tiempo completo' });
     expect(within(form).getByLabelText('Nombre')).toHaveValue('Tiempo completo');
     await userEvent.click(within(form).getByLabelText('Días extra por antigüedad'));
+    // Emptying the expiry means the days no longer expire.
+    const expiry = within(form).getByLabelText('Los días no usados caducan a los (meses)');
+    expect(expiry).toHaveValue(24);
+    await userEvent.clear(expiry);
     await userEvent.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(sent('PATCH')?.url).toBe('/api/contract-types/ct1'));
-    expect(sent('PATCH')?.body.seniority).toBeNull();
+    expect(sent('PATCH')?.body).toMatchObject({ seniority: null, vacationExpiryMonths: null });
   });
 
   it('is read-only without organization:write', async () => {

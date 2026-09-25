@@ -19,6 +19,7 @@ const BALANCE: VacationBalance = {
     vacationAccrual: 'ANNUAL',
     vacationDayCounting: 'WORKING_DAYS',
     seniority: null,
+    vacationExpiryMonths: null,
     allowNegativeVacationBalance: false,
   },
   accrual: { completedServiceYears: 1, currentYearEntitlement: 15, nextCreditOn: '2027-01-06' },
@@ -27,6 +28,8 @@ const BALANCE: VacationBalance = {
   usedDays: 3,
   scheduledDays: 5,
   pendingDays: 2,
+  expiredDays: 0,
+  nextExpiry: null,
   availableDays: 7.5,
   adjustments: [
     {
@@ -101,6 +104,24 @@ describe('VacationBalanceCard', () => {
     expect(figure('Pendientes')).toBe('2 días');
     expect(screen.getByText(/próximo abono el/)).toBeVisible();
     expect(screen.getByText('Saldo del sistema anterior')).toBeVisible();
+    // Days never expire under this contract: nothing to say about it.
+    expect(screen.queryByText('Caducados', { selector: 'dt' })).toBeNull();
+    expect(screen.queryByText(/caducan el/)).toBeNull();
+  });
+
+  it('shows what expired and warns about the next days due to expire', async () => {
+    renderCard({
+      ...BALANCE,
+      contractType: { ...BALANCE.contractType!, vacationExpiryMonths: 12 },
+      expiredDays: 4,
+      nextExpiry: { date: '2027-01-06', days: 6.5 },
+    });
+    expect(
+      await screen.findByText('6,5 días caducan el 6 ene 2027 si no se usan antes'),
+    ).toBeVisible();
+    expect(screen.getByText('Caducados', { selector: 'dt' }).nextElementSibling?.textContent).toBe(
+      '4 días',
+    );
   });
 
   it('says so when the employee has no contract type', async () => {

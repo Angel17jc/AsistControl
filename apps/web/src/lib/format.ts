@@ -82,6 +82,12 @@ export const VACATION_COUNTING_LABEL = {
   CALENDAR_DAYS: 'Días corridos',
 } as const;
 
+/** "No caducan", "1 mes después de cada aniversario", "24 meses después…". */
+export function describeExpiry(months: number | null): string {
+  if (months === null) return 'No caducan';
+  return `${months} ${months === 1 ? 'mes' : 'meses'} después de cada aniversario`;
+}
+
 export const LEAVE_LABEL: Record<LeaveType, string> = {
   PERSONAL: 'Permiso personal',
   MEDICAL: 'Médico',
