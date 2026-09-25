@@ -58,6 +58,7 @@ describe('Vacation balances (e2e)', () => {
         vacationAccrual: 'ANNUAL',
         vacationDayCounting: 'WORKING_DAYS',
         seniority: null,
+        vacationExpiryMonths: null,
         allowNegativeVacationBalance: false,
       });
     });
@@ -231,6 +232,112 @@ describe('Vacation balances (e2e)', () => {
         .send({ vacationDaysPerYear: 20 })
         .expect(200);
       expect((await balance('2027-01-01').expect(200)).body.accruedDays).toBe(before + 5);
+    });
+  });
+
+  describe('expiry of unused days', () => {
+    // The teammate: hired 2026-01-01 like everyone in the fixture, no adjustments.
+    const teammateBalance = (asOf: string) => balance(asOf, tokens.hr, fx.teammate.id);
+    let expiringTypeId: string;
+
+    it('loses what a service year left unused, the configured months after its anniversary', async () => {
+      expiringTypeId = (
+        await http()
+          .post('/api/contract-types')
+          .set(bearer(tokens.hr))
+          .send({ name: 'Con caducidad vac', vacationDaysPerYear: 15, vacationExpiryMonths: 12 })
+          .expect(201)
+      ).body.id;
+      await http()
+        .patch(`/api/employees/${fx.teammate.id}`)
+        .set(bearer(tokens.hr))
+        .send({ contractTypeId: expiringTypeId })
+        .expect(200);
+
+      expect((await teammateBalance('2027-12-31').expect(200)).body).toMatchObject({
+        accruedDays: 15,
+        expiredDays: 0,
+        availableDays: 15,
+        nextExpiry: { date: '2028-01-01', days: 15 },
+      });
+      expect((await teammateBalance('2028-01-01').expect(200)).body).toMatchObject({
+        accruedDays: 30,
+        expiredDays: 15,
+        availableDays: 15,
+        nextExpiry: { date: '2029-01-01', days: 15 },
+      });
+    });
+
+    it('only loses the days that were not taken', async () => {
+      // 7 → 11 June 2027: five days of year one, approved by HR.
+      const leave = await http()
+        .post('/api/leave-requests')
+        .set(bearer(tokens.hr))
+        .send({
+          employeeId: fx.teammate.id,
+          type: 'VACATION',
+          startsAt: '2027-06-07T00:00:00-05:00',
+          endsAt: '2027-06-12T00:00:00-05:00',
+          reason: 'Vacaciones',
+        })
+        .expect(201);
+      await http()
+        .post(`/api/leave-requests/${leave.body.id}/review`)
+        .set(bearer(tokens.hr))
+        .send({ decision: 'APPROVED' })
+        .expect(201);
+
+      expect((await teammateBalance('2027-12-31').expect(200)).body.nextExpiry).toEqual({
+        date: '2028-01-01',
+        days: 10,
+      });
+      expect((await teammateBalance('2028-01-01').expect(200)).body).toMatchObject({
+        usedDays: 5,
+        expiredDays: 10,
+        availableDays: 15,
+      });
+    });
+
+    it('checks a request against the balance left after expiry', async () => {
+      // 1 → 20 February 2028: twenty days, but only year two's 15 are still valid.
+      const res = await http()
+        .post('/api/leave-requests')
+        .set(bearer(tokens.hr))
+        .send({
+          employeeId: fx.teammate.id,
+          type: 'VACATION',
+          startsAt: '2028-02-01T00:00:00-05:00',
+          endsAt: '2028-02-21T00:00:00-05:00',
+          reason: 'Vacaciones',
+        })
+        .expect(409);
+      expect(res.body.message).toBe(
+        'Insufficient vacation balance: 15 day(s) available on 2028-02-01, the request uses 20',
+      );
+    });
+
+    it('gives the days back when the rule is removed', async () => {
+      await http()
+        .patch(`/api/contract-types/${expiringTypeId}`)
+        .set(bearer(tokens.hr))
+        .send({ vacationExpiryMonths: null })
+        .expect(200);
+      expect((await teammateBalance('2028-01-01').expect(200)).body).toMatchObject({
+        expiredDays: 0,
+        availableDays: 25,
+        nextExpiry: null,
+      });
+    });
+
+    it('rejects a nonsensical expiry', async () => {
+      const patch = (vacationExpiryMonths: unknown) =>
+        http()
+          .patch(`/api/contract-types/${expiringTypeId}`)
+          .set(bearer(tokens.hr))
+          .send({ vacationExpiryMonths });
+      await patch(0).expect(400);
+      await patch(1.5).expect(400);
+      await patch(121).expect(400);
     });
   });
 

@@ -74,6 +74,19 @@ export class CreateContractTypeDto {
   seniority?: SeniorityDto | null;
 
   @ApiPropertyOptional({
+    example: 24,
+    nullable: true,
+    description:
+      'Unused days of a service year expire this many months after its anniversary; ' +
+      'null = they never expire',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  vacationExpiryMonths?: number | null;
+
+  @ApiPropertyOptional({
     default: false,
     description: 'Allow requesting vacation beyond the available balance (an advance)',
   })

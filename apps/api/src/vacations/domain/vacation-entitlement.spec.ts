@@ -8,7 +8,12 @@ import {
 } from './vacation-entitlement';
 
 /** Example values only: every number here is company configuration, not law. */
-const ANNUAL: VacationRule = { daysPerYear: 15, accrual: 'ANNUAL', seniority: null };
+const ANNUAL: VacationRule = {
+  daysPerYear: 15,
+  accrual: 'ANNUAL',
+  seniority: null,
+  expiryMonths: null,
+};
 const MONTHLY: VacationRule = { ...ANNUAL, accrual: 'MONTHLY' };
 const WITH_SENIORITY: VacationRule = {
   ...ANNUAL,

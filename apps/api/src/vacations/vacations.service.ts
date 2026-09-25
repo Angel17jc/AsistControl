@@ -8,11 +8,14 @@ import { toContractTypeResponse, vacationRuleOf } from '../contract-types/contra
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import {
+  type VacationCredit,
   accruedVacationDays,
   datesCovered,
   round,
+  vacationCredits,
   vacationDaysUsed,
 } from './domain/vacation-entitlement';
+import { type VacationDebit, simulateExpiry } from './domain/vacation-expiry';
 import type { CreateVacationAdjustmentDto } from './vacations.dto';
 
 interface LeaveSpan {
@@ -27,7 +30,7 @@ interface LeaveSpan {
  * and pending requests, manual adjustments): the balance is recomputed on every read, so
  * editing a contract type or cancelling a request is reflected at once and never drifts.
  *
- *   available = accrued + adjustments − used − scheduled − pending
+ *   available = accrued + adjustments − used − scheduled − pending − expired
  */
 @Injectable()
 export class VacationsService {
@@ -144,18 +147,18 @@ export class VacationsService {
         usedDays: 0,
         scheduledDays: 0,
         pendingDays: 0,
+        expiredDays: 0,
+        nextExpiry: null,
         availableDays: adjustmentDays,
         adjustments: adjustments.map(toAdjustment),
       };
     }
 
     const contractType = toContractTypeResponse(employee.contractType);
-    const accrual = accruedVacationDays(
-      vacationRuleOf(employee.contractType),
-      fromDbDate(employee.hireDate),
-      asOf,
-      employee.terminatedAt ? fromDbDate(employee.terminatedAt) : null,
-    );
+    const rule = vacationRuleOf(employee.contractType);
+    const hireDate = fromDbDate(employee.hireDate);
+    const terminatedOn = employee.terminatedAt ? fromDbDate(employee.terminatedAt) : null;
+    const accrual = accruedVacationDays(rule, hireDate, asOf, terminatedOn);
     const counted = await this.daysOf(
       employeeId,
       leaves as LeaveSpan[],
@@ -163,6 +166,34 @@ export class VacationsService {
       timezone,
       asOf,
     );
+
+    // Adjustments never expire: an opening balance that should can be corrected with another.
+    const expiry =
+      rule.expiryMonths === null
+        ? { expiredDays: 0, nextExpiry: null }
+        : simulateExpiry(
+            [
+              ...vacationCredits(rule, hireDate, asOf, terminatedOn),
+              ...adjustments
+                .filter((a) => Number(a.days) > 0)
+                .map((a): VacationCredit => ({
+                  date: localDateOf(a.createdAt, timezone),
+                  days: Number(a.days),
+                  expiresOn: null,
+                })),
+            ],
+            [
+              ...counted.approvedByDate,
+              ...adjustments
+                .filter((a) => Number(a.days) < 0)
+                .map((a): VacationDebit => ({
+                  date: localDateOf(a.createdAt, timezone),
+                  days: -Number(a.days),
+                })),
+            ],
+            asOf,
+            terminatedOn,
+          );
     return {
       employeeId,
       asOf,
@@ -177,8 +208,15 @@ export class VacationsService {
       usedDays: counted.used,
       scheduledDays: counted.scheduled,
       pendingDays: counted.pending,
+      expiredDays: expiry.expiredDays,
+      nextExpiry: expiry.nextExpiry,
       availableDays: round(
-        accrual.accruedDays + adjustmentDays - counted.used - counted.scheduled - counted.pending,
+        accrual.accruedDays +
+          adjustmentDays -
+          counted.used -
+          counted.scheduled -
+          counted.pending -
+          expiry.expiredDays,
       ),
       adjustments: adjustments.map(toAdjustment),
     };
@@ -187,6 +225,7 @@ export class VacationsService {
   /**
    * Days the given leaves take from the balance, split by state: approved days up to `asOf`
    * were used, later ones are scheduled, and pending requests hold their days in reserve.
+   * `approvedByDate` lists every approved day that counts, for the expiry timeline.
    */
   private async daysOf(
     employeeId: string,
@@ -220,10 +259,15 @@ export class VacationsService {
     let used = 0;
     let scheduled = 0;
     let pending = 0;
+    const approvedByDate: VacationDebit[] = [];
     for (const { leave, dates } of spans) {
       if (leave.status === 'PENDING') {
         pending += vacationDaysUsed(dates, counting, isWorkingDay);
         continue;
+      }
+      for (const date of dates) {
+        const days = vacationDaysUsed([date], counting, isWorkingDay);
+        if (days > 0) approvedByDate.push({ date, days });
       }
       used += vacationDaysUsed(
         dates.filter((d) => d <= asOf),
@@ -236,7 +280,7 @@ export class VacationsService {
         isWorkingDay,
       );
     }
-    return { used, scheduled, pending, total: used + scheduled + pending };
+    return { used, scheduled, pending, total: used + scheduled + pending, approvedByDate };
   }
 
   private async employee(id: string) {
