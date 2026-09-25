@@ -59,6 +59,7 @@ describe('Vacation balances (e2e)', () => {
         vacationDayCounting: 'WORKING_DAYS',
         seniority: null,
         vacationExpiryMonths: null,
+        allowHalfDayVacations: false,
         allowNegativeVacationBalance: false,
       });
     });
@@ -338,6 +339,62 @@ describe('Vacation balances (e2e)', () => {
       await patch(0).expect(400);
       await patch(1.5).expect(400);
       await patch(121).expect(400);
+    });
+  });
+
+  describe('half days', () => {
+    // The supervisor: hired 2026-01-01, 08:00-17:00 with lunch 12:00-13:00 every day.
+    const request = (date: string, from: string, to: string) =>
+      http()
+        .post('/api/leave-requests')
+        .set(bearer(tokens.hr))
+        .send({
+          employeeId: fx.supervisor.id,
+          type: 'VACATION',
+          startsAt: `${date}T${from}:00-05:00`,
+          endsAt: `${date}T${to}:00-05:00`,
+          reason: 'Medio día',
+        });
+    const pending = async () =>
+      (await balance('2027-01-15', tokens.hr, fx.supervisor.id).expect(200)).body.pendingDays;
+    let halfDayTypeId: string;
+
+    it('prices a morning at half a day when the contract allows it', async () => {
+      halfDayTypeId = (
+        await http()
+          .post('/api/contract-types')
+          .set(bearer(tokens.hr))
+          .send({ name: 'Medios días vac', vacationDaysPerYear: 15, allowHalfDayVacations: true })
+          .expect(201)
+      ).body.id;
+      await http()
+        .patch(`/api/employees/${fx.supervisor.id}`)
+        .set(bearer(tokens.hr))
+        .send({ contractTypeId: halfDayTypeId })
+        .expect(200);
+
+      await request('2027-02-01', '08:00', '12:00').expect(201);
+      expect(await pending()).toBe(0.5);
+    });
+
+    it('charges a whole day for more than half the working time', async () => {
+      // 08:00-14:00 is five of the eight working hours.
+      await request('2027-02-02', '08:00', '14:00').expect(201);
+      expect(await pending()).toBe(1.5);
+    });
+
+    it('refuses one that misses the working time altogether', async () => {
+      const res = await request('2027-02-03', '18:00', '20:00').expect(409);
+      expect(res.body.message).toBe('The vacation covers no day that counts against the balance');
+    });
+
+    it('charges whole days when the contract does not allow half days', async () => {
+      await http()
+        .patch(`/api/contract-types/${halfDayTypeId}`)
+        .set(bearer(tokens.hr))
+        .send({ allowHalfDayVacations: false })
+        .expect(200);
+      expect(await pending()).toBe(2);
     });
   });
 

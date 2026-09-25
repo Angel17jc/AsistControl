@@ -132,7 +132,59 @@ export function vacationDaysUsed(
   counting: VacationDayCounting,
   isWorkingDay: (date: string) => boolean,
 ): number {
-  return counting === 'CALENDAR_DAYS' ? dates.length : dates.filter(isWorkingDay).length;
+  return dates.reduce((sum, date) => sum + vacationDayCost(counting, isWorkingDay(date), null), 0);
+}
+
+/**
+ * What one date of a vacation costs. WORKING_DAYS leaves rest days and holidays free. With
+ * half days allowed, a vacation within a single day is priced by the share of working time it
+ * covers (`halfDayShare`); null prices whole days.
+ */
+export function vacationDayCost(
+  counting: VacationDayCounting,
+  isWorkingDay: boolean,
+  halfDayShare: number | null,
+): number {
+  if (counting === 'WORKING_DAYS' && !isWorkingDay) return 0;
+  return halfDayShare === null ? 1 : partialDayCost(halfDayShare);
+}
+
+export interface TimeRange {
+  start: Date;
+  end: Date;
+}
+
+/**
+ * Share (0-1) of a day's working time a leave covers: the shift minus its break when the day
+ * has one, otherwise the whole `day`.
+ */
+export function coveredShare(
+  leave: TimeRange,
+  day: TimeRange,
+  shift: (TimeRange & { break: TimeRange | null }) | null,
+): number {
+  const reference = shift ?? day;
+  const pause = shift?.break ?? null;
+  const total = overlap(reference, reference) - (pause ? overlap(pause, reference) : 0);
+  if (total <= 0) return 0;
+  const covered = overlap(leave, reference) - (pause ? overlap(leave, pause, reference) : 0);
+  return Math.min(1, covered / total);
+}
+
+/**
+ * What a leave within a single day costs when half days are allowed: nothing if it misses the
+ * working time, half a day if it covers at most half of it, a whole day otherwise.
+ */
+export function partialDayCost(share: number): 0 | 0.5 | 1 {
+  if (share <= 0) return 0;
+  return share <= 0.5 ? 0.5 : 1;
+}
+
+/** Milliseconds shared by every range given. */
+function overlap(...ranges: TimeRange[]): number {
+  const start = Math.max(...ranges.map((r) => r.start.getTime()));
+  const end = Math.min(...ranges.map((r) => r.end.getTime()));
+  return Math.max(0, end - start);
 }
 
 /** Local dates an interval touches: from its first instant to its last (end exclusive). */

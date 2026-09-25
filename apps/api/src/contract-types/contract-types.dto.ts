@@ -88,6 +88,15 @@ export class CreateContractTypeDto {
 
   @ApiPropertyOptional({
     default: false,
+    description:
+      'A single-day vacation covering at most half of that day’s working time costs half a day',
+  })
+  @IsOptional()
+  @IsBoolean()
+  allowHalfDayVacations?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
     description: 'Allow requesting vacation beyond the available balance (an advance)',
   })
   @IsOptional()

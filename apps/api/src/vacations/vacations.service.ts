@@ -3,17 +3,19 @@ import { WorkCalendarService } from '../attendance/work-calendar.service';
 import { AuditService } from '../audit/audit.service';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
-import { fromDbDate, localDateOf, todayIn } from '../common/utils/date-only';
+import { fromDbDate, localDateOf, localDayBounds, todayIn } from '../common/utils/date-only';
 import { toContractTypeResponse, vacationRuleOf } from '../contract-types/contract-types.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import {
   type VacationCredit,
+  type VacationDayCounting,
   accruedVacationDays,
+  coveredShare,
   datesCovered,
   round,
   vacationCredits,
-  vacationDaysUsed,
+  vacationDayCost,
 } from './domain/vacation-entitlement';
 import { type VacationDebit, simulateExpiry } from './domain/vacation-expiry';
 import type { CreateVacationAdjustmentDto } from './vacations.dto';
@@ -68,7 +70,10 @@ export class VacationsService {
     const requested = await this.daysOf(
       request.employeeId,
       [{ id: 'new', status: 'PENDING', startsAt: request.startsAt, endsAt: request.endsAt }],
-      balance.contractType.vacationDayCounting,
+      {
+        counting: balance.contractType.vacationDayCounting,
+        halfDays: balance.contractType.allowHalfDayVacations,
+      },
       timezone,
     );
     if (requested.total === 0) {
@@ -162,7 +167,10 @@ export class VacationsService {
     const counted = await this.daysOf(
       employeeId,
       leaves as LeaveSpan[],
-      contractType.vacationDayCounting,
+      {
+        counting: contractType.vacationDayCounting,
+        halfDays: contractType.allowHalfDayVacations,
+      },
       timezone,
       asOf,
     );
@@ -230,7 +238,7 @@ export class VacationsService {
   private async daysOf(
     employeeId: string,
     leaves: LeaveSpan[],
-    counting: 'CALENDAR_DAYS' | 'WORKING_DAYS',
+    rules: { counting: VacationDayCounting; halfDays: boolean },
     timezone: string,
     asOf = '9999-12-31',
   ) {
@@ -244,7 +252,7 @@ export class VacationsService {
     }));
     const all = spans.flatMap((s) => s.dates).sort();
     const calendar =
-      counting === 'WORKING_DAYS' && all.length > 0
+      (rules.counting === 'WORKING_DAYS' || rules.halfDays) && all.length > 0
         ? await this.calendars.load({
             employeeIds: [employeeId],
             from: all[0]!,
@@ -253,32 +261,44 @@ export class VacationsService {
             policy: await this.settings.getAttendancePolicy(),
           })
         : null;
-    const isWorkingDay = (date: string) =>
-      calendar ? calendar.dayFor(employeeId, date).dayType === 'WORKDAY' : true;
+
+    /** Half days only price a vacation within one date; longer ones take whole days. */
+    const cost = (leave: LeaveSpan, date: string, singleDay: boolean) => {
+      const day = calendar?.dayFor(employeeId, date);
+      const isWorkingDay = day ? day.dayType === 'WORKDAY' : true;
+      if (!rules.halfDays || !singleDay || !day) {
+        return vacationDayCost(rules.counting, isWorkingDay, null);
+      }
+      const bounds = localDayBounds(date, timezone);
+      const { shift } = day;
+      const share = coveredShare(
+        { start: leave.startsAt, end: leave.endsAt },
+        { start: bounds.from, end: bounds.to },
+        shift && {
+          start: shift.start,
+          end: shift.end,
+          break:
+            shift.breakStart && shift.breakEnd
+              ? { start: shift.breakStart, end: shift.breakEnd }
+              : null,
+        },
+      );
+      return vacationDayCost(rules.counting, isWorkingDay, share);
+    };
 
     let used = 0;
     let scheduled = 0;
     let pending = 0;
     const approvedByDate: VacationDebit[] = [];
     for (const { leave, dates } of spans) {
-      if (leave.status === 'PENDING') {
-        pending += vacationDaysUsed(dates, counting, isWorkingDay);
-        continue;
-      }
       for (const date of dates) {
-        const days = vacationDaysUsed([date], counting, isWorkingDay);
-        if (days > 0) approvedByDate.push({ date, days });
+        const days = cost(leave, date, dates.length === 1);
+        if (days === 0) continue;
+        if (leave.status === 'PENDING') pending += days;
+        else if (date <= asOf) used += days;
+        else scheduled += days;
+        if (leave.status === 'APPROVED') approvedByDate.push({ date, days });
       }
-      used += vacationDaysUsed(
-        dates.filter((d) => d <= asOf),
-        counting,
-        isWorkingDay,
-      );
-      scheduled += vacationDaysUsed(
-        dates.filter((d) => d > asOf),
-        counting,
-        isWorkingDay,
-      );
     }
     return { used, scheduled, pending, total: used + scheduled + pending, approvedByDate };
   }

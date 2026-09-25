@@ -32,4 +32,4 @@ Y sigue vigente la regla del proyecto: **ningún valor de ninguna legislación e
 
 - Una empresa configura sus reglas sin tocar código; cambiar de política es editar un tipo de contrato.
 - Cada lectura del saldo recalcula a partir de pocas filas por empleado, y el calendario solo se carga para las fechas con solicitudes. Si hiciera falta un reporte masivo, se calcularía en lote con el mismo dominio puro.
-- **Fuera de alcance por ahora:** caducidad o tope de acumulación de días no usados (_carry-over_; resuelto en el [ADR 0009](0009-vacation-expiry.md)), fraccionamiento en medios días y periodos de devengo por año calendario en lugar de aniversario. Encajan como nuevos campos de `ContractType` y nuevas reglas en la función pura, sin cambiar el modelo.
+- **Fuera de alcance por ahora:** caducidad o tope de acumulación de días no usados (_carry-over_; resuelto en el [ADR 0009](0009-vacation-expiry.md)), fraccionamiento en medios días ([ADR 0010](0010-half-day-vacations.md)) y periodos de devengo por año calendario en lugar de aniversario. Encajan como nuevos campos de `ContractType` y nuevas reglas en la función pura, sin cambiar el modelo.
