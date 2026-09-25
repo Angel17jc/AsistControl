@@ -28,4 +28,5 @@ Con el ADR 0008 los días no usados se acumulaban sin límite. Muchas empresas, 
 
 - Una política de caducidad es un número en el tipo de contrato; sin él, el saldo es exactamente el del ADR 0008.
 - Un tope de acumulación ("nunca más de N días") no se implementa aparte: un plazo de caducidad ya limita el saldo a unos pocos periodos, que es lo que buscan esas políticas.
-- **Fuera de alcance por ahora:** días de un periodo que vencen en fechas distintas según cuándo se ganaron (cada fracción mensual con su propio plazo) y avisos automáticos antes del vencimiento.
+- **Avisos (añadido después):** una tarea diaria avisa con `VACATION_EXPIRING` a cada persona con cuenta cuyo `nextExpiry` cae dentro de 30 días, una sola vez por fecha de vencimiento. Solo a ella: los días son suyos, y RR. HH. los ve en su panel.
+- **Fuera de alcance por ahora:** días de un periodo que vencen en fechas distintas según cuándo se ganaron (cada fracción mensual con su propio plazo).

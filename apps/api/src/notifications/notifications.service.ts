@@ -182,6 +182,40 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Some of an employee's vacation days are about to expire. It goes to the employee alone,
+   * whose days they are, and once per expiry date however often the check runs.
+   */
+  async vacationExpiring(notice: {
+    employeeId: string;
+    employeeName: string;
+    userId: string;
+    days: number;
+    expiresOn: string;
+  }): Promise<boolean> {
+    let sent = false;
+    await this.safely(`vacation expiry of employee ${notice.employeeId}`, async () => {
+      const already = await this.prisma.notification.findFirst({
+        where: {
+          userId: notice.userId,
+          type: 'VACATION_EXPIRING',
+          entityId: notice.employeeId,
+          data: { path: ['expiresOn'], equals: notice.expiresOn },
+        },
+        select: { id: true },
+      });
+      if (already) return;
+      await this.send(
+        [notice.userId],
+        'VACATION_EXPIRING',
+        { entity: 'Employee', id: notice.employeeId },
+        { employeeName: notice.employeeName, days: notice.days, expiresOn: notice.expiresOn },
+      );
+      sent = true;
+    });
+    return sent;
+  }
+
   private async send<T extends NotificationType>(
     recipients: string[],
     type: T,

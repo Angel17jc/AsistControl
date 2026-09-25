@@ -32,6 +32,13 @@ export interface NotificationDataByType {
     decision: 'APPROVED' | 'REJECTED';
     note: string | null;
   };
+  /** Some of the recipient's vacation days expire soon if they are not used (ADR 0009). */
+  VACATION_EXPIRING: {
+    employeeName: string;
+    days: number;
+    /** `YYYY-MM-DD`: the first day those days can no longer be used. */
+    expiresOn: string;
+  };
 }
 
 /** A notification as the API returns it and pushes it. Narrow on `type` to read `data`. */

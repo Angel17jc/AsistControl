@@ -120,9 +120,10 @@ Tipos en [`packages/shared/src/realtime.ts`](../packages/shared/src/realtime.ts)
 
 Una notificación trae **datos, no texto**: `type` más `data` con forma fija por tipo ([`packages/shared/src/notifications.ts`](../packages/shared/src/notifications.ts)); cada cliente la redacta. Quién recibe cada tipo y por qué hay un solo aviso por corte de un equipo: [ADR 0007](adr/0007-notifications.md).
 
-| `type`             | `data`                                                          | Destinatarios                                 |
-| ------------------ | --------------------------------------------------------------- | --------------------------------------------- |
-| `DEVICE_DOWN`      | `{ deviceName, status: "OFFLINE" \| "ERROR", error }`           | Con `devices:sync` (administradores)          |
-| `DEVICE_RECOVERED` | `{ deviceName }`                                                | Con `devices:sync`                            |
-| `LEAVE_REQUESTED`  | `{ employeeName, leaveType, startsAt, endsAt }`                 | RRHH, administradores y el supervisor directo |
-| `LEAVE_REVIEWED`   | `{ employeeName, leaveType, startsAt, endsAt, decision, note }` | El empleado y quien presentó la solicitud     |
+| `type`              | `data`                                                          | Destinatarios                                                  |
+| ------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+| `DEVICE_DOWN`       | `{ deviceName, status: "OFFLINE" \| "ERROR", error }`           | Con `devices:sync` (administradores)                           |
+| `DEVICE_RECOVERED`  | `{ deviceName }`                                                | Con `devices:sync`                                             |
+| `LEAVE_REQUESTED`   | `{ employeeName, leaveType, startsAt, endsAt }`                 | RRHH, administradores y el supervisor directo                  |
+| `LEAVE_REVIEWED`    | `{ employeeName, leaveType, startsAt, endsAt, decision, note }` | El empleado y quien presentó la solicitud                      |
+| `VACATION_EXPIRING` | `{ employeeName, days, expiresOn }`                             | El empleado, 30 días antes de que caduquen (una vez por fecha) |

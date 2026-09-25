@@ -44,6 +44,11 @@ export class VacationsService {
     private readonly calendars: WorkCalendarService,
   ) {}
 
+  /** The balance without an access check, for the platform's own jobs. */
+  balanceAt(employeeId: string, asOf: string, timezone: string) {
+    return this.compute(employeeId, asOf, timezone);
+  }
+
   async balance(employeeId: string, user: AuthenticatedUser, asOf?: string) {
     await this.scope.assertCanAccessEmployee(user, employeeId);
     const timezone = await this.settings.getTimezone();

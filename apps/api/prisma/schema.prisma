@@ -57,6 +57,7 @@ enum NotificationType {
   DEVICE_RECOVERED
   LEAVE_REQUESTED
   LEAVE_REVIEWED
+  VACATION_EXPIRING
 }
 
 enum PunchType {

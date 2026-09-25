@@ -251,7 +251,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] Adaptador **Hikvision** (ISAPI + Digest) — experimental, pendiente de validar con hardware
 - [ ] Recepción _push_ HTTP (ADMS/iclock) para equipos en la nube
 - [x] Saldos de vacaciones y políticas por tipo de contrato
-- [x] Notificaciones in-app en tiempo real (dispositivo desconectado/recuperado, solicitudes por revisar/resueltas)
+- [x] Notificaciones in-app en tiempo real (dispositivo desconectado/recuperado, solicitudes por revisar/resueltas, vacaciones por caducar)
 - [x] Gestión de horarios por empleado desde la web
 - [x] E2E de interfaz con Playwright
 - [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real
