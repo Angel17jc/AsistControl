@@ -22,6 +22,7 @@ export function toContractTypeResponse(row: ContractType, employees?: number) {
             extraDaysPerYear: Number(row.seniorityExtraDaysPerYear),
             maxExtraDays: Number(row.seniorityMaxExtraDays),
           },
+    vacationExpiryMonths: row.vacationExpiryMonths,
     allowNegativeVacationBalance: row.allowNegativeVacationBalance,
     ...(employees !== undefined && { employees }),
   };
@@ -29,8 +30,14 @@ export function toContractTypeResponse(row: ContractType, employees?: number) {
 
 /** The entitlement rule the pure vacation domain works with. */
 export function vacationRuleOf(row: ContractType): VacationRule {
-  const { vacationDaysPerYear, vacationAccrual, seniority } = toContractTypeResponse(row);
-  return { daysPerYear: vacationDaysPerYear, accrual: vacationAccrual, seniority };
+  const { vacationDaysPerYear, vacationAccrual, seniority, vacationExpiryMonths } =
+    toContractTypeResponse(row);
+  return {
+    daysPerYear: vacationDaysPerYear,
+    accrual: vacationAccrual,
+    seniority,
+    expiryMonths: vacationExpiryMonths,
+  };
 }
 
 /**

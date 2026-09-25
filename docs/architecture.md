@@ -134,7 +134,7 @@ Socket.IO en el namespace `/realtime`, autenticado con el mismo access token. Ca
 
 ## Vacaciones
 
-Cada tipo de contrato define sus reglas (días por año, devengo anual o mensual, días hábiles o corridos, bono de antigüedad, anticipos). El saldo **no se guarda**: se calcula en cada lectura a partir de esas reglas, la fecha de ingreso, las solicitudes aprobadas y pendientes y los ajustes manuales, con una función pura (`vacations/domain`). Una vacación se valida contra el saldo **a su fecha de inicio**, al solicitarla y otra vez al aprobarla. Los días hábiles salen del mismo calendario que la asistencia: el horario de cada persona y los feriados. Ver [ADR 0008](adr/0008-vacation-balances.md).
+Cada tipo de contrato define sus reglas (días por año, devengo anual o mensual, días hábiles o corridos, bono de antigüedad, caducidad de los días no usados, anticipos). El saldo **no se guarda**: se calcula en cada lectura a partir de esas reglas, la fecha de ingreso, las solicitudes aprobadas y pendientes y los ajustes manuales, con una función pura (`vacations/domain`). Una vacación se valida contra el saldo **a su fecha de inicio**, al solicitarla y otra vez al aprobarla. Los días hábiles salen del mismo calendario que la asistencia: el horario de cada persona y los feriados. Los días que caducan se gastan primero ([ADR 0009](adr/0009-vacation-expiry.md)). Ver [ADR 0008](adr/0008-vacation-balances.md).
 
 ## Notificaciones
 
@@ -166,3 +166,4 @@ Los hechos que alguien debe atender (un marcador caído o recuperado, una solici
 | [0006](adr/0006-unified-leave-requests.md)  | Permisos y vacaciones en un único flujo                            |
 | [0007](adr/0007-notifications.md)           | Notificaciones: datos por destinatario, un aviso por incidente     |
 | [0008](adr/0008-vacation-balances.md)       | Saldos de vacaciones: reglas por tipo de contrato, saldo calculado |
+| [0009](adr/0009-vacation-expiry.md)         | Caducidad de días de vacaciones no usados                          |

@@ -19,6 +19,18 @@ export interface VacationRule {
   accrual: VacationAccrual;
   /** Extra days per service year beyond `afterYears`, never more than `maxExtraDays`. */
   seniority: { afterYears: number; extraDaysPerYear: number; maxExtraDays: number } | null;
+  /**
+   * Unused days of a service year expire this many months after the year ends (its
+   * anniversary); null = they never expire. See `vacation-expiry.ts`.
+   */
+  expiryMonths: number | null;
+}
+
+/** Days credited on a date, and the first date they can no longer be used (null = never). */
+export interface VacationCredit {
+  date: string;
+  days: number;
+  expiresOn: string | null;
 }
 
 export interface Accrual {
@@ -63,32 +75,52 @@ export function accruedVacationDays(
 
   let years = 0;
   while (addMonths(hireDate, (years + 1) * 12) <= end) years++;
-  const currentYearEntitlement = entitlementForServiceYear(rule, years + 1);
+  const credits = vacationCredits(rule, hireDate, asOf, terminatedOn);
   const serviceEnded = terminatedOn !== null && terminatedOn <= asOf;
-
-  if (rule.accrual === 'ANNUAL') {
-    let accrued = 0;
-    for (let y = 1; y <= years; y++) accrued += entitlementForServiceYear(rule, y);
-    return {
-      accruedDays: round(accrued),
-      completedServiceYears: years,
-      currentYearEntitlement,
-      nextCreditOn: serviceEnded ? null : addMonths(hireDate, (years + 1) * 12),
-    };
-  }
-
-  let months = 0;
-  while (addMonths(hireDate, months + 1) <= end) months++;
-  let accrued = 0;
-  for (let m = 1; m <= months; m++) {
-    accrued += entitlementForServiceYear(rule, Math.ceil(m / 12)) / 12;
-  }
+  const periodMonths = rule.accrual === 'ANNUAL' ? 12 : 1;
   return {
-    accruedDays: round(accrued),
+    accruedDays: round(credits.reduce((sum, c) => sum + c.days, 0)),
     completedServiceYears: years,
-    currentYearEntitlement,
-    nextCreditOn: serviceEnded ? null : addMonths(hireDate, months + 1),
+    currentYearEntitlement: entitlementForServiceYear(rule, years + 1),
+    nextCreditOn: serviceEnded ? null : addMonths(hireDate, (credits.length + 1) * periodMonths),
   };
+}
+
+/**
+ * Each credit earned from `hireDate` up to and including `asOf` (service stops on
+ * `terminatedOn`): one per anniversary with ANNUAL accrual, one per monthiversary with
+ * MONTHLY. Every credit of a service year expires on the same date, `expiryMonths` after the
+ * year's anniversary. Days are not rounded, so twelve twelfths add up to the year exactly.
+ */
+export function vacationCredits(
+  rule: VacationRule,
+  hireDate: string,
+  asOf: string,
+  terminatedOn: string | null = null,
+): VacationCredit[] {
+  const end = terminatedOn && terminatedOn < asOf ? terminatedOn : asOf;
+  const expiresOn = (serviceYear: number) =>
+    rule.expiryMonths === null ? null : addMonths(hireDate, serviceYear * 12 + rule.expiryMonths);
+  const credits: VacationCredit[] = [];
+  if (rule.accrual === 'ANNUAL') {
+    for (let y = 1; addMonths(hireDate, y * 12) <= end; y++) {
+      credits.push({
+        date: addMonths(hireDate, y * 12),
+        days: entitlementForServiceYear(rule, y),
+        expiresOn: expiresOn(y),
+      });
+    }
+    return credits;
+  }
+  for (let m = 1; addMonths(hireDate, m) <= end; m++) {
+    const year = Math.ceil(m / 12);
+    credits.push({
+      date: addMonths(hireDate, m),
+      days: entitlementForServiceYear(rule, year) / 12,
+      expiresOn: expiresOn(year),
+    });
+  }
+  return credits;
 }
 
 /**

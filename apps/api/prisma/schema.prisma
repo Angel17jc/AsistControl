@@ -487,6 +487,8 @@ model ContractType {
   seniorityAfterYears          Int?                @map("seniority_after_years")
   seniorityExtraDaysPerYear    Decimal?            @map("seniority_extra_days_per_year") @db.Decimal(4, 2)
   seniorityMaxExtraDays        Decimal?            @map("seniority_max_extra_days") @db.Decimal(5, 2)
+  /// Unused days of a service year expire this many months after its anniversary; null = never.
+  vacationExpiryMonths         Int?                @map("vacation_expiry_months")
   /// Whether a vacation may be requested beyond the available balance (an advance).
   allowNegativeVacationBalance Boolean             @default(false) @map("allow_negative_vacation_balance")
   createdAt                    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
