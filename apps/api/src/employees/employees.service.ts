@@ -102,7 +102,13 @@ export class EmployeesService {
         data: {
           ...dto,
           hireDate: dto.hireDate ? toDbDate(dto.hireDate) : undefined,
-          terminatedAt: dto.terminatedAt ? toDbDate(dto.terminatedAt) : undefined,
+          // null clears the date (a reinstatement), undefined leaves it untouched.
+          terminatedAt:
+            dto.terminatedAt === null
+              ? null
+              : dto.terminatedAt
+                ? toDbDate(dto.terminatedAt)
+                : undefined,
         },
         include: EMPLOYEE_INCLUDE,
       });
