@@ -71,6 +71,8 @@ export interface ContractTypeRow {
   vacationAccrual: VacationAccrual;
   vacationDayCounting: VacationDayCounting;
   seniority: { afterYears: number; extraDaysPerYear: number; maxExtraDays: number } | null;
+  /** Unused days of a service year expire this many months after its anniversary; null = never. */
+  vacationExpiryMonths: number | null;
   allowNegativeVacationBalance: boolean;
   /** How many employees use it (list only). */
   employees?: number;
@@ -91,6 +93,9 @@ export interface VacationBalance {
   usedDays: number;
   scheduledDays: number;
   pendingDays: number;
+  expiredDays: number;
+  /** The next days due to expire, counting the vacations approved before that date. */
+  nextExpiry: { date: string; days: number } | null;
   availableDays: number;
   adjustments: { id: string; days: number; reason: string; createdAt: string }[];
 }
