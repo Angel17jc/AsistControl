@@ -1,6 +1,22 @@
 import type { ScheduleAssignmentRow, WorkScheduleRow } from './types';
 
 const WEEKDAY = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'] as const;
+
+/** ISO weekdays with their full names, Monday first. */
+export const WEEKDAYS = [
+  [1, 'Lunes'],
+  [2, 'Martes'],
+  [3, 'Miércoles'],
+  [4, 'Jueves'],
+  [5, 'Viernes'],
+  [6, 'Sábado'],
+  [7, 'Domingo'],
+] as const;
+
+/** "08:00–17:00", or "22:00–06:00 (+1 día)" for a shift that ends the next day. */
+export function describeHours(startTime: string, endTime: string): string {
+  return `${startTime}–${endTime}${endTime <= startTime ? ' (+1 día)' : ''}`;
+}
 const dayName = (weekday: number) => WEEKDAY[weekday - 1] ?? '?';
 
 /**

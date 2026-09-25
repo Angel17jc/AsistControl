@@ -16,6 +16,7 @@ Hay hechos que alguien debe atender y que hoy solo se ven si se entra a buscarlo
   - `DEVICE_DOWN` / `DEVICE_RECOVERED` → usuarios activos con `devices:sync`, es decir, quienes pueden actuar sobre el equipo.
   - `LEAVE_REQUESTED` → roles con `leave:approve` sin restricción de alcance, más el supervisor directo del empleado. Se excluyen el propio empleado y quien presentó la solicitud.
   - `LEAVE_REVIEWED` → el empleado y quien presentó la solicitud, salvo el revisor.
+  - `VACATION_EXPIRING` (añadido con el [ADR 0009](0009-vacation-expiry.md)) → solo el empleado dueño de los días, una vez por fecha de vencimiento.
 - **Datos, no frases.** Se guarda `type` + `data` (JSON con forma fija por tipo, `NotificationDataByType` en `packages/shared`), y cada cliente redacta el texto. La API sigue siendo neutral respecto al idioma.
 - **Un aviso por incidente.** Un incidente de un dispositivo empieza en su último contacto correcto (`lastSeenAt`). Se notifica `DEVICE_DOWN` solo si no existe ya uno posterior a ese instante, y `DEVICE_RECOVERED` solo si hubo un `DEVICE_DOWN` en ese incidente. Un equipo que nunca respondió (`lastSeenAt` nulo) no "se cayó": no se notifica.
 - **Entrega en vivo** por Socket.IO a la sala `user:<id>`, a la que cada socket se une al autenticarse. Solo el destinatario la recibe.

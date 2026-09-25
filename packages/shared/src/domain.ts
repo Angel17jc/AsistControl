@@ -79,6 +79,7 @@ export const NOTIFICATION_TYPES = values(
   'DEVICE_RECOVERED',
   'LEAVE_REQUESTED',
   'LEAVE_REVIEWED',
+  'VACATION_EXPIRING',
 );
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

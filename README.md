@@ -37,7 +37,7 @@ El sistema **no depende de ningún fabricante**: cada marca se integra mediante 
 | **Sincronización**        | Descarga incremental con cursor opaco por adaptador, validación, normalización, deduplicación idempotente, reintentos con backoff, bloqueo por dispositivo entre instancias, historial de cada ejecución (`DeviceSyncLog`). Push en tiempo real + polling programado como red de seguridad.                          |
 | **Asistencia**            | Separación entre **marcaciones** (`AttendanceEvent`, inmutables) y **jornadas** (`AttendanceRecord`, derivadas y recalculables). Atrasos, salida anticipada, almuerzo, horas extra, ausencias, jornadas incompletas, dobles marcaciones, marcaciones fuera de horario, feriados, días libres y **turnos nocturnos**. |
 | **Correcciones**          | Marcaciones manuales con justificación obligatoria y anulación (nunca borrado), todo auditado.                                                                                                                                                                                                                       |
-| **Horarios**              | Turnos reutilizables, horarios semanales, historial de asignaciones por empleado (un cambio de horario no reescribe el pasado), asignación y corrección desde el panel del empleado, feriados.                                                                                                                       |
+| **Horarios**              | Turnos reutilizables, horarios semanales, historial de asignaciones por empleado (un cambio de horario no reescribe el pasado), asignación y corrección desde el panel del empleado, feriados; todo gestionable desde la web.                                                                                        |
 | **Permisos y vacaciones** | Flujo único de solicitud → aprobación; al aprobar se recalculan los días afectados (un permiso de mañana mueve la hora esperada de llegada).                                                                                                                                                                         |
 | **Horas extra**           | Propuestas automáticamente por el motor, **aprobadas por una persona** antes de llegar a nómina.                                                                                                                                                                                                                     |
 | **Reportes**              | Diario, mensual (nómina), atrasos, ausencias, horas extra, marcaciones y sincronización. Exportación CSV segura para Excel.                                                                                                                                                                                          |
@@ -251,7 +251,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] Adaptador **Hikvision** (ISAPI + Digest) — experimental, pendiente de validar con hardware
 - [ ] Recepción _push_ HTTP (ADMS/iclock) para equipos en la nube
 - [x] Saldos de vacaciones y políticas por tipo de contrato
-- [x] Notificaciones in-app en tiempo real (dispositivo desconectado/recuperado, solicitudes por revisar/resueltas)
+- [x] Notificaciones in-app en tiempo real (dispositivo desconectado/recuperado, solicitudes por revisar/resueltas, vacaciones por caducar)
 - [x] Gestión de horarios por empleado desde la web
 - [x] E2E de interfaz con Playwright
 - [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real

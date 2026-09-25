@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import {
   Briefcase,
   CalendarCheck,
+  CalendarClock,
   ClipboardList,
   Cpu,
   FileSpreadsheet,
@@ -22,6 +23,7 @@ const NAV: { to: string; label: string; icon: typeof Users; permission: Permissi
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
   { to: '/asistencia', label: 'Asistencia', icon: CalendarCheck, permission: 'attendance:read' },
   { to: '/empleados', label: 'Empleados', icon: Users, permission: 'employees:read' },
+  { to: '/horarios', label: 'Horarios', icon: CalendarClock, permission: 'schedules:read' },
   { to: '/contratos', label: 'Contratos', icon: Briefcase, permission: 'organization:read' },
   { to: '/dispositivos', label: 'Dispositivos', icon: Cpu, permission: 'devices:read' },
   { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, permission: 'leave:read' },

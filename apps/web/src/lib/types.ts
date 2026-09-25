@@ -181,11 +181,36 @@ export interface NamedRef {
   name: string;
 }
 
+export interface WorkShiftRow {
+  id: string;
+  name: string;
+  /** HH:mm; an end earlier than the start means the shift ends the next day. */
+  startTime: string;
+  endTime: string;
+  breakStart: string | null;
+  breakEnd: string | null;
+  /** null = the attendance policy's value applies. */
+  lateToleranceMinutes: number | null;
+  earlyLeaveToleranceMinutes: number | null;
+  overtimeThresholdMinutes: number | null;
+}
+
 export interface WorkScheduleRow {
   id: string;
   name: string;
   description: string | null;
-  days: { weekday: number; shift: { name: string; startTime: string; endTime: string } }[];
+  /** Weekdays not listed are rest days (ISO weekday, 1 = Monday). */
+  days: {
+    weekday: number;
+    shiftId?: string;
+    shift: { name: string; startTime: string; endTime: string };
+  }[];
+}
+
+export interface HolidayRow {
+  id: string;
+  date: string;
+  name: string;
 }
 
 /** One period of an employee's schedule history; dates are `YYYY-MM-DD`, `effectiveTo` inclusive. */

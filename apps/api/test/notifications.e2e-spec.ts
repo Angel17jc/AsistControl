@@ -5,6 +5,7 @@ import { type AppNotification, REALTIME_EVENTS, REALTIME_NAMESPACE } from '@asis
 import { type Socket, io } from 'socket.io-client';
 import request from 'supertest';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { VacationExpiryNotices } from '../src/vacations/vacation-expiry-notices';
 import { WORK_DATE, bearer, createApp, createFixture, type Fixture, login } from './utils';
 
 /**
@@ -299,6 +300,66 @@ describe('Notifications (e2e)', () => {
       });
       await new Promise((r) => setTimeout(r, 300));
       expect(leaked).toHaveLength(0);
+    });
+  });
+
+  describe('vacation days about to expire', () => {
+    // The fixture employee was hired 2026-01-01: with a 12-month expiry, the 15 days of
+    // service year one (credited 2027-01-01) expire on 2028-01-01.
+    const notices = () => app.get(VacationExpiryNotices);
+    const expiring = () =>
+      prisma.notification.findMany({
+        where: { userId: ids.employee, type: 'VACATION_EXPIRING' },
+      });
+
+    beforeAll(async () => {
+      const contractType = await http()
+        .post('/api/contract-types')
+        .set(bearer(tokens.hr))
+        .send({ name: 'Con caducidad ntf', vacationDaysPerYear: 15, vacationExpiryMonths: 12 })
+        .expect(201);
+      await http()
+        .patch(`/api/employees/${fx.employee.id}`)
+        .set(bearer(tokens.hr))
+        .send({ contractTypeId: contractType.body.id })
+        .expect(200);
+    });
+
+    it('says nothing while the expiry is further away than the notice period', async () => {
+      await notices().run(new Date('2027-11-15T12:00:00Z'));
+      expect(await expiring()).toHaveLength(0);
+    });
+
+    it('warns the employee, and only them, once per expiry date', async () => {
+      await notices().run(new Date('2027-12-10T12:00:00Z'));
+      await notices().run(new Date('2027-12-11T12:00:00Z'));
+
+      const found = await expiring();
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({
+        entity: 'Employee',
+        entityId: fx.employee.id,
+        data: { days: 15, expiresOn: '2028-01-01', employeeName: expect.any(String) },
+      });
+      // Not HR, not the supervisor: the days are the employee's.
+      for (const userId of [ids.hr, ids.supervisor, ids.admin]) {
+        expect(
+          await prisma.notification.count({ where: { userId, type: 'VACATION_EXPIRING' } }),
+        ).toBe(0);
+      }
+    });
+
+    it('is visible to the employee through the API', async () => {
+      const res = await http()
+        .get('/api/notifications?unread=true')
+        .set(bearer(tokens.employee))
+        .expect(200);
+      expect(res.body.data).toContainEqual(
+        expect.objectContaining({
+          type: 'VACATION_EXPIRING',
+          data: expect.objectContaining({ expiresOn: '2028-01-01' }),
+        }),
+      );
     });
   });
 });

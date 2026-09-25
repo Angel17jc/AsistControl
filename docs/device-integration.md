@@ -99,6 +99,30 @@ Conservar el cursor al cambiar de terminal sería peligroso: el cursor de Hikvis
 
 La interfaz traduce el código a una indicación accionable ("El equipo rechazó las credenciales", "Sin respuesta del equipo: revise la IP, el puerto y la red"…).
 
+## Validar un equipo real: `npm run device:probe`
+
+Antes de registrar un terminal en la plataforma, el diagnóstico ejecuta contra él la misma secuencia que una sincronización y dice qué revisar en cada paso. **No escribe nada en el equipo** y prueba las credenciales **una sola vez**, así que se puede usar con un equipo en producción.
+
+```bash
+# ZKTeco: la clave de comunicación va por variable de entorno, nunca como argumento
+DEVICE_COMM_KEY=0 npm run device:probe -- --driver ZKTECO --host 192.168.1.201 --timezone America/Guayaquil
+
+# Hikvision: un usuario ISAPI dedicado (no admin); --protocol https si el equipo lo usa
+DEVICE_USERNAME=asistencia DEVICE_PASSWORD='********' \
+  npm run device:probe -- --driver HIKVISION --host 192.168.1.64 --timezone America/Guayaquil
+```
+
+| Paso                 | Qué comprueba                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Conexión             | Red, puerto y credenciales. Un fallo detiene el resto y explica la causa (`CONNECTION_FAILED`, `TIMEOUT`…) |
+| Identidad            | Fabricante, modelo, serie, firmware y contadores de usuarios y registros                                   |
+| Reloj                | Desfase con el servidor; aviso a partir de 60 s                                                            |
+| Usuarios             | Cuántos hay y los primeros ID, que deben coincidir con el **ID biométrico** de cada empleado               |
+| Descarga completa    | Marcaciones por tipo y método, horas futuras o muy antiguas (reloj o zona horaria mal configurados)        |
+| Descarga incremental | Que el cursor avance: una segunda descarga no debe traer nada                                              |
+
+Sale con código 0 si funciona (con o sin avisos) y 1 si falla; `--json` entrega el informe completo para adjuntarlo a un issue. Las cifras por tipo y método deben contrastarse con el registro del propio equipo.
+
 ## Driver `ZKTECO` (experimental)
 
 Terminales ZKTeco _standalone_ (K40, F18, MB160…) por **TCP 4370**. El protocolo no es una especificación pública: la implementación sigue el trazado que usan los clientes de la comunidad (pyzk, zklib), está cubierta por tests byte a byte y se verifica contra un **servidor falso que habla el protocolo**. Falta validarla contra hardware real antes de usarla en producción.
@@ -126,7 +150,7 @@ curl -X POST localhost:3000/api/devices -H "authorization: Bearer $TOKEN" -H 'co
 }'
 ```
 
-Para validarlo con un equipo real: registrar el dispositivo, ejecutar `POST /devices/:id/test-connection` (debe devolver serie, modelo y desfase de reloj) y luego `POST /devices/:id/sync`. Revisar en el `DeviceSyncLog` que no haya registros rechazados y contrastar las horas con el reloj del equipo.
+Para validarlo con un equipo real: correr `npm run device:probe` (arriba); luego registrar el dispositivo, ejecutar `POST /devices/:id/test-connection` (debe devolver serie, modelo y desfase de reloj) y luego `POST /devices/:id/sync`. Revisar en el `DeviceSyncLog` que no haya registros rechazados y contrastar las horas con el reloj del equipo.
 
 ## Driver `HIKVISION` (experimental)
 
@@ -177,10 +201,11 @@ curl -X POST localhost:3000/api/devices -H "authorization: Bearer $TOKEN" -H 'co
 Para validarlo con un equipo real:
 
 1. Crear en el terminal un **usuario ISAPI dedicado** (no `admin`) con permiso de consulta de eventos; así un error de configuración nunca bloquea la cuenta de administración.
-2. Registrar el dispositivo y ejecutar `POST /devices/:id/test-connection`: debe devolver modelo, serie y desfase de reloj.
-3. Marcar con rostro, huella y tarjeta, y ejecutar `POST /devices/:id/sync`. Contrastar en `/asistencia → Marcaciones` la hora, el tipo y el método de cada marcación con el registro del equipo.
-4. Sincronizar de nuevo: `recordsReceived` debe ser 0.
-5. Si el firmware usa otros códigos `minor` para las identificaciones correctas, ajustarlos en `config.eventMinors` y documentarlos aquí.
+2. Correr `npm run device:probe` con ese usuario (arriba) y resolver lo que marque como fallo.
+3. Registrar el dispositivo y ejecutar `POST /devices/:id/test-connection`: debe devolver modelo, serie y desfase de reloj.
+4. Marcar con rostro, huella y tarjeta, y ejecutar `POST /devices/:id/sync`. Contrastar en `/asistencia → Marcaciones` la hora, el tipo y el método de cada marcación con el registro del equipo.
+5. Sincronizar de nuevo: `recordsReceived` debe ser 0.
+6. Si el firmware usa otros códigos `minor` para las identificaciones correctas, ajustarlos en `config.eventMinors` y documentarlos aquí.
 
 ## Simulador (driver `MOCK`)
 

@@ -1,7 +1,7 @@
 import type { AppNotification } from '@asistcontrol/shared';
 import type { Tone } from '../components/ui';
 import { explainDeviceError } from './device-drivers';
-import { LEAVE_LABEL, formatDateTime } from './format';
+import { LEAVE_LABEL, formatDateTime, formatDateWithYear, formatDays } from './format';
 
 export interface NotificationView {
   title: string;
@@ -53,6 +53,16 @@ export function describeNotification(notification: AppNotification): Notificatio
           (note ? ` — «${note}»` : ''),
         href: '/solicitudes',
         tone: approved ? 'good' : 'critical',
+      };
+    }
+    case 'VACATION_EXPIRING': {
+      const { days, expiresOn } = notification.data;
+      return {
+        title: 'Vacaciones por caducar',
+        body: `${formatDays(days)} de vacaciones caducan el ${formatDateWithYear(expiresOn)} si no los usas antes.`,
+        // "Mis vacaciones" lives on the requests page, next to the form to request them.
+        href: '/solicitudes',
+        tone: 'warning',
       };
     }
     default:

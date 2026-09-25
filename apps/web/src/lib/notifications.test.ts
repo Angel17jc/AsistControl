@@ -68,4 +68,18 @@ describe('describeNotification', () => {
     expect(view).toMatchObject({ title: 'Solicitud rechazada', tone: 'critical' });
     expect(view.body).toMatch(/«Coincide con el inventario»$/);
   });
+
+  it('warns about vacation days about to expire, pointing to where they are requested', () => {
+    const view = describeNotification({
+      ...base,
+      type: 'VACATION_EXPIRING',
+      data: { employeeName: 'Luis Mendoza', days: 6.5, expiresOn: '2027-01-06' },
+    });
+    expect(view).toEqual({
+      title: 'Vacaciones por caducar',
+      body: '6,5 días de vacaciones caducan el 6 ene 2027 si no los usas antes.',
+      href: '/solicitudes',
+      tone: 'warning',
+    });
+  });
 });

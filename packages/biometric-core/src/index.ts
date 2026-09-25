@@ -15,3 +15,4 @@ export * from './hikvision/hikvision.adapter';
 export * from './zkteco/test-fixtures';
 export * from './zkteco/fake-device';
 export * from './hikvision/fake-device';
+export * from './probe';
