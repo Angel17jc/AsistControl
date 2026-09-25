@@ -44,7 +44,9 @@ export function VacationBalanceCard({
   const b = balance.data;
   // Shown whenever the contract makes days expire, or some already did under an earlier rule.
   const expires =
-    b !== undefined && (b.contractType?.vacationExpiryMonths != null || b.expiredDays > 0);
+    b !== undefined &&
+    ((b.contractType !== null && b.contractType.vacationExpiryMonths !== null) ||
+      b.expiredDays > 0);
 
   return (
     <Card className={className}>
