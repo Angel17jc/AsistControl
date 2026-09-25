@@ -173,3 +173,18 @@ export interface NamedRef {
   id: string;
   name: string;
 }
+
+export interface WorkScheduleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  days: { weekday: number; shift: { name: string; startTime: string; endTime: string } }[];
+}
+
+/** One period of an employee's schedule history; dates are `YYYY-MM-DD`, `effectiveTo` inclusive. */
+export interface ScheduleAssignmentRow {
+  id: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  schedule: NamedRef;
+}
