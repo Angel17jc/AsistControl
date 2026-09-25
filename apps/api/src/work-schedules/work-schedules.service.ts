@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { EmployeeSchedule } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
@@ -166,12 +167,15 @@ export class WorkSchedulesService {
 
   // ─────────────────────────────────────────── assignments
 
-  listAssignments(employeeId: string) {
-    return this.prisma.employeeSchedule.findMany({
+  /** An employee's schedule history, newest first, with calendar dates (`YYYY-MM-DD`). */
+  async listAssignments(employeeId: string) {
+    await this.assertEmployeeExists(employeeId);
+    const rows = await this.prisma.employeeSchedule.findMany({
       where: { employeeId },
       orderBy: { effectiveFrom: 'desc' },
       include: { schedule: { select: { id: true, name: true } } },
     });
+    return rows.map((row) => toAssignmentResponse(row));
   }
 
   /**
@@ -179,10 +183,7 @@ export class WorkSchedulesService {
    * History is preserved: past days keep being evaluated with the schedule in force back then.
    */
   async assign(dto: AssignScheduleDto, actor: AuthenticatedUser, ctx: RequestContext) {
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: dto.employeeId, deletedAt: null },
-    });
-    if (!employee) throw new NotFoundException('Employee not found');
+    await this.assertEmployeeExists(dto.employeeId);
     await this.getSchedule(dto.scheduleId);
 
     const from = toDbDate(dto.effectiveFrom);
@@ -203,6 +204,7 @@ export class WorkSchedulesService {
       });
       const created = await tx.employeeSchedule.create({
         data: { employeeId: dto.employeeId, scheduleId: dto.scheduleId, effectiveFrom: from },
+        include: { schedule: { select: { id: true, name: true } } },
       });
       await this.audit.record(
         {
@@ -219,7 +221,7 @@ export class WorkSchedulesService {
     });
 
     await this.recomputeRetroactively(dto.employeeId, dto.effectiveFrom);
-    return assignment;
+    return toAssignmentResponse(assignment);
   }
 
   // ─────────────────────────────────────────── holidays
@@ -276,6 +278,11 @@ export class WorkSchedulesService {
 
   // ─────────────────────────────────────────── helpers
 
+  private async assertEmployeeExists(id: string) {
+    const found = await this.prisma.employee.count({ where: { id, deletedAt: null } });
+    if (found === 0) throw new NotFoundException('Employee not found');
+  }
+
   private async assertShiftsExist(ids: string[]) {
     const unique = [...new Set(ids)];
     const found = await this.prisma.workShift.count({
@@ -299,6 +306,17 @@ export class WorkSchedulesService {
       .recomputeRange({ from: date, to: date })
       .catch((err: unknown) => this.logger.error({ err, date }, 'Holiday recompute failed'));
   }
+}
+
+type AssignmentRow = EmployeeSchedule & { schedule: { id: string; name: string } };
+
+/** `@db.Date` columns go out as calendar dates, like every other date-only field. */
+function toAssignmentResponse({ effectiveFrom, effectiveTo, ...rest }: AssignmentRow) {
+  return {
+    ...rest,
+    effectiveFrom: fromDbDate(effectiveFrom),
+    effectiveTo: effectiveTo ? fromDbDate(effectiveTo) : null,
+  };
 }
 
 function validateBreak(shift: { breakStart?: string | null; breakEnd?: string | null }) {
