@@ -14,7 +14,14 @@ test.describe('Permisos en la interfaz', () => {
     await expect(page).toHaveURL(/\/asistencia$/);
     const nav = page.getByRole('navigation', { name: 'Principal' });
     await expect(nav.getByRole('link', { name: 'Asistencia' })).toBeVisible();
-    for (const hidden of ['Dashboard', 'Empleados', 'Dispositivos', 'Auditoría', 'Reportes']) {
+    for (const hidden of [
+      'Dashboard',
+      'Empleados',
+      'Horarios',
+      'Dispositivos',
+      'Auditoría',
+      'Reportes',
+    ]) {
       await expect(nav.getByRole('link', { name: hidden })).toHaveCount(0);
     }
 
@@ -32,6 +39,7 @@ test.describe('Permisos en la interfaz', () => {
       'Dashboard',
       'Asistencia',
       'Empleados',
+      'Horarios',
       'Dispositivos',
       'Solicitudes',
       'Reportes',
@@ -47,7 +55,7 @@ test.describe('Permisos en la interfaz', () => {
     const nav = page.getByRole('navigation', { name: 'Principal' });
     await expect(nav.getByRole('link', { name: 'Asistencia' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Empleados' })).toBeVisible();
-    for (const hidden of ['Dispositivos', 'Auditoría', 'Reportes']) {
+    for (const hidden of ['Horarios', 'Dispositivos', 'Auditoría', 'Reportes']) {
       await expect(nav.getByRole('link', { name: hidden })).toHaveCount(0);
     }
 
