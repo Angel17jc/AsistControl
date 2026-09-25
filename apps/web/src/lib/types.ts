@@ -55,6 +55,7 @@ export interface EmployeeRow {
   email: string | null;
   phone: string | null;
   hireDate: string;
+  terminatedAt: string | null;
   status: EmployeeStatus;
   biometricId: string | null;
   department: { id: string; name: string } | null;

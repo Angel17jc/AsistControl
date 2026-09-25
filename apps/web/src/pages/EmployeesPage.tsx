@@ -1,16 +1,15 @@
 import type { EmployeeStatus, PaginatedResponse } from '@asistcontrol/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Palmtree, Plus, Search } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Palmtree, Pencil, Plus, Search } from 'lucide-react';
+import { useState } from 'react';
+import { EMPLOYEE_STATUS_LABEL, EmployeeForm } from '../components/employees/EmployeeForm';
 import {
   Button,
   Card,
   ErrorState,
-  Field,
   Input,
   PageHeader,
   Pagination,
-  Select,
   Spinner,
   StatusBadge,
   Table,
@@ -19,19 +18,20 @@ import {
 } from '../components/ui';
 import { VacationBalanceCard } from '../components/vacations/VacationBalanceCard';
 import { api } from '../lib/api';
-import type { ContractTypeRow, EmployeeRow, NamedRef } from '../lib/types';
+import type { EmployeeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
-const STATUS: Record<EmployeeStatus, { label: string; tone: Tone }> = {
-  ACTIVE: { label: 'Activo', tone: 'good' },
-  INACTIVE: { label: 'Inactivo', tone: 'neutral' },
-  SUSPENDED: { label: 'Suspendido', tone: 'warning' },
+const STATUS_TONE: Record<EmployeeStatus, Tone> = {
+  ACTIVE: 'good',
+  INACTIVE: 'neutral',
+  SUSPENDED: 'warning',
 };
 
 export function EmployeesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<EmployeeRow | null>(null);
   const [vacationsOf, setVacationsOf] = useState<EmployeeRow | null>(null);
   const canWrite = useAuth((s) => s.can('employees:write'));
   const canReadLeave = useAuth((s) => s.can('leave:read'));
@@ -59,6 +59,9 @@ export function EmployeesPage() {
         }
       />
       {creating && <EmployeeForm onDone={() => setCreating(false)} />}
+      {editing && (
+        <EmployeeForm key={editing.id} employee={editing} onDone={() => setEditing(null)} />
+      )}
       {vacationsOf && (
         <div className="mb-6">
           <VacationBalanceCard
@@ -125,20 +128,35 @@ export function EmployeesPage() {
                     {e.biometricId ?? <span className="text-ink-3">sin enrolar</span>}
                   </Td>
                   <Td>
-                    <StatusBadge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</StatusBadge>
+                    <StatusBadge tone={STATUS_TONE[e.status]}>
+                      {EMPLOYEE_STATUS_LABEL[e.status]}
+                    </StatusBadge>
                   </Td>
                   <Td>
-                    {canReadLeave && (
-                      <Button
-                        variant="ghost"
-                        className="px-2 py-1 text-xs"
-                        icon={<Palmtree className="size-3.5" />}
-                        aria-label={`Vacaciones de ${e.firstName} ${e.lastName}`}
-                        onClick={() => setVacationsOf(e)}
-                      >
-                        Vacaciones
-                      </Button>
-                    )}
+                    <div className="flex justify-end gap-1">
+                      {canWrite && (
+                        <Button
+                          variant="ghost"
+                          className="px-2 py-1 text-xs"
+                          icon={<Pencil className="size-3.5" />}
+                          aria-label={`Editar ${e.firstName} ${e.lastName}`}
+                          onClick={() => (setCreating(false), setEditing(e))}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                      {canReadLeave && (
+                        <Button
+                          variant="ghost"
+                          className="px-2 py-1 text-xs"
+                          icon={<Palmtree className="size-3.5" />}
+                          aria-label={`Vacaciones de ${e.firstName} ${e.lastName}`}
+                          onClick={() => setVacationsOf(e)}
+                        >
+                          Vacaciones
+                        </Button>
+                      )}
+                    </div>
                   </Td>
                 </tr>
               ))}
@@ -152,129 +170,5 @@ export function EmployeesPage() {
         )}
       </Card>
     </>
-  );
-}
-
-function EmployeeForm({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient();
-  const departments = useQuery({
-    queryKey: ['departments'],
-    queryFn: () => api<NamedRef[]>('/departments'),
-  });
-  const positions = useQuery({
-    queryKey: ['positions'],
-    queryFn: () => api<NamedRef[]>('/positions'),
-  });
-  const contractTypes = useQuery({
-    queryKey: ['contract-types'],
-    queryFn: () => api<ContractTypeRow[]>('/contract-types'),
-  });
-  const [form, setForm] = useState({
-    employeeCode: '',
-    identification: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    hireDate: new Date().toISOString().slice(0, 10),
-    departmentId: '',
-    positionId: '',
-    contractTypeId: '',
-    biometricId: '',
-  });
-  const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const create = useMutation({
-    // Empty optional fields are omitted so the API validation does not reject them.
-    mutationFn: () =>
-      api('/employees', {
-        method: 'POST',
-        body: Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '')),
-      }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['employees'] });
-      onDone();
-    },
-  });
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    create.mutate();
-  }
-
-  return (
-    <Card className="mb-6">
-      <form onSubmit={submit} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Código interno">
-          <Input
-            required
-            placeholder="EMP-0011"
-            value={form.employeeCode}
-            onChange={set('employeeCode')}
-          />
-        </Field>
-        <Field label="Identificación">
-          <Input required value={form.identification} onChange={set('identification')} />
-        </Field>
-        <Field label="Nombres">
-          <Input required value={form.firstName} onChange={set('firstName')} />
-        </Field>
-        <Field label="Apellidos">
-          <Input required value={form.lastName} onChange={set('lastName')} />
-        </Field>
-        <Field label="Correo">
-          <Input type="email" value={form.email} onChange={set('email')} />
-        </Field>
-        <Field label="Fecha de ingreso">
-          <Input type="date" required value={form.hireDate} onChange={set('hireDate')} />
-        </Field>
-        <Field label="Departamento">
-          <Select value={form.departmentId} onChange={set('departmentId')}>
-            <option value="">—</option>
-            {departments.data?.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Cargo">
-          <Select value={form.positionId} onChange={set('positionId')}>
-            <option value="">—</option>
-            {positions.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Tipo de contrato" hint="Decide sus vacaciones">
-          <Select value={form.contractTypeId} onChange={set('contractTypeId')}>
-            <option value="">—</option>
-            {contractTypes.data?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="ID biométrico" hint="El mismo número enrolado en los marcadores">
-          <Input value={form.biometricId} onChange={set('biometricId')} />
-        </Field>
-        <div className="flex items-end gap-2 lg:col-span-2">
-          <Button type="submit" variant="primary" loading={create.isPending}>
-            Guardar
-          </Button>
-          <Button type="button" variant="ghost" onClick={onDone}>
-            Cancelar
-          </Button>
-          {create.error && (
-            <p role="alert" className="text-sm text-critical">
-              {create.error.message}
-            </p>
-          )}
-        </div>
-      </form>
-    </Card>
   );
 }
