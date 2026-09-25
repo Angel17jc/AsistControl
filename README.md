@@ -255,7 +255,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] Gestión de horarios por empleado desde la web
 - [x] E2E de interfaz con Playwright
 - [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real
-- [ ] Vacaciones: caducidad de días no usados y medios días
+- [x] Vacaciones: caducidad de días no usados y medios días
 - [ ] Notificaciones por correo
 - [ ] Exportación directa a formatos de nómina y PDF firmado
 - [ ] Multi-empresa / multi-sede con zonas horarias por sede
