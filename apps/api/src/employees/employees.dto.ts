@@ -95,10 +95,14 @@ export class UpdateEmployeeDto extends PartialType(CreateEmployeeDto) {
   @IsIn(EMPLOYEE_STATUSES)
   status?: EmployeeStatus;
 
-  @ApiPropertyOptional({ example: '2026-12-31', description: 'Last working day' })
+  @ApiPropertyOptional({
+    example: '2026-12-31',
+    nullable: true,
+    description: 'Last working day; null clears it when someone is reinstated',
+  })
   @IsOptional()
   @Matches(DATE_ONLY_REGEX, { message: 'terminatedAt must be YYYY-MM-DD' })
-  terminatedAt?: string;
+  terminatedAt?: string | null;
 }
 
 export class EmployeeQueryDto extends PaginationQueryDto {
