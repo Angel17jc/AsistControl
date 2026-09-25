@@ -73,6 +73,8 @@ export interface ContractTypeRow {
   seniority: { afterYears: number; extraDaysPerYear: number; maxExtraDays: number } | null;
   /** Unused days of a service year expire this many months after its anniversary; null = never. */
   vacationExpiryMonths: number | null;
+  /** A single-day vacation covering at most half the working time costs half a day. */
+  allowHalfDayVacations: boolean;
   allowNegativeVacationBalance: boolean;
   /** How many employees use it (list only). */
   employees?: number;

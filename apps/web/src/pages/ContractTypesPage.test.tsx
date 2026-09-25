@@ -17,6 +17,7 @@ const TYPES: ContractTypeRow[] = [
     vacationDayCounting: 'WORKING_DAYS',
     seniority: { afterYears: 5, extraDaysPerYear: 1, maxExtraDays: 15 },
     vacationExpiryMonths: 24,
+    allowHalfDayVacations: true,
     allowNegativeVacationBalance: false,
     employees: 9,
   },
@@ -28,6 +29,7 @@ const TYPES: ContractTypeRow[] = [
     vacationDayCounting: 'CALENDAR_DAYS',
     seniority: null,
     vacationExpiryMonths: null,
+    allowHalfDayVacations: false,
     allowNegativeVacationBalance: true,
     employees: 0,
   },
@@ -69,6 +71,7 @@ describe('ContractTypesPage', () => {
     expect(within(row).getByText('Anual, en cada aniversario')).toBeVisible();
     expect(within(row).getByText('+1 día/año desde el año 6, máx. 15 días')).toBeVisible();
     expect(within(row).getByText('24 meses después de cada aniversario')).toBeVisible();
+    expect(within(row).getByText('Días hábiles · medios días')).toBeVisible();
 
     const temporal = screen.getByText('Temporal').closest('tr')!;
     expect(within(temporal).getByText('7,5 días')).toBeVisible();
@@ -96,6 +99,7 @@ describe('ContractTypesPage', () => {
       '12',
     );
     expect(within(form).queryByLabelText('Máximo de días extra')).toBeNull();
+    await userEvent.click(within(form).getByLabelText(/Permitir medios días/));
 
     await userEvent.click(within(form).getByLabelText('Días extra por antigüedad'));
     await userEvent.clear(within(form).getByLabelText('Máximo de días extra'));
@@ -111,6 +115,7 @@ describe('ContractTypesPage', () => {
           vacationAccrual: 'ANNUAL',
           vacationDayCounting: 'WORKING_DAYS',
           allowNegativeVacationBalance: false,
+          allowHalfDayVacations: true,
           vacationExpiryMonths: 12,
           seniority: { afterYears: 5, extraDaysPerYear: 1, maxExtraDays: 5 },
         },

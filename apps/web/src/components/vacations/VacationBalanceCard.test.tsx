@@ -20,6 +20,7 @@ const BALANCE: VacationBalance = {
     vacationDayCounting: 'WORKING_DAYS',
     seniority: null,
     vacationExpiryMonths: null,
+    allowHalfDayVacations: false,
     allowNegativeVacationBalance: false,
   },
   accrual: { completedServiceYears: 1, currentYearEntitlement: 15, nextCreditOn: '2027-01-06' },

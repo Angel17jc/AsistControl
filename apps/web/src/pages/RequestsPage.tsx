@@ -289,6 +289,12 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
             Cancelar
           </Button>
         </div>
+        {type === 'VACATION' && (
+          <p className="text-xs text-ink-3 sm:col-span-2 lg:col-span-5">
+            Una vacación de un solo día que ocupe hasta media jornada (una mañana o una tarde)
+            descuenta medio día si tu contrato lo permite.
+          </p>
+        )}
         {create.error && (
           <p role="alert" className="text-sm text-critical sm:col-span-2 lg:col-span-5">
             {create.error.message}

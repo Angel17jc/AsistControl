@@ -96,7 +96,10 @@ export function ContractTypesPage() {
                 <Td className="font-medium">{t.name}</Td>
                 <Td className="tabular">{formatDays(t.vacationDaysPerYear)}</Td>
                 <Td className="text-ink-2">{VACATION_ACCRUAL_LABEL[t.vacationAccrual]}</Td>
-                <Td className="text-ink-2">{VACATION_COUNTING_LABEL[t.vacationDayCounting]}</Td>
+                <Td className="text-ink-2">
+                  {VACATION_COUNTING_LABEL[t.vacationDayCounting]}
+                  {t.allowHalfDayVacations && ' · medios días'}
+                </Td>
                 <Td className="text-ink-2">
                   {t.seniority
                     ? `+${formatDays(t.seniority.extraDaysPerYear)}/año desde el año ${t.seniority.afterYears + 1}, máx. ${formatDays(t.seniority.maxExtraDays)}`
@@ -157,6 +160,7 @@ function ContractTypeForm({
     vacationDayCounting:
       contractType?.vacationDayCounting ?? ('WORKING_DAYS' as VacationDayCounting),
     allowNegativeVacationBalance: contractType?.allowNegativeVacationBalance ?? false,
+    allowHalfDayVacations: contractType?.allowHalfDayVacations ?? false,
     // Empty = the days never expire.
     vacationExpiryMonths: String(contractType?.vacationExpiryMonths ?? ''),
   });
@@ -291,6 +295,15 @@ function ContractTypeForm({
             }
           />
           Permitir anticipos (pedir más días de los disponibles)
+        </label>
+        <label className="flex items-center gap-2 text-ink-2">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--accent)]"
+            checked={form.allowHalfDayVacations}
+            onChange={(e) => setForm((f) => ({ ...f, allowHalfDayVacations: e.target.checked }))}
+          />
+          Permitir medios días (una mañana o una tarde descuenta medio día)
         </label>
       </div>
 
