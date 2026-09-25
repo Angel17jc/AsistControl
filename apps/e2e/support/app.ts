@@ -106,6 +106,20 @@ export class ApiClient {
     }
   }
 
+  /** A new hire with no schedule yet; the surname is unique so a test can search for it. */
+  async createEmployee(label: string): Promise<{ id: string; name: string }> {
+    const suffix = Date.now().toString().slice(-6);
+    const lastName = `${label} ${suffix}`;
+    const employee = await this.send<{ id: string }>('post', '/employees', {
+      employeeCode: `QA-${suffix}`,
+      identification: `QA${suffix}`,
+      firstName: 'Prueba',
+      lastName,
+      hireDate: '2026-01-05',
+    });
+    return { id: employee.id, name: `Prueba ${lastName}` };
+  }
+
   /** A punch registered by hand, the way an operator corrects a missing one. */
   async manualPunch(): Promise<void> {
     const employees = await this.send<{ data: { id: string }[] }>('get', '/employees?pageSize=1');

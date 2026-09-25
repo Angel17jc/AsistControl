@@ -40,6 +40,17 @@ export function formatDate(isoDate: string): string {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+/** "1 sept 2026": for periods that can span years. */
+export function formatDateWithYear(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat('es-EC', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
 export function todayIso(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: displayTimezone }).format(new Date());
 }

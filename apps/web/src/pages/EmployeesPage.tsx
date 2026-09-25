@@ -1,8 +1,9 @@
 import type { EmployeeStatus, PaginatedResponse } from '@asistcontrol/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Palmtree, Pencil, Plus, Search } from 'lucide-react';
+import { CalendarClock, Palmtree, Pencil, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { EMPLOYEE_STATUS_LABEL, EmployeeForm } from '../components/employees/EmployeeForm';
+import { EmployeeScheduleCard } from '../components/schedules/EmployeeScheduleCard';
 import {
   Button,
   Card,
@@ -33,8 +34,11 @@ export function EmployeesPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<EmployeeRow | null>(null);
   const [vacationsOf, setVacationsOf] = useState<EmployeeRow | null>(null);
+  const [scheduleOf, setScheduleOf] = useState<EmployeeRow | null>(null);
   const canWrite = useAuth((s) => s.can('employees:write'));
   const canReadLeave = useAuth((s) => s.can('leave:read'));
+  const canReadSchedules = useAuth((s) => s.can('schedules:read'));
+  const canWriteSchedules = useAuth((s) => s.can('schedules:write'));
   const { data, isLoading, error } = useQuery({
     queryKey: ['employees', search, page],
     queryFn: () =>
@@ -72,6 +76,19 @@ export function EmployeesPage() {
           />
           <Button variant="ghost" className="mt-2" onClick={() => setVacationsOf(null)}>
             Cerrar vacaciones
+          </Button>
+        </div>
+      )}
+      {scheduleOf && (
+        <div className="mb-6">
+          <EmployeeScheduleCard
+            key={scheduleOf.id}
+            employeeId={scheduleOf.id}
+            title={`Horario de ${scheduleOf.firstName} ${scheduleOf.lastName}`}
+            manage={canWriteSchedules}
+          />
+          <Button variant="ghost" className="mt-2" onClick={() => setScheduleOf(null)}>
+            Cerrar horario
           </Button>
         </div>
       )}
@@ -154,6 +171,17 @@ export function EmployeesPage() {
                           onClick={() => setVacationsOf(e)}
                         >
                           Vacaciones
+                        </Button>
+                      )}
+                      {canReadSchedules && (
+                        <Button
+                          variant="ghost"
+                          className="px-2 py-1 text-xs"
+                          icon={<CalendarClock className="size-3.5" />}
+                          aria-label={`Horario de ${e.firstName} ${e.lastName}`}
+                          onClick={() => setScheduleOf(e)}
+                        >
+                          Horario
                         </Button>
                       )}
                     </div>
