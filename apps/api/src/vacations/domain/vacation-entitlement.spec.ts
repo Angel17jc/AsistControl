@@ -2,8 +2,11 @@ import {
   type VacationRule,
   accruedVacationDays,
   addMonths,
+  coveredShare,
   datesCovered,
   entitlementForServiceYear,
+  partialDayCost,
+  vacationDayCost,
   vacationDaysUsed,
 } from './vacation-entitlement';
 
@@ -117,6 +120,39 @@ describe('days a leave uses', () => {
 
   it('covers nothing when the range is inverted', () => {
     expect(datesCovered('2026-09-28', '2026-09-25')).toEqual([]);
+  });
+});
+
+describe('half days', () => {
+  const at = (hhmm: string) => new Date(`2026-09-28T${hhmm}:00-05:00`);
+  const range = (from: string, to: string) => ({ start: at(from), end: at(to) });
+  const day = { start: at('00:00'), end: new Date('2026-09-29T00:00:00-05:00') };
+  // 08:00-17:00 with lunch 12:00-13:00: eight working hours.
+  const shift = { ...range('08:00', '17:00'), break: range('12:00', '13:00') };
+
+  it('measures the working time covered, leaving lunch out', () => {
+    expect(coveredShare(range('08:00', '12:00'), day, shift)).toBe(0.5);
+    expect(coveredShare(range('08:00', '13:00'), day, shift)).toBe(0.5);
+    expect(coveredShare(range('13:00', '17:00'), day, shift)).toBe(0.5);
+    expect(coveredShare(range('08:00', '14:00'), day, shift)).toBe(0.625);
+    expect(coveredShare(range('06:00', '20:00'), day, shift)).toBe(1);
+    expect(coveredShare(range('18:00', '20:00'), day, shift)).toBe(0);
+  });
+
+  it('measures against the whole day when there is no shift', () => {
+    expect(coveredShare(range('00:00', '12:00'), day, null)).toBe(0.5);
+    expect(coveredShare(range('08:00', '10:00'), day, null)).toBeCloseTo(1 / 12);
+  });
+
+  it('prices a morning or an afternoon at half a day, more than that at a whole one', () => {
+    expect([0, 0.25, 0.5, 0.51, 1].map(partialDayCost)).toEqual([0, 0.5, 0.5, 1, 1]);
+  });
+
+  it('never charges a rest day, half or whole', () => {
+    expect(vacationDayCost('WORKING_DAYS', false, 0.5)).toBe(0);
+    expect(vacationDayCost('WORKING_DAYS', true, 0.5)).toBe(0.5);
+    expect(vacationDayCost('CALENDAR_DAYS', false, 0.5)).toBe(0.5);
+    expect(vacationDayCost('CALENDAR_DAYS', false, null)).toBe(1);
   });
 });
 

@@ -23,6 +23,7 @@ export function toContractTypeResponse(row: ContractType, employees?: number) {
             maxExtraDays: Number(row.seniorityMaxExtraDays),
           },
     vacationExpiryMonths: row.vacationExpiryMonths,
+    allowHalfDayVacations: row.allowHalfDayVacations,
     allowNegativeVacationBalance: row.allowNegativeVacationBalance,
     ...(employees !== undefined && { employees }),
   };
