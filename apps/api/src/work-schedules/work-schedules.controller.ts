@@ -109,6 +109,23 @@ export class WorkSchedulesController {
     return this.schedules.assign(dto, actor, ctx);
   }
 
+  @Delete('work-schedules/assignments/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('schedules:write')
+  @ApiOperation({
+    summary: "Undo an employee's latest schedule assignment",
+    description:
+      'The previous assignment runs open-ended again and affected past days are recomputed. ' +
+      'Earlier assignments, and ones that started more than 62 days ago, cannot be undone.',
+  })
+  unassign(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ) {
+    return this.schedules.unassign(id, actor, ctx);
+  }
+
   @Get('employees/:employeeId/schedules')
   @RequirePermissions('schedules:read')
   listAssignments(@Param('employeeId', ParseUUIDPipe) employeeId: string) {

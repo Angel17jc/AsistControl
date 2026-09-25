@@ -224,6 +224,61 @@ export class WorkSchedulesService {
     return toAssignmentResponse(assignment);
   }
 
+  /**
+   * Undoes an employee's latest assignment (e.g. the wrong schedule was picked): it is removed
+   * and the previous one runs open-ended again. Older assignments are history and stay; so do
+   * assignments that started before the recompute window, whose days could not be re-evaluated.
+   */
+  async unassign(id: string, actor: AuthenticatedUser, ctx: RequestContext) {
+    const assignment = await this.prisma.employeeSchedule.findUnique({ where: { id } });
+    if (!assignment) throw new NotFoundException('Assignment not found');
+    const { employeeId, effectiveFrom } = assignment;
+
+    const later = await this.prisma.employeeSchedule.count({
+      where: { employeeId, effectiveFrom: { gt: effectiveFrom } },
+    });
+    if (later > 0) throw new BadRequestException('Only the latest assignment can be undone');
+
+    const from = fromDbDate(effectiveFrom);
+    const today = todayIn(await this.settings.getTimezone());
+    if (from < addDays(today, -MAX_RETROACTIVE_DAYS)) {
+      throw new BadRequestException(
+        `Assignments that started more than ${MAX_RETROACTIVE_DAYS} days ago cannot be undone`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.employeeSchedule.delete({ where: { id } });
+      const previous = await tx.employeeSchedule.findFirst({
+        where: { employeeId, effectiveFrom: { lt: effectiveFrom } },
+        orderBy: { effectiveFrom: 'desc' },
+      });
+      if (previous) {
+        await tx.employeeSchedule.update({
+          where: { id: previous.id },
+          data: { effectiveTo: null },
+        });
+      }
+      await this.audit.record(
+        {
+          actorId: actor.id,
+          action: 'schedule.unassigned',
+          entity: 'Employee',
+          entityId: employeeId,
+          context: ctx,
+          metadata: {
+            scheduleId: assignment.scheduleId,
+            effectiveFrom: from,
+            restoredScheduleId: previous?.scheduleId ?? null,
+          },
+        },
+        tx,
+      );
+    });
+
+    await this.recomputeRetroactively(employeeId, from);
+  }
+
   // ─────────────────────────────────────────── holidays
 
   async listHolidays(year?: number) {

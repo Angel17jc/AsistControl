@@ -17,6 +17,7 @@ export type AuditAction =
   | 'device.credentials_changed'
   | 'device.sync'
   | 'schedule.assigned'
+  | 'schedule.unassigned'
   | 'attendance.manual_event'
   | 'attendance.event_voided'
   | 'attendance.recompute'
