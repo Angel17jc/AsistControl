@@ -147,8 +147,54 @@ export function NotificationBell({ className }: { className?: string }) {
               );
             })}
           </ul>
+          <EmailPreference />
         </div>
       )}
     </div>
+  );
+}
+
+interface NotificationPreferences {
+  emailNotifications: boolean;
+  /** False while the server has no email configured: then there is nothing to choose. */
+  emailAvailable: boolean;
+}
+
+/** Whether notifications also arrive by email. Hidden when the server cannot send any. */
+function EmailPreference() {
+  const queryClient = useQueryClient();
+  const key = ['notifications', 'preferences'];
+  const preferences = useQuery({
+    queryKey: key,
+    queryFn: () => api<NotificationPreferences>('/notifications/preferences'),
+  });
+  const save = useMutation({
+    mutationFn: (emailNotifications: boolean) =>
+      api<NotificationPreferences>('/notifications/preferences', {
+        method: 'PATCH',
+        body: { emailNotifications },
+      }),
+    onSuccess: (saved) => queryClient.setQueryData(key, saved),
+  });
+  if (!preferences.data?.emailAvailable) return null;
+
+  return (
+    <footer className="border-t border-line px-4 py-3 text-xs">
+      <label className="flex items-center gap-2 text-ink-2">
+        <input
+          type="checkbox"
+          className="size-4 accent-[var(--accent)]"
+          checked={preferences.data.emailNotifications}
+          disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)}
+        />
+        Recibir también por correo
+      </label>
+      {save.error && (
+        <p role="alert" className="mt-1 text-critical">
+          No se pudo guardar: {save.error.message}
+        </p>
+      )}
+    </footer>
   );
 }

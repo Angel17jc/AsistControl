@@ -30,9 +30,18 @@ const NOTIFICATIONS: AppNotification[] = [
   },
 ];
 
-function renderBell(unread = 1) {
+function renderBell(
+  unread = 1,
+  preferences?: { emailNotifications: boolean; emailAvailable: boolean },
+) {
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url === '/api/notifications/preferences') {
+      if (init?.method === 'PATCH') {
+        return Response.json({ ...preferences, ...JSON.parse(String(init.body)) });
+      }
+      return preferences ? Response.json(preferences) : new Response(null, { status: 404 });
+    }
     if (url.startsWith('/api/notifications/unread-count')) return Response.json({ count: unread });
     if (url.startsWith('/api/notifications?')) {
       return Response.json({ data: NOTIFICATIONS, total: 2, page: 1, pageSize: 20 });
@@ -122,5 +131,31 @@ describe('NotificationBell', () => {
 
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('lets people turn email notifications off', async () => {
+    renderBell(0, { emailNotifications: true, emailAvailable: true });
+    await openBell();
+    const toggle = await screen.findByRole('checkbox', { name: 'Recibir también por correo' });
+    expect(toggle).toBeChecked();
+
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH');
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ emailNotifications: false });
+  });
+
+  it('offers no email choice while the server cannot send email', async () => {
+    renderBell(0, { emailNotifications: true, emailAvailable: false });
+    await openBell();
+    // The list renders from the same kind of response: once it is there, so is the answer.
+    await screen.findByText('Dispositivo sin conexión');
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain(
+        '/api/notifications/preferences',
+      ),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole('checkbox', { name: 'Recibir también por correo' })).toBeNull();
   });
 });

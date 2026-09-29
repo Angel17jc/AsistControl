@@ -259,7 +259,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] E2E de interfaz con Playwright
 - [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real
 - [x] Vacaciones: caducidad de días no usados y medios días
-- [ ] Notificaciones por correo
+- [x] Notificaciones por correo (outbox con reintentos; cada usuario decide si las recibe)
 - [ ] Exportación directa a formatos de nómina y PDF firmado
 - [ ] Multi-empresa / multi-sede con zonas horarias por sede
 - [ ] Métricas Prometheus y trazas OpenTelemetry
