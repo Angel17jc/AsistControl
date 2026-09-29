@@ -38,8 +38,15 @@ fs.writeFileSync('package-lock.json', `${JSON.stringify(lock, null, 2)}\n`);
 process.stdout.write(`runtime lockfile: dropped ${removed.join(', ') || 'nothing'}\n`);
 
 function rewriteManifest(file) {
-  if (!fs.existsSync(file)) return;
-  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // Read and handle absence in one step: checking first and reading later is a race.
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return;
+    throw err;
+  }
+  const manifest = JSON.parse(text);
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
     for (const dep of drop) delete manifest[field]?.[dep];
   }
