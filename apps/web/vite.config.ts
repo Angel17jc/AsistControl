@@ -22,5 +22,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Forms are filled with user-event, one timer per keystroke: on a loaded machine a long
+    // form took more than Vitest's 5 s. A real hang still fails, just later.
+    testTimeout: 15_000,
   },
 });
