@@ -27,8 +27,14 @@ RUN npm run build -w @asistcontrol/shared \
 
 FROM manifests AS runtime
 ENV NODE_ENV=production
+# Prisma's postinstall leaves a second copy of its engines in /root/.cache.
+# Dependencies' source maps and type declarations are never read by `node`.
+# infra/docker/smoke-test.sh proves the pruned image still migrates, seeds and serves.
 RUN npm ci --omit=dev -w @asistcontrol/shared -w @asistcontrol/biometric-core -w @asistcontrol/api \
- && npm cache clean --force
+ && npm cache clean --force \
+ && rm -rf /root/.cache \
+ && find /app -path '*/node_modules/*' -type f \
+      \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' \) -delete
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/biometric-core/dist packages/biometric-core/dist
 COPY --from=build /app/apps/api/dist apps/api/dist

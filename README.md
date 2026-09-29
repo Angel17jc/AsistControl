@@ -154,7 +154,14 @@ docker compose logs -f api      # logs estructurados de la API
 docker compose down             # detener (conserva datos)
 ```
 
-Las imágenes son multi-stage: la de la API no contiene código fuente ni dependencias de desarrollo y corre como usuario sin privilegios.
+Las imágenes son multi-stage: la de la API no contiene código fuente, dependencias de desarrollo, sourcemaps ni declaraciones de tipos de las dependencias, y corre como usuario sin privilegios.
+
+La CI no solo construye la imagen de la API: la **arranca** contra un PostgreSQL desechable y espera a `/health` (migraciones, seed y servidor). Se puede repetir en local:
+
+```bash
+docker build -f infra/docker/api.Dockerfile -t asistcontrol-api:smoke .
+infra/docker/smoke-test.sh asistcontrol-api:smoke
+```
 
 ## Base de datos
 
