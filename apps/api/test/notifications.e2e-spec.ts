@@ -303,6 +303,18 @@ describe('Notifications (e2e)', () => {
     });
   });
 
+  it('queues no email while the server has none configured', async () => {
+    // Enabling SMTP later must not send the backlog: nothing is queued meanwhile.
+    expect(await prisma.notification.count({ where: { userId: ids.supervisor } })).toBeGreaterThan(
+      0,
+    );
+    expect(
+      await prisma.emailDelivery.count({ where: { notification: { userId: ids.supervisor } } }),
+    ).toBe(0);
+    const res = await http().get('/api/notifications/preferences').set(bearer(tokens.supervisor));
+    expect(res.body).toEqual({ emailNotifications: true, emailAvailable: false });
+  });
+
   describe('vacation days about to expire', () => {
     // The fixture employee was hired 2026-01-01: with a 12-month expiry, the 15 days of
     // service year one (credited 2027-01-01) expire on 2028-01-01.

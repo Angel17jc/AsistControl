@@ -52,6 +52,16 @@ enum VacationDayCounting {
   WORKING_DAYS
 }
 
+/// Delivery of a notification by email (ADR 0011).
+enum EmailStatus {
+  PENDING
+  SENT
+  /// Not sent on purpose: already read, user opted out or inactive, or too old to matter.
+  SKIPPED
+  /// Gave up after the last retry.
+  FAILED
+}
+
 enum NotificationType {
   DEVICE_DOWN
   DEVICE_RECOVERED
@@ -148,15 +158,17 @@ enum OvertimeKind {
 // ─────────────────────────────────────────────────────────────── identity & access
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  role         Role      @default(EMPLOYEE)
-  isActive     Boolean   @default(true) @map("is_active")
-  employeeId   String?   @unique @map("employee_id") @db.Uuid
-  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  role               Role      @default(EMPLOYEE)
+  isActive           Boolean   @default(true) @map("is_active")
+  /// Whether notifications also reach this user by email (ADR 0011).
+  emailNotifications Boolean   @default(true) @map("email_notifications")
+  employeeId         String?   @unique @map("employee_id") @db.Uuid
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   employee      Employee?      @relation(fields: [employeeId], references: [id])
   sessions      Session[]
@@ -556,13 +568,36 @@ model Notification {
   readAt    DateTime?        @map("read_at") @db.Timestamptz(3)
   createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email EmailDelivery?
 
   /// The bell: a user's unread notifications, newest first.
   @@index([userId, readAt, createdAt(sort: Desc)])
   /// Incident deduplication: "was this device already reported down?".
   @@index([type, entityId, createdAt])
   @@map("notifications")
+}
+
+/// Outbox of the email channel: one row per notification created while email was enabled.
+/// A worker sends it with retries; the notification itself never waits for it (ADR 0011).
+model EmailDelivery {
+  id             String      @id @default(uuid()) @db.Uuid
+  notificationId String      @unique @map("notification_id") @db.Uuid
+  status         EmailStatus @default(PENDING)
+  attempts       Int         @default(0)
+  nextAttemptAt  DateTime    @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  /// Claimed by a worker since then; a stale claim belongs to a crashed instance.
+  lockedAt       DateTime?   @map("locked_at") @db.Timestamptz(3)
+  sentAt         DateTime?   @map("sent_at") @db.Timestamptz(3)
+  /// Last error, or why it was skipped.
+  detail         String?
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  /// The worker's queue: pending rows whose time has come.
+  @@index([status, nextAttemptAt])
+  @@map("email_deliveries")
 }
 
 model AuditLog {

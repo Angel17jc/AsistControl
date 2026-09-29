@@ -168,3 +168,4 @@ Los hechos que alguien debe atender (un marcador caído o recuperado, una solici
 | [0008](adr/0008-vacation-balances.md)       | Saldos de vacaciones: reglas por tipo de contrato, saldo calculado |
 | [0009](adr/0009-vacation-expiry.md)         | Caducidad de días de vacaciones no usados                          |
 | [0010](adr/0010-half-day-vacations.md)      | Medios días de vacaciones                                          |
+| [0011](adr/0011-email-notifications.md)     | Notificaciones por correo: un canal más, con outbox                |

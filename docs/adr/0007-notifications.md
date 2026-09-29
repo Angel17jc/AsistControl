@@ -20,6 +20,7 @@ Hay hechos que alguien debe atender y que hoy solo se ven si se entra a buscarlo
 - **Datos, no frases.** Se guarda `type` + `data` (JSON con forma fija por tipo, `NotificationDataByType` en `packages/shared`), y cada cliente redacta el texto. La API sigue siendo neutral respecto al idioma.
 - **Un aviso por incidente.** Un incidente de un dispositivo empieza en su último contacto correcto (`lastSeenAt`). Se notifica `DEVICE_DOWN` solo si no existe ya uno posterior a ese instante, y `DEVICE_RECOVERED` solo si hubo un `DEVICE_DOWN` en ese incidente. Un equipo que nunca respondió (`lastSeenAt` nulo) no "se cayó": no se notifica.
 - **Entrega en vivo** por Socket.IO a la sala `user:<id>`, a la que cada socket se une al autenticarse. Solo el destinatario la recibe.
+- **Otros canales** siguen las mismas reglas de destinatarios: el correo se añadió en el [ADR 0011](0011-email-notifications.md).
 - **Mejor esfuerzo.** La acción de negocio (sincronizar, aprobar) ya ocurrió: un fallo al notificar se registra en el log y nunca la revierte ni la bloquea.
 - **Retención de 90 días**, leídas o no: son avisos, no registros. El historial de lo ocurrido es la auditoría.
 

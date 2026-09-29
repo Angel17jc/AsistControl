@@ -18,6 +18,7 @@ erDiagram
   User ||--o{ Session : tiene
   User ||--o{ AuditLog : realiza
   User ||--o{ Notification : recibe
+  Notification ||--o| EmailDelivery : "envío por correo"
   Department ||--o{ Employee : agrupa
   Position ||--o{ Employee : ocupa
   Employee ||--o{ Employee : supervisa
@@ -58,6 +59,7 @@ erDiagram
 | `VacationAdjustment`               | Corrección manual del saldo (saldo inicial de otro sistema, días otorgados o retirados), con motivo y autor. El saldo en sí **no se guarda**: se calcula.                                                                                                                                                                                   |
 | `AuditLog`                         | Bitácora _append-only_: actor, acción, entidad, IP, user-agent, metadata (secretos redactados).                                                                                                                                                                                                                                             |
 | `Notification`                     | Aviso para **un** usuario (dispositivo caído o recuperado, solicitud por revisar o resuelta). Guarda `type` + `data` JSON, no texto; `read_at` por destinatario ([ADR 0007](adr/0007-notifications.md)).                                                                                                                                    |
+| `EmailDelivery`                    | Outbox del correo: una fila por notificación creada con el correo activo, con estado (`PENDING`, `SENT`, `SKIPPED`, `FAILED`), intentos, próximo intento y reclamo del worker. `User.email_notifications` guarda la preferencia ([ADR 0011](adr/0011-email-notifications.md)).                                                              |
 | `SystemSetting`                    | Política laboral y zona horaria editables en caliente.                                                                                                                                                                                                                                                                                      |
 
 ### Diferencias respecto a la lista inicial de entidades (y por qué)

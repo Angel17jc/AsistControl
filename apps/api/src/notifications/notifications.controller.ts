@@ -1,17 +1,19 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
 import { CurrentUser } from '../common/decorators';
-import { NotificationQueryDto } from './notifications.dto';
+import { NotificationQueryDto, UpdateNotificationPreferencesDto } from './notifications.dto';
 import { NotificationsService } from './notifications.service';
 
 /**
@@ -34,6 +36,24 @@ export class NotificationsController {
   @ApiOperation({ summary: 'How many of my notifications are unread (the bell badge)' })
   unreadCount(@CurrentUser() user: AuthenticatedUser) {
     return this.notifications.unreadCount(user);
+  }
+
+  @Get('preferences')
+  @ApiOperation({
+    summary: 'How I receive notifications',
+    description: '`emailAvailable` is false while the server has no email configured.',
+  })
+  preferences(@CurrentUser() user: AuthenticatedUser) {
+    return this.notifications.preferences(user);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Turn my email notifications on or off' })
+  updatePreferences(
+    @Body() dto: UpdateNotificationPreferencesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.updatePreferences(dto, user);
   }
 
   @Post('read-all')
