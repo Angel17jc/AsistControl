@@ -155,8 +155,15 @@ jobs:
           context: .
           file: infra/docker/api.Dockerfile
           push: false
+          load: true
+          tags: asistcontrol-api:smoke
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
+      # Building proves the image compiles; this proves it migrates, seeds and serves.
+      - name: Smoke test API image
+        run: bash infra/docker/smoke-test.sh asistcontrol-api:smoke
+      - name: Report API image size
+        run: docker image ls asistcontrol-api:smoke --format 'API image {{.Size}}' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Build web image
         uses: docker/build-push-action@v7
         with:
