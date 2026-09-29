@@ -6,6 +6,7 @@ import {
   datesCovered,
   entitlementForServiceYear,
   partialDayCost,
+  vacationCredits,
   vacationDayCost,
   vacationDaysUsed,
 } from './vacation-entitlement';
@@ -102,6 +103,68 @@ describe('accruedVacationDays — monthly accrual', () => {
     expect(accruedVacationDays(MONTHLY, '2026-01-31', '2026-02-28').accruedDays).toBe(1.25);
     expect(accruedVacationDays(MONTHLY, '2026-01-31', '2026-03-30').accruedDays).toBe(1.25);
     expect(accruedVacationDays(MONTHLY, '2026-01-31', '2026-03-31').accruedDays).toBe(2.5);
+  });
+});
+
+describe('accruedVacationDays — calendar-year accrual', () => {
+  const CALENDAR: VacationRule = { ...ANNUAL, accrual: 'CALENDAR_YEAR' };
+  const accrued = (
+    hire: string,
+    asOf: string,
+    terminatedOn: string | null = null,
+    rule = CALENDAR,
+  ) => accruedVacationDays(rule, hire, asOf, terminatedOn);
+
+  it('credits the year of hire at once, prorated from the hire date', () => {
+    // 1 Sep → 31 Dec 2026 is 122 of 365 days: 15 × 122 / 365.
+    expect(accrued('2026-09-01', '2026-09-01')).toMatchObject({
+      accruedDays: 5.01,
+      nextCreditOn: '2027-01-01',
+    });
+    expect(accrued('2026-09-01', '2026-12-31').accruedDays).toBe(5.01);
+  });
+
+  it('credits every following year in full on 1 January, in advance', () => {
+    expect(accrued('2026-09-01', '2027-01-01').accruedDays).toBe(20.01);
+    expect(accrued('2026-01-01', '2026-01-01').accruedDays).toBe(15);
+  });
+
+  it('prorates the year of termination once it has happened', () => {
+    // 1 Jan → 31 Mar 2027 is 90 of 365 days: 3.70 on top of 2026's 5.01.
+    expect(accrued('2026-09-01', '2027-06-01', '2027-03-31')).toMatchObject({
+      accruedDays: 8.71,
+      nextCreditOn: null,
+    });
+    // Seen from before it, the year still stands whole.
+    expect(accrued('2026-09-01', '2027-02-01', '2027-03-31').accruedDays).toBe(20.01);
+  });
+
+  it('counts the days of a leap year', () => {
+    // 1 Jul → 31 Dec 2028 is 184 of 366 days.
+    expect(accrued('2028-07-01', '2028-07-01').accruedDays).toBe(7.54);
+  });
+
+  it('prices each year at the service year in progress on 1 January', () => {
+    const rule: VacationRule = { ...WITH_SENIORITY, accrual: 'CALENDAR_YEAR' };
+    // Hired mid-2020: on 1 Jan 2026 five years are complete, so 2026 is service year 6.
+    const credits = vacationCredits(rule, '2020-06-01', '2026-01-01');
+    expect(credits.at(-1)).toMatchObject({ date: '2026-01-01', days: 16 });
+    expect(accrued('2020-06-01', '2026-03-01', null, rule).currentYearEntitlement).toBe(16);
+  });
+
+  it('lets unused days expire the configured months after 31 December', () => {
+    const rule: VacationRule = { ...CALENDAR, expiryMonths: 3 };
+    expect(vacationCredits(rule, '2026-01-01', '2027-01-01')).toEqual([
+      { date: '2026-01-01', days: 15, expiresOn: '2027-04-01' },
+      { date: '2027-01-01', days: 15, expiresOn: '2028-04-01' },
+    ]);
+  });
+
+  it('has nothing before the hire date, whose credit comes on the day itself', () => {
+    expect(accrued('2026-10-01', '2026-09-23')).toMatchObject({
+      accruedDays: 0,
+      nextCreditOn: '2026-10-01',
+    });
   });
 });
 

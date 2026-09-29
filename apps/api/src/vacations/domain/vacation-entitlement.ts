@@ -7,7 +7,7 @@ import { eachDate } from '../../common/utils/date-only';
  * company timezone, and every rule comes from the contract type. Nothing here encodes a
  * country's labor law — base days, accrual and seniority bonus are all configuration.
  */
-export type VacationAccrual = 'ANNUAL' | 'MONTHLY';
+export type VacationAccrual = 'ANNUAL' | 'MONTHLY' | 'CALENDAR_YEAR';
 export type VacationDayCounting = 'CALENDAR_DAYS' | 'WORKING_DAYS';
 
 export interface VacationRule {
@@ -15,13 +15,16 @@ export interface VacationRule {
   /**
    * ANNUAL: a service year's days are credited on its anniversary.
    * MONTHLY: a twelfth of the year's days is credited at each completed month of service.
+   * CALENDAR_YEAR: each calendar year's days are credited in advance on 1 January; the year
+   * of hire counts from the hire date and the year of termination up to it, prorated by days.
    */
   accrual: VacationAccrual;
   /** Extra days per service year beyond `afterYears`, never more than `maxExtraDays`. */
   seniority: { afterYears: number; extraDaysPerYear: number; maxExtraDays: number } | null;
   /**
-   * Unused days of a service year expire this many months after the year ends (its
-   * anniversary); null = they never expire. See `vacation-expiry.ts`.
+   * Unused days of a year expire this many months after it ends: the service year's
+   * anniversary, or 31 December with CALENDAR_YEAR. null = they never expire. See
+   * `vacation-expiry.ts`.
    */
   expiryMonths: number | null;
 }
@@ -73,13 +76,26 @@ export function accruedVacationDays(
     };
   }
 
-  let years = 0;
-  while (addMonths(hireDate, (years + 1) * 12) <= end) years++;
+  const years = completedYears(hireDate, end);
   const credits = vacationCredits(rule, hireDate, asOf, terminatedOn);
   const serviceEnded = terminatedOn !== null && terminatedOn <= asOf;
+  const accruedDays = round(credits.reduce((sum, c) => sum + c.days, 0));
+  if (rule.accrual === 'CALENDAR_YEAR') {
+    // What a full calendar year is worth now, before any proration for hire or termination.
+    const yearStart = `${yearOf(asOf)}-01-01`;
+    return {
+      accruedDays,
+      completedServiceYears: years,
+      currentYearEntitlement: entitlementForServiceYear(
+        rule,
+        completedYears(hireDate, yearStart > hireDate ? yearStart : hireDate) + 1,
+      ),
+      nextCreditOn: serviceEnded ? null : `${yearOf(asOf) + 1}-01-01`,
+    };
+  }
   const periodMonths = rule.accrual === 'ANNUAL' ? 12 : 1;
   return {
-    accruedDays: round(credits.reduce((sum, c) => sum + c.days, 0)),
+    accruedDays,
     completedServiceYears: years,
     currentYearEntitlement: entitlementForServiceYear(rule, years + 1),
     nextCreditOn: serviceEnded ? null : addMonths(hireDate, (credits.length + 1) * periodMonths),
@@ -98,6 +114,9 @@ export function vacationCredits(
   asOf: string,
   terminatedOn: string | null = null,
 ): VacationCredit[] {
+  if (rule.accrual === 'CALENDAR_YEAR') {
+    return calendarYearCredits(rule, hireDate, asOf, terminatedOn);
+  }
   const end = terminatedOn && terminatedOn < asOf ? terminatedOn : asOf;
   const expiresOn = (serviceYear: number) =>
     rule.expiryMonths === null ? null : addMonths(hireDate, serviceYear * 12 + rule.expiryMonths);
@@ -121,6 +140,54 @@ export function vacationCredits(
     });
   }
   return credits;
+}
+
+/**
+ * CALENDAR_YEAR credits: one per calendar year, on 1 January, or on the hire date for the
+ * year of hire. The first and the last year are prorated by the days of that year actually
+ * employed; a termination only prorates once it has happened by `asOf`, so a balance seen
+ * from before the termination shows the year as it stood then. Seniority is the service
+ * year in progress on the day of the credit.
+ */
+function calendarYearCredits(
+  rule: VacationRule,
+  hireDate: string,
+  asOf: string,
+  terminatedOn: string | null,
+): VacationCredit[] {
+  const left = terminatedOn !== null && terminatedOn <= asOf ? terminatedOn : null;
+  const end = left ?? asOf;
+  const credits: VacationCredit[] = [];
+  for (let year = yearOf(hireDate); ; year++) {
+    const date = year === yearOf(hireDate) ? hireDate : `${year}-01-01`;
+    if (date > end) break;
+    const yearEnd = `${year}-12-31`;
+    const until = left !== null && left < yearEnd ? left : yearEnd;
+    const share = daysInclusive(date, until) / daysInclusive(`${year}-01-01`, yearEnd);
+    credits.push({
+      date,
+      days: entitlementForServiceYear(rule, completedYears(hireDate, date) + 1) * share,
+      expiresOn:
+        rule.expiryMonths === null ? null : addMonths(`${year + 1}-01-01`, rule.expiryMonths),
+    });
+  }
+  return credits;
+}
+
+/** Whole years of service completed on `date` (anniversaries on or before it). */
+function completedYears(hireDate: string, date: string): number {
+  let years = 0;
+  while (addMonths(hireDate, (years + 1) * 12) <= date) years++;
+  return years;
+}
+
+function yearOf(isoDate: string): number {
+  return Number(isoDate.slice(0, 4));
+}
+
+/** Calendar days from `from` to `to`, both included. */
+function daysInclusive(from: string, to: string): number {
+  return (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1;
 }
 
 /**
@@ -207,6 +274,7 @@ export function addMonths(isoDate: string, months: number): string {
 }
 
 function firstCredit(rule: VacationRule, hireDate: string): string {
+  if (rule.accrual === 'CALENDAR_YEAR') return hireDate;
   return addMonths(hireDate, rule.accrual === 'ANNUAL' ? 12 : 1);
 }
 

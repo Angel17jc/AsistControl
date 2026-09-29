@@ -398,6 +398,45 @@ describe('Vacation balances (e2e)', () => {
     });
   });
 
+  describe('calendar-year accrual', () => {
+    it('credits the year of hire prorated, then every 1 January in advance', async () => {
+      const contractType = await http()
+        .post('/api/contract-types')
+        .set(bearer(tokens.hr))
+        .send({
+          name: 'Año calendario vac',
+          vacationDaysPerYear: 15,
+          vacationAccrual: 'CALENDAR_YEAR',
+        })
+        .expect(201);
+      expect(contractType.body.vacationAccrual).toBe('CALENDAR_YEAR');
+
+      const hired = await http()
+        .post('/api/employees')
+        .set(bearer(tokens.hr))
+        .send({
+          employeeCode: 'VAC-CAL',
+          identification: 'VACCAL0001',
+          firstName: 'Carla',
+          lastName: 'Calendario',
+          hireDate: '2026-09-01',
+          contractTypeId: contractType.body.id,
+        })
+        .expect(201);
+
+      // 1 Sep → 31 Dec is 122 of 365 days of 15: 5.01, credited on the hire date.
+      expect(
+        (await balance('2026-09-01', tokens.hr, hired.body.id).expect(200)).body,
+      ).toMatchObject({
+        accruedDays: 5.01,
+        accrual: { nextCreditOn: '2027-01-01', currentYearEntitlement: 15 },
+      });
+      expect(
+        (await balance('2027-01-01', tokens.hr, hired.body.id).expect(200)).body.accruedDays,
+      ).toBe(20.01);
+    });
+  });
+
   describe('deleting a contract type', () => {
     it('is refused while employees use it, allowed once unused', async () => {
       const res = await http()

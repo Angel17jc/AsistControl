@@ -45,6 +45,8 @@ enum DeviceDriver {
 enum VacationAccrual {
   ANNUAL
   MONTHLY
+  /// Credited in advance each 1 January; first and last year prorated (ADR 0012).
+  CALENDAR_YEAR
 }
 
 enum VacationDayCounting {

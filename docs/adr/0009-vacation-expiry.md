@@ -9,7 +9,7 @@ Con el ADR 0008 los días no usados se acumulaban sin límite. Muchas empresas, 
 
 ## Decisión
 
-- **`ContractType.vacationExpiryMonths`** (vacío = no caducan): los días ganados en un año de servicio caducan esos meses después de **su aniversario**. Con devengo mensual, las doce fracciones de un año caducan juntas, como un único periodo.
+- **`ContractType.vacationExpiryMonths`** (vacío = no caducan): los días ganados en un año de servicio caducan esos meses después de **su aniversario** (con devengo por año calendario, después del 31 de diciembre: [ADR 0012](0012-calendar-year-vacations.md)). Con devengo mensual, las doce fracciones de un año caducan juntas, como un único periodo.
 - **Se gastan primero los días que vencen antes.** Recorriendo la línea de tiempo, cada día de vacaciones consume el lote que vence antes, así nadie pierde un día que podía haber usado. Un anticipo (saldo negativo) queda como deuda y lo cubre el siguiente abono antes que nada.
 - **El saldo sigue calculándose, no se guarda.** La caducidad es otra función pura (`vacations/domain/vacation-expiry.ts`) sobre las mismas entradas:
 

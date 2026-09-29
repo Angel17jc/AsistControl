@@ -66,7 +66,7 @@ export const REQUEST_STATUSES = values('PENDING', 'APPROVED', 'REJECTED', 'CANCE
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
 /** How vacation days are earned: credited on each anniversary, or a twelfth per month. */
-export const VACATION_ACCRUALS = values('ANNUAL', 'MONTHLY');
+export const VACATION_ACCRUALS = values('ANNUAL', 'MONTHLY', 'CALENDAR_YEAR');
 export type VacationAccrual = (typeof VACATION_ACCRUALS)[number];
 
 /** Which days a vacation takes from the balance. */
