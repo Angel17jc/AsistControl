@@ -1,4 +1,4 @@
-import type { AppNotification, PaginatedResponse } from '@asistcontrol/shared';
+import type { AppNotification, NotificationType, PaginatedResponse } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Bell } from 'lucide-react';
@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../lib/api';
 import { relativeTime } from '../lib/format';
-import { describeNotification } from '../lib/notifications';
+import { NOTIFICATION_TYPE_LABEL, describeNotification } from '../lib/notifications';
 import { Spinner, ToneIcon } from './ui';
 
 const PAGE_SIZE = 20;
@@ -158,9 +158,16 @@ interface NotificationPreferences {
   emailNotifications: boolean;
   /** False while the server has no email configured: then there is nothing to choose. */
   emailAvailable: boolean;
+  /** The types this role can receive, and whether each also goes by email. */
+  emailTypes: { type: NotificationType; enabled: boolean }[];
 }
 
-/** Whether notifications also arrive by email. Hidden when the server cannot send any. */
+type PreferencesChange = { emailNotifications: boolean } | { mutedTypes: NotificationType[] };
+
+/**
+ * Whether notifications also arrive by email, and which kinds. Hidden when the server cannot
+ * send any; the kinds offered are only those the user's role can receive (the API says so).
+ */
 function EmailPreference() {
   const queryClient = useQueryClient();
   const key = ['notifications', 'preferences'];
@@ -169,14 +176,19 @@ function EmailPreference() {
     queryFn: () => api<NotificationPreferences>('/notifications/preferences'),
   });
   const save = useMutation({
-    mutationFn: (emailNotifications: boolean) =>
-      api<NotificationPreferences>('/notifications/preferences', {
-        method: 'PATCH',
-        body: { emailNotifications },
-      }),
+    mutationFn: (change: PreferencesChange) =>
+      api<NotificationPreferences>('/notifications/preferences', { method: 'PATCH', body: change }),
     onSuccess: (saved) => queryClient.setQueryData(key, saved),
   });
-  if (!preferences.data?.emailAvailable) return null;
+  const data = preferences.data;
+  if (!data?.emailAvailable) return null;
+
+  function toggleType(type: NotificationType, enabled: boolean) {
+    const muted = data!.emailTypes
+      .filter((t) => (t.type === type ? !enabled : !t.enabled))
+      .map((t) => t.type);
+    save.mutate({ mutedTypes: muted });
+  }
 
   return (
     <footer className="border-t border-line px-4 py-3 text-xs">
@@ -184,12 +196,30 @@ function EmailPreference() {
         <input
           type="checkbox"
           className="size-4 accent-[var(--accent)]"
-          checked={preferences.data.emailNotifications}
+          checked={data.emailNotifications}
           disabled={save.isPending}
-          onChange={(e) => save.mutate(e.target.checked)}
+          onChange={(e) => save.mutate({ emailNotifications: e.target.checked })}
         />
         Recibir también por correo
       </label>
+      {/* With a single kind, a list would only repeat the switch above. */}
+      {data.emailNotifications && data.emailTypes.length > 1 && (
+        <fieldset className="mt-2 space-y-1 pl-6">
+          <legend className="sr-only">Qué avisos recibir por correo</legend>
+          {data.emailTypes.map(({ type, enabled }) => (
+            <label key={type} className="flex items-center gap-2 text-ink-3">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-[var(--accent)]"
+                checked={enabled}
+                disabled={save.isPending}
+                onChange={(e) => toggleType(type, e.target.checked)}
+              />
+              {NOTIFICATION_TYPE_LABEL[type]}
+            </label>
+          ))}
+        </fieldset>
+      )}
       {save.error && (
         <p role="alert" className="mt-1 text-critical">
           No se pudo guardar: {save.error.message}

@@ -1,6 +1,6 @@
-import type { AppNotification } from '@asistcontrol/shared';
+import type { AppNotification, NotificationType } from '@asistcontrol/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,17 +30,46 @@ const NOTIFICATIONS: AppNotification[] = [
   },
 ];
 
-function renderBell(
-  unread = 1,
-  preferences?: { emailNotifications: boolean; emailAvailable: boolean },
-) {
+interface Preferences {
+  emailNotifications: boolean;
+  emailAvailable: boolean;
+  emailTypes: { type: NotificationType; enabled: boolean }[];
+}
+
+/** A supervisor's choices: they review and request leave, and never hear about devices. */
+const SUPERVISOR_TYPES: Preferences['emailTypes'] = [
+  { type: 'LEAVE_REQUESTED', enabled: true },
+  { type: 'LEAVE_REVIEWED', enabled: true },
+  { type: 'VACATION_EXPIRING', enabled: true },
+];
+
+function renderBell(unread = 1, preferences?: Omit<Preferences, 'emailTypes'>) {
+  let current: Preferences | undefined = preferences && {
+    ...preferences,
+    emailTypes: SUPERVISOR_TYPES,
+  };
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);
     if (url === '/api/notifications/preferences') {
-      if (init?.method === 'PATCH') {
-        return Response.json({ ...preferences, ...JSON.parse(String(init.body)) });
+      if (init?.method === 'PATCH' && current) {
+        // Like the API: a switch, or a list of muted types that replaces the previous one.
+        const change = JSON.parse(String(init.body)) as {
+          emailNotifications?: boolean;
+          mutedTypes?: NotificationType[];
+        };
+        current = {
+          ...current,
+          emailNotifications: change.emailNotifications ?? current.emailNotifications,
+          emailTypes: change.mutedTypes
+            ? current.emailTypes.map((t) => ({
+                ...t,
+                enabled: !change.mutedTypes!.includes(t.type),
+              }))
+            : current.emailTypes,
+        };
+        return Response.json(current);
       }
-      return preferences ? Response.json(preferences) : new Response(null, { status: 404 });
+      return current ? Response.json(current) : new Response(null, { status: 404 });
     }
     if (url.startsWith('/api/notifications/unread-count')) return Response.json({ count: unread });
     if (url.startsWith('/api/notifications?')) {
@@ -157,5 +186,36 @@ describe('NotificationBell', () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByRole('checkbox', { name: 'Recibir también por correo' })).toBeNull();
+  });
+
+  it('lets people choose which kinds arrive by email', async () => {
+    renderBell(0, { emailNotifications: true, emailAvailable: true });
+    await openBell();
+    const kinds = await screen.findByRole('group', { name: 'Qué avisos recibir por correo' });
+    // Only what a supervisor can receive: nothing about devices.
+    expect(
+      within(kinds)
+        .getAllByRole('checkbox')
+        .map((c) => c.closest('label')!.textContent),
+    ).toEqual([
+      'Solicitudes por revisar',
+      'Solicitudes aprobadas o rechazadas',
+      'Vacaciones por caducar',
+    ]);
+
+    const reviewed = within(kinds).getByRole('checkbox', {
+      name: 'Solicitudes aprobadas o rechazadas',
+    });
+    await userEvent.click(reviewed);
+    await waitFor(() => expect(reviewed).not.toBeChecked());
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH');
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ mutedTypes: ['LEAVE_REVIEWED'] });
+  });
+
+  it('hides the kinds while email is off altogether', async () => {
+    renderBell(0, { emailNotifications: false, emailAvailable: true });
+    await openBell();
+    await screen.findByRole('checkbox', { name: 'Recibir también por correo' });
+    expect(screen.queryByRole('group', { name: 'Qué avisos recibir por correo' })).toBeNull();
   });
 });

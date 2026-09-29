@@ -1,7 +1,16 @@
-import type { AppNotification } from '@asistcontrol/shared';
+import type { AppNotification, NotificationType } from '@asistcontrol/shared';
 import type { Tone } from '../components/ui';
 import { explainDeviceError } from './device-drivers';
 import { LEAVE_LABEL, formatDateTime, formatDateWithYear, formatDays } from './format';
+
+/** What each kind of notification is about, for the email preferences. Exhaustive. */
+export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
+  DEVICE_DOWN: 'Dispositivos sin conexión o con error',
+  DEVICE_RECOVERED: 'Dispositivos que vuelven a estar en línea',
+  LEAVE_REQUESTED: 'Solicitudes por revisar',
+  LEAVE_REVIEWED: 'Solicitudes aprobadas o rechazadas',
+  VACATION_EXPIRING: 'Vacaciones por caducar',
+};
 
 export interface NotificationView {
   title: string;
