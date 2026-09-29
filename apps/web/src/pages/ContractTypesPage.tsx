@@ -105,7 +105,9 @@ export function ContractTypesPage() {
                     ? `+${formatDays(t.seniority.extraDaysPerYear)}/año desde el año ${t.seniority.afterYears + 1}, máx. ${formatDays(t.seniority.maxExtraDays)}`
                     : '—'}
                 </Td>
-                <Td className="text-ink-2">{describeExpiry(t.vacationExpiryMonths)}</Td>
+                <Td className="text-ink-2">
+                  {describeExpiry(t.vacationExpiryMonths, t.vacationAccrual)}
+                </Td>
                 <Td className="text-ink-2">{t.allowNegativeVacationBalance ? 'Sí' : 'No'}</Td>
                 <Td className="tabular">{t.employees ?? 0}</Td>
                 <Td>
@@ -262,7 +264,11 @@ function ContractTypeForm({
 
       <Field
         label="Los días no usados caducan a los (meses)"
-        hint="Contados desde el aniversario del año en que se ganaron. Vacío: no caducan."
+        hint={
+          form.vacationAccrual === 'CALENDAR_YEAR'
+            ? 'Contados desde el 31 de diciembre del año en que se ganaron. Vacío: no caducan.'
+            : 'Contados desde el aniversario del año en que se ganaron. Vacío: no caducan.'
+        }
       >
         <Input
           type="number"

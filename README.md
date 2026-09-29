@@ -38,7 +38,7 @@ El sistema **no depende de ningún fabricante**: cada marca se integra mediante 
 | **Asistencia**            | Separación entre **marcaciones** (`AttendanceEvent`, inmutables) y **jornadas** (`AttendanceRecord`, derivadas y recalculables). Atrasos, salida anticipada, almuerzo, horas extra, ausencias, jornadas incompletas, dobles marcaciones, marcaciones fuera de horario, feriados, días libres y **turnos nocturnos**. |
 | **Correcciones**          | Marcaciones manuales con justificación obligatoria y anulación (nunca borrado), todo auditado.                                                                                                                                                                                                                       |
 | **Horarios**              | Turnos reutilizables, horarios semanales, historial de asignaciones por empleado (un cambio de horario no reescribe el pasado), asignación y corrección desde el panel del empleado, feriados; todo gestionable desde la web.                                                                                        |
-| **Permisos y vacaciones** | Flujo único de solicitud → aprobación; al aprobar se recalculan los días afectados (un permiso de mañana mueve la hora esperada de llegada).                                                                                                                                                                         |
+| **Permisos y vacaciones** | Flujo único de solicitud → aprobación; al aprobar se recalculan los días afectados (un permiso de mañana mueve la hora esperada de llegada). Saldos calculados por tipo de contrato: devengo por aniversario, mensual o por año calendario, antigüedad, caducidad, medios días y anticipos.                          |
 | **Horas extra**           | Propuestas automáticamente por el motor, **aprobadas por una persona** antes de llegar a nómina.                                                                                                                                                                                                                     |
 | **Reportes**              | Diario, mensual (nómina), atrasos, ausencias, horas extra, marcaciones y sincronización. Exportación CSV segura para Excel.                                                                                                                                                                                          |
 | **Dashboard**             | Presentes, atrasados, ausentes, permisos, horas extra del mes, dispositivos en línea, marcaciones por hora y feed en vivo por WebSocket.                                                                                                                                                                             |
@@ -258,7 +258,7 @@ Flujo trunk-based con ramas cortas, Conventional Commits, PRs con CI obligatorio
 - [x] Gestión de horarios por empleado desde la web
 - [x] E2E de interfaz con Playwright
 - [ ] Validar los adaptadores ZKTeco y Hikvision con hardware real
-- [x] Vacaciones: caducidad de días no usados y medios días
+- [x] Vacaciones: caducidad de días no usados, medios días y devengo por año calendario
 - [x] Notificaciones por correo (outbox con reintentos; cada usuario decide si las recibe)
 - [ ] Exportación directa a formatos de nómina y PDF firmado
 - [ ] Multi-empresa / multi-sede con zonas horarias por sede

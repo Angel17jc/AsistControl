@@ -1,4 +1,4 @@
-import { type LeaveType, formatMinutes } from '@asistcontrol/shared';
+import { type LeaveType, type VacationAccrual, formatMinutes } from '@asistcontrol/shared';
 
 export { formatMinutes };
 
@@ -75,6 +75,7 @@ export function formatDays(days: number): string {
 export const VACATION_ACCRUAL_LABEL = {
   ANNUAL: 'Anual, en cada aniversario',
   MONTHLY: 'Mensual, 1/12 por mes',
+  CALENDAR_YEAR: 'Por año calendario, cada 1 de enero',
 } as const;
 
 export const VACATION_COUNTING_LABEL = {
@@ -82,10 +83,14 @@ export const VACATION_COUNTING_LABEL = {
   CALENDAR_DAYS: 'Días corridos',
 } as const;
 
-/** "No caducan", "1 mes después de cada aniversario", "24 meses después…". */
-export function describeExpiry(months: number | null): string {
+/**
+ * "No caducan", "3 meses después del 31 de diciembre", "24 meses después de cada aniversario":
+ * the months count from the end of the year the days were earned in, which depends on accrual.
+ */
+export function describeExpiry(months: number | null, accrual: VacationAccrual): string {
   if (months === null) return 'No caducan';
-  return `${months} ${months === 1 ? 'mes' : 'meses'} después de cada aniversario`;
+  const from = accrual === 'CALENDAR_YEAR' ? 'del 31 de diciembre' : 'de cada aniversario';
+  return `${months} ${months === 1 ? 'mes' : 'meses'} después ${from}`;
 }
 
 export const LEAVE_LABEL: Record<LeaveType, string> = {

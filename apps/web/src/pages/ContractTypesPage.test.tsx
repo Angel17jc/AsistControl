@@ -33,6 +33,18 @@ const TYPES: ContractTypeRow[] = [
     allowNegativeVacationBalance: true,
     employees: 0,
   },
+  {
+    id: 'ct3',
+    name: 'Administrativo',
+    vacationDaysPerYear: 22,
+    vacationAccrual: 'CALENDAR_YEAR',
+    vacationDayCounting: 'WORKING_DAYS',
+    seniority: null,
+    vacationExpiryMonths: 3,
+    allowHalfDayVacations: false,
+    allowNegativeVacationBalance: false,
+    employees: 4,
+  },
 ];
 
 function renderPage(role: 'HR' | 'SUPERVISOR' = 'HR') {
@@ -77,6 +89,11 @@ describe('ContractTypesPage', () => {
     expect(within(temporal).getByText('7,5 días')).toBeVisible();
     expect(within(temporal).getByText('Días corridos')).toBeVisible();
     expect(within(temporal).getByText('No caducan')).toBeVisible();
+
+    // Calendar-year days expire counting from 31 December, not from an anniversary.
+    const calendar = screen.getByText('Administrativo').closest('tr')!;
+    expect(within(calendar).getByText('Por año calendario, cada 1 de enero')).toBeVisible();
+    expect(within(calendar).getByText('3 meses después del 31 de diciembre')).toBeVisible();
   });
 
   it('only offers to delete the types nobody uses', async () => {
