@@ -4,7 +4,7 @@ import * as argon2 from 'argon2';
 /** argon2id with OWASP-recommended parameters. */
 @Injectable()
 export class PasswordService {
-  private static readonly OPTIONS: argon2.Options = {
+  private static readonly OPTIONS: argon2.HashOptions = {
     type: argon2.argon2id,
     memoryCost: 19_456,
     timeCost: 2,
