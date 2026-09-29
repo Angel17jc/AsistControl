@@ -89,6 +89,8 @@ describe('Notification emails (e2e)', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.subject).toMatch(/^Solicitud por revisar: /);
     expect(sent[0]!.text).toContain('Permiso personal, del 1 mar 2027, 08:00');
+    // The HTML alternative travels with it, carrying the same content.
+    expect(sent[0]!.html).toContain('Permiso personal, del 1 mar 2027, 08:00');
   });
 
   it('skips a notification already read in the app', async () => {
