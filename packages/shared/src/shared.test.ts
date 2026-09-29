@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, hasPermission, rolesWith } from './rbac';
+import { NOTIFICATION_TYPES } from './domain';
+import { notificationTypesFor } from './notifications';
 import { formatMinutes } from './time';
 
 describe('RBAC matrix', () => {
@@ -23,6 +25,20 @@ describe('RBAC matrix', () => {
   it('does not allow HR to manage users or devices', () => {
     expect(hasPermission('HR', 'users:write')).toBe(false);
     expect(hasPermission('HR', 'devices:write')).toBe(false);
+  });
+});
+
+describe('notification audience', () => {
+  it('offers each role only the notifications it can receive', () => {
+    expect(notificationTypesFor('EMPLOYEE')).toEqual(['LEAVE_REVIEWED', 'VACATION_EXPIRING']);
+    expect(notificationTypesFor('SUPERVISOR')).toEqual([
+      'LEAVE_REQUESTED',
+      'LEAVE_REVIEWED',
+      'VACATION_EXPIRING',
+    ]);
+    // HR approves leave but cannot act on devices, so it never hears about outages.
+    expect(notificationTypesFor('HR')).not.toContain('DEVICE_DOWN');
+    expect(notificationTypesFor('ADMIN')).toEqual([...NOTIFICATION_TYPES]);
   });
 });
 

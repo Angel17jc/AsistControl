@@ -312,7 +312,7 @@ describe('Notifications (e2e)', () => {
       await prisma.emailDelivery.count({ where: { notification: { userId: ids.supervisor } } }),
     ).toBe(0);
     const res = await http().get('/api/notifications/preferences').set(bearer(tokens.supervisor));
-    expect(res.body).toEqual({ emailNotifications: true, emailAvailable: false });
+    expect(res.body).toMatchObject({ emailNotifications: true, emailAvailable: false });
   });
 
   describe('vacation days about to expire', () => {

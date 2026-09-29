@@ -160,17 +160,19 @@ enum OvertimeKind {
 // ─────────────────────────────────────────────────────────────── identity & access
 
 model User {
-  id                 String    @id @default(uuid()) @db.Uuid
-  email              String    @unique
-  passwordHash       String    @map("password_hash")
-  role               Role      @default(EMPLOYEE)
-  isActive           Boolean   @default(true) @map("is_active")
+  id                 String             @id @default(uuid()) @db.Uuid
+  email              String             @unique
+  passwordHash       String             @map("password_hash")
+  role               Role               @default(EMPLOYEE)
+  isActive           Boolean            @default(true) @map("is_active")
   /// Whether notifications also reach this user by email (ADR 0011).
-  emailNotifications Boolean   @default(true) @map("email_notifications")
-  employeeId         String?   @unique @map("employee_id") @db.Uuid
-  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  emailNotifications Boolean            @default(true) @map("email_notifications")
+  /// Types this user does not want by email (they still reach the bell).
+  emailMutedTypes    NotificationType[] @default([]) @map("email_muted_types")
+  employeeId         String?            @unique @map("employee_id") @db.Uuid
+  lastLoginAt        DateTime?          @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   employee      Employee?      @relation(fields: [employeeId], references: [id])
   sessions      Session[]
