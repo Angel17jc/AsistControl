@@ -22,10 +22,11 @@ Las notificaciones ([ADR 0007](0007-notifications.md)) solo se ven dentro de la 
 - **Apagado por defecto.** Sin `SMTP_URL` no se encola nada, así que activarlo después no envía el histórico. `MAIL_FROM` es obligatorio con `SMTP_URL` (se valida al arrancar). En producción, `smtp://` exige STARTTLS; `smtps://` usa TLS implícito. Timeouts explícitos de conexión, saludo y socket.
 - **Transporte como puerto** (`MailTransport`): SMTP con nodemailer en producción, uno en memoria en los tests e2e.
 - Cada usuario ve y cambia su preferencia en `GET/PATCH /notifications/preferences`, que también dice si el servidor tiene correo configurado (`emailAvailable`).
+- **Por tipo (añadido después):** además del interruptor general, cada persona puede silenciar tipos concretos por correo (`User.emailMutedTypes`; siguen llegando a la campana). Solo se le ofrecen los tipos que su rol puede recibir, según `NOTIFICATION_AUDIENCE` en `packages/shared`: el mismo mapa tipo → permiso del que la API saca los destinatarios, así que la lista de opciones y los avisos reales no pueden divergir.
 
 ## Consecuencias
 
 - Una notificación nunca espera al correo, y un fallo de SMTP queda registrado y reintentado sin intervención.
 - El texto vive en dos lugares (web y correo). Se acepta: son dos medios con necesidades distintas y los dos `switch` exhaustivos obligan a mantenerlos al día.
 - Los correos caen con la notificación: la retención de 90 días borra ambas (cascada).
-- **Fuera de alcance por ahora:** correo en HTML, preferencias por tipo de notificación, resúmenes diarios y proveedores por API (SES, SendGrid), que serían otra implementación de `MailTransport`.
+- **Fuera de alcance por ahora:** correo en HTML, resúmenes diarios y proveedores por API (SES, SendGrid), que serían otra implementación de `MailTransport`.

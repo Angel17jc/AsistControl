@@ -110,7 +110,14 @@ export class NotificationEmailDispatcher implements OnApplicationBootstrap, OnMo
         include: {
           notification: {
             include: {
-              user: { select: { email: true, isActive: true, emailNotifications: true } },
+              user: {
+                select: {
+                  email: true,
+                  isActive: true,
+                  emailNotifications: true,
+                  emailMutedTypes: true,
+                },
+              },
             },
           },
         },
@@ -124,7 +131,9 @@ export class NotificationEmailDispatcher implements OnApplicationBootstrap, OnMo
           ? 'User is inactive'
           : !user.emailNotifications
             ? 'User turned email notifications off'
-            : null;
+            : user.emailMutedTypes.includes(notification.type)
+              ? 'User turned this type off by email'
+              : null;
       if (skip) {
         await this.finish(id, { status: 'SKIPPED', detail: skip });
         summary.skipped++;

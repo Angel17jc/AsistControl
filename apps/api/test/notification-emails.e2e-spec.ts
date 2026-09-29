@@ -108,13 +108,14 @@ describe('Notification emails (e2e)', () => {
   it('lets people turn email off, even for emails already queued', async () => {
     expect(
       (await http().get('/api/notifications/preferences').set(bearer(supervisor))).body,
-    ).toEqual({ emailNotifications: true, emailAvailable: true });
+    ).toMatchObject({ emailNotifications: true, emailAvailable: true });
     const delivery = await requestLeave();
-    await http()
+    const off = await http()
       .patch('/api/notifications/preferences')
       .set(bearer(supervisor))
       .send({ emailNotifications: false })
-      .expect(200, { emailNotifications: false, emailAvailable: true });
+      .expect(200);
+    expect(off.body).toMatchObject({ emailNotifications: false, emailAvailable: true });
 
     await dispatcher().run(new Date());
     expect(await deliveryOf(delivery.id)).toMatchObject({
@@ -132,6 +133,48 @@ describe('Notification emails (e2e)', () => {
       .set(bearer(supervisor))
       .send({ emailNotifications: 'yes' })
       .expect(400);
+  });
+
+  describe('by type', () => {
+    const preferences = (body?: object) =>
+      body
+        ? http().patch('/api/notifications/preferences').set(bearer(supervisor)).send(body)
+        : http().get('/api/notifications/preferences').set(bearer(supervisor));
+
+    it('offers only the types the role can receive, all on by default', async () => {
+      // A supervisor reviews and requests leave, but never hears about devices.
+      expect((await preferences().expect(200)).body.emailTypes).toEqual([
+        { type: 'LEAVE_REQUESTED', enabled: true },
+        { type: 'LEAVE_REVIEWED', enabled: true },
+        { type: 'VACATION_EXPIRING', enabled: true },
+      ]);
+    });
+
+    it('skips a muted type by email; the bell still gets it', async () => {
+      const muted = await preferences({ mutedTypes: ['LEAVE_REQUESTED'] }).expect(200);
+      expect(muted.body.emailTypes).toContainEqual({ type: 'LEAVE_REQUESTED', enabled: false });
+      expect(muted.body.emailNotifications).toBe(true);
+
+      const delivery = await requestLeave();
+      await dispatcher().run(new Date());
+      expect(await deliveryOf(delivery.id)).toMatchObject({
+        status: 'SKIPPED',
+        detail: 'User turned this type off by email',
+      });
+      expect(delivery.notification.userId).toBe(supervisorId);
+
+      await preferences({ mutedTypes: [] }).expect(200);
+      const next = await requestLeave();
+      await dispatcher().run(new Date());
+      expect((await deliveryOf(next.id)).status).toBe('SENT');
+    });
+
+    it('rejects unknown types, empty bodies and a bad switch next to a good list', async () => {
+      await preferences({ mutedTypes: ['NOT_A_TYPE'] }).expect(400);
+      await preferences({ mutedTypes: 'LEAVE_REQUESTED' }).expect(400);
+      await preferences({}).expect(400);
+      await preferences({ emailNotifications: 'yes', mutedTypes: [] }).expect(400);
+    });
   });
 
   it('retries a refused email with backoff, then gives up', async () => {

@@ -3,10 +3,12 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Device, LeaveRequest, Notification, Prisma } from '@prisma/client';
 import {
   type AppNotification,
+  NOTIFICATION_AUDIENCE,
   type NotificationDataByType,
   type NotificationType,
   type Role,
   SCOPED_ROLES,
+  notificationTypesFor,
   rolesWith,
 } from '@asistcontrol/shared';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
@@ -25,6 +27,8 @@ export interface NotificationPreferences {
   emailNotifications: boolean;
   /** Whether the server can send email at all (SMTP configured). */
   emailAvailable: boolean;
+  /** The types this user's role can receive, and whether each also goes by email. */
+  emailTypes: { type: NotificationType; enabled: boolean }[];
 }
 
 /** What the platform knew about a device right before a status change. */
@@ -93,22 +97,36 @@ export class NotificationsService {
     return { updated: count };
   }
 
+  /** Email on or off, and per type among those the user's role can receive at all. */
   async preferences(user: AuthenticatedUser): Promise<NotificationPreferences> {
-    const { emailNotifications } = await this.prisma.user.findUniqueOrThrow({
+    const { emailNotifications, emailMutedTypes } = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { emailNotifications: true },
+      select: { emailNotifications: true, emailMutedTypes: true },
     });
-    return { emailNotifications, emailAvailable: this.mail !== null };
+    return {
+      emailNotifications,
+      emailAvailable: this.mail !== null,
+      emailTypes: notificationTypesFor(user.role).map((type) => ({
+        type,
+        enabled: !emailMutedTypes.includes(type),
+      })),
+    };
   }
 
-  /** Applies to emails not sent yet too: the worker checks the preference when it sends. */
+  /**
+   * Either or both settings. Applies to emails not sent yet too: the worker checks the
+   * preferences when it sends. Muting a type the role never receives is harmless.
+   */
   async updatePreferences(
-    dto: { emailNotifications: boolean },
+    dto: { emailNotifications?: boolean; mutedTypes?: NotificationType[] },
     user: AuthenticatedUser,
   ): Promise<NotificationPreferences> {
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { emailNotifications: dto.emailNotifications },
+      data: {
+        emailNotifications: dto.emailNotifications,
+        emailMutedTypes: dto.mutedTypes && [...new Set(dto.mutedTypes)],
+      },
     });
     return this.preferences(user);
   }
@@ -137,7 +155,7 @@ export class NotificationsService {
         // A terminal never reached did not go down: it was never up.
         if (!device.lastSeenAt) return;
         if (await this.downReportedSince(device.id, device.lastSeenAt)) return;
-        await this.send(await this.usersWith('devices:sync'), 'DEVICE_DOWN', deviceEntity(device), {
+        await this.send(await this.audienceOf('DEVICE_DOWN'), 'DEVICE_DOWN', deviceEntity(device), {
           deviceName: device.name,
           status: device.status as 'OFFLINE' | 'ERROR',
           error: device.lastError,
@@ -148,7 +166,7 @@ export class NotificationsService {
       if (device.status === 'ONLINE' && before?.lastSeenAt) {
         if (!(await this.downReportedSince(device.id, before.lastSeenAt))) return;
         await this.send(
-          await this.usersWith('devices:sync'),
+          await this.audienceOf('DEVICE_RECOVERED'),
           'DEVICE_RECOVERED',
           deviceEntity(device),
           {
@@ -163,8 +181,9 @@ export class NotificationsService {
   async leaveRequested(request: LeaveRequest, actorId: string): Promise<void> {
     await this.safely(`leave request ${request.id}`, async () => {
       const employee = await this.employeeOf(request);
-      const unrestricted = rolesWith('leave:approve').filter((r) => !SCOPED_ROLES.includes(r));
-      const scoped = rolesWith('leave:approve').filter((r) => SCOPED_ROLES.includes(r));
+      const reviewerRoles = rolesWith(NOTIFICATION_AUDIENCE.LEAVE_REQUESTED);
+      const unrestricted = reviewerRoles.filter((r) => !SCOPED_ROLES.includes(r));
+      const scoped = reviewerRoles.filter((r) => SCOPED_ROLES.includes(r));
       const reviewers = await this.prisma.user.findMany({
         where: {
           isActive: true,
@@ -281,8 +300,9 @@ export class NotificationsService {
     return found !== null;
   }
 
-  private async usersWith(permission: Parameters<typeof rolesWith>[0]): Promise<string[]> {
-    const roles: Role[] = rolesWith(permission);
+  /** Active users whose role holds the permission that type is addressed to. */
+  private async audienceOf(type: NotificationType): Promise<string[]> {
+    const roles: Role[] = rolesWith(NOTIFICATION_AUDIENCE[type]);
     const users = await this.prisma.user.findMany({
       where: { isActive: true, role: { in: roles } },
       select: { id: true },

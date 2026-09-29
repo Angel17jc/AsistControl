@@ -1,4 +1,10 @@
-import type { DeviceStatus, LeaveType, NotificationType } from './domain';
+import {
+  type DeviceStatus,
+  type LeaveType,
+  NOTIFICATION_TYPES,
+  type NotificationType,
+} from './domain';
+import { type Permission, type Role, hasPermission } from './rbac';
 
 /**
  * Notifications carry data, not sentences: the API stays language-neutral and each client
@@ -54,3 +60,21 @@ export type AppNotification = {
     createdAt: string;
   };
 }[NotificationType];
+
+/**
+ * The permission that makes someone a possible recipient of each type (ADR 0007): the API
+ * resolves recipients from it, and clients use it to offer only the email preferences that
+ * matter to a role. A new type must say who hears about it, or this does not compile.
+ */
+export const NOTIFICATION_AUDIENCE: Readonly<Record<NotificationType, Permission>> = Object.freeze({
+  DEVICE_DOWN: 'devices:sync',
+  DEVICE_RECOVERED: 'devices:sync',
+  LEAVE_REQUESTED: 'leave:approve',
+  LEAVE_REVIEWED: 'leave:request',
+  VACATION_EXPIRING: 'leave:request',
+});
+
+/** Notification types a role can ever receive, in the contract's order. */
+export function notificationTypesFor(role: Role): NotificationType[] {
+  return NOTIFICATION_TYPES.filter((type) => hasPermission(role, NOTIFICATION_AUDIENCE[type]));
+}
