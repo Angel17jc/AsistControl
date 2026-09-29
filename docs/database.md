@@ -90,7 +90,7 @@ erDiagram
 
 ```bash
 npm run db:migrate                          # desarrollo: crea y aplica
-npx prisma migrate deploy                   # CI/producción: solo aplica (lo hace el contenedor al iniciar)
+npx prisma migrate deploy                   # CI/producción: solo aplica (en Docker, la imagen migrator; ADR 0013)
 ```
 
 - Toda modificación del esquema va con su migración en el mismo PR. La CI verifica que las migraciones reproduzcan exactamente el `schema.prisma` (`migrate diff --exit-code`).

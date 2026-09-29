@@ -1,5 +1,5 @@
 # AsistControl — local / demo stack.
-#   docker compose up -d                 → postgres + api + web (http://localhost:8080)
+#   docker compose up -d                 → postgres, migrate (runs once), api, web (http://localhost:8080)
 #   docker compose --profile tools up -d → also pgAdmin (http://localhost:5050)
 #
 # Every value can be overridden from a .env file next to this file (see .env.example).
@@ -46,16 +46,33 @@ services:
       timeout: 3s
       retries: 20
 
+  # One-shot job: applies migrations and, with SEED_DEMO_DATA, seeds; then exits (ADR 0013).
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: migrator
+    image: asistcontrol/migrate:local
+    restart: 'no'
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
+      target: runtime
     image: asistcontrol/api:local
     restart: unless-stopped
     environment: *api-env
     depends_on:
       postgres:
         condition: service_healthy
+      # The API image cannot migrate: it starts only once the migrator has finished.
+      migrate:
+        condition: service_completed_successfully
     ports:
       - '${API_PORT:-3000}:3000'
     healthcheck:
