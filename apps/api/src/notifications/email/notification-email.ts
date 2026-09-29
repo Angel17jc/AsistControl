@@ -16,6 +16,8 @@ export interface EmailContext {
 export interface RenderedEmail {
   subject: string;
   text: string;
+  /** The same content as `text`, for clients that show HTML. */
+  html: string;
 }
 
 const LEAVE_LABEL: Record<LeaveType, string> = {
@@ -107,22 +109,65 @@ export function renderNotificationEmail(
   }
 }
 
+const FOOTER =
+  'Este aviso también está en la campana de AsistControl, donde puede elegir qué avisos ' +
+  'recibir por correo.';
+
+/**
+ * The same message twice: plain text, and HTML for clients that show it. In the HTML every
+ * piece of data is escaped (names come from people and devices), and the only link is the
+ * configured public address plus a fixed path: no data ever reaches an href.
+ */
 function compose(
   subject: string,
   paragraphs: string[],
   path: string,
   { appUrl }: EmailContext,
 ): RenderedEmail {
+  const link = appUrl ? `${appUrl}${path}` : null;
   const lines = [...paragraphs];
-  if (appUrl) lines.push('', `Abrir en AsistControl: ${appUrl}${path}`);
-  lines.push(
-    '',
-    '—',
-    'Este aviso también está en la campana de AsistControl. ' +
-      'Si no quiere recibirlos por correo, desactívelos en su cuenta.',
-  );
+  if (link) lines.push('', `Abrir en AsistControl: ${link}`);
+  lines.push('', '—', FOOTER);
   // Names come from people and devices: never let them break into a new header line.
-  return { subject: singleLine(subject), text: lines.join('\n') };
+  const title = singleLine(subject);
+  return { subject: title, text: lines.join('\n'), html: renderHtml(title, paragraphs, link) };
+}
+
+/** Table layout and inline styles: what email clients reliably render. */
+function renderHtml(title: string, paragraphs: string[], link: string | null): string {
+  const text = 'font-size:14px;line-height:1.5;margin:0 0 12px';
+  return [
+    '<!doctype html><html lang="es"><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    `<title>${escapeHtml(title)}</title></head>`,
+    '<body style="margin:0;padding:24px;background:#f4f5f7;',
+    'font-family:Arial,Helvetica,sans-serif;color:#1f2937">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ',
+    'style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:8px">',
+    '<tr><td style="padding:24px">',
+    '<p style="margin:0 0 16px;font-size:12px;color:#6b7280;text-transform:uppercase">AsistControl</p>',
+    `<h1 style="margin:0 0 16px;font-size:18px">${escapeHtml(title)}</h1>`,
+    ...paragraphs.map((p) => `<p style="${text}">${escapeHtml(p)}</p>`),
+    link
+      ? `<p style="margin:20px 0"><a href="${escapeHtml(link)}" style="display:inline-block;` +
+        'padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;' +
+        'border-radius:6px;font-size:14px">Abrir en AsistControl</a></p>'
+      : '',
+    `<p style="margin:24px 0 0;font-size:12px;color:#6b7280">${escapeHtml(FOOTER)}</p>`,
+    '</td></tr></table></body></html>',
+  ].join('');
+}
+
+const HTML_ESCAPES = new Map([
+  ['&', '&amp;'],
+  ['<', '&lt;'],
+  ['>', '&gt;'],
+  ['"', '&quot;'],
+  ["'", '&#39;'],
+]);
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES.get(c)!);
 }
 
 function explainDeviceError(error: string | null): string {

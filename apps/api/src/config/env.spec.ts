@@ -44,6 +44,18 @@ describe('validateEnv', () => {
     ).toBe('https://asistencia.empresa.com');
   });
 
+  it('only takes a web address as the public URL, since it becomes a link', () => {
+    expect(() => validateEnv({ ...base, APP_PUBLIC_URL: 'javascript:alert(1)' })).toThrow(
+      /APP_PUBLIC_URL/,
+    );
+    expect(() => validateEnv({ ...base, APP_PUBLIC_URL: 'data:text/html,hola' })).toThrow(
+      /APP_PUBLIC_URL/,
+    );
+    expect(validateEnv({ ...base, APP_PUBLIC_URL: 'http://intranet:8080' }).APP_PUBLIC_URL).toBe(
+      'http://intranet:8080',
+    );
+  });
+
   it('treats empty values as unset, as Docker Compose passes them', () => {
     const env = validateEnv({ ...base, SMTP_URL: '', MAIL_FROM: '', APP_PUBLIC_URL: '' });
     expect(env).toMatchObject({

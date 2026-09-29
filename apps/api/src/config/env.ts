@@ -58,7 +58,14 @@ export const envSchema = z.object({
   /** Sender, e.g. `AsistControl <no-reply@empresa.com>`. Required with SMTP_URL. */
   MAIL_FROM: optional(z.string().min(3)),
   /** Public address of the web app, for links in emails. Without it, emails carry no link. */
-  APP_PUBLIC_URL: optional(z.string().url().transform(withoutTrailingSlashes)),
+  // It becomes a link in HTML emails: any other scheme (javascript:, data:) is refused.
+  APP_PUBLIC_URL: optional(
+    z
+      .string()
+      .url()
+      .refine((v) => /^https?:\/\//i.test(v), 'must start with http:// or https://')
+      .transform(withoutTrailingSlashes),
+  ),
   /** How often pending emails are sent; 0 = never (the e2e suite drives it by hand). */
   EMAIL_DISPATCH_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(30),
 

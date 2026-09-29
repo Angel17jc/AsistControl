@@ -91,6 +91,45 @@ describe('renderNotificationEmail', () => {
   });
 });
 
+describe('renderNotificationEmail — HTML', () => {
+  it('carries the same message with the link as a button', () => {
+    const email = render({ type: 'DEVICE_RECOVERED', data: { deviceName: 'Bodega' } });
+    expect(email.html).toContain(
+      '<h1 style="margin:0 0 16px;font-size:18px">Dispositivo en línea de nuevo: Bodega</h1>',
+    );
+    expect(email.html).toContain('href="https://asistencia.empresa.com/dispositivos"');
+    expect(email.html).toContain('Abrir en AsistControl</a>');
+    // Plain text stays plain.
+    expect(email.text).not.toMatch(/<[a-z]/);
+  });
+
+  it('escapes every piece of data, so a name cannot become markup', () => {
+    const email = render({
+      type: 'LEAVE_REVIEWED',
+      data: {
+        employeeName: '<img src=x onerror=alert(1)>',
+        leaveType: 'VACATION',
+        startsAt: '2026-10-05T05:00:00.000Z',
+        endsAt: '2026-10-10T05:00:00.000Z',
+        decision: 'REJECTED',
+        note: '"Cierre" & <b>mes</b>',
+      },
+    });
+    expect(email.html).not.toContain('<img');
+    expect(email.html).not.toContain('<b>');
+    expect(email.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(email.html).toContain('&quot;Cierre&quot; &amp; &lt;b&gt;mes&lt;/b&gt;');
+  });
+
+  it('has no link without a public address', () => {
+    const email = render(
+      { type: 'DEVICE_RECOVERED', data: { deviceName: 'Bodega' } },
+      { ...context, appUrl: null },
+    );
+    expect(email.html).not.toContain('<a ');
+  });
+});
+
 describe('nextAttemptAfter', () => {
   const now = new Date('2026-09-29T12:00:00Z');
   const minutesLater = (attempts: number) => {

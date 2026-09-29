@@ -14,7 +14,7 @@ Las notificaciones ([ADR 0007](0007-notifications.md)) solo se ven dentro de la 
 
 ## Decisión
 
-- **Un canal más de las mismas notificaciones.** Mismos destinatarios, mismos datos y mismas reglas del ADR 0007; no hay un sistema de avisos paralelo. El texto del correo lo redacta la API, como otro cliente de los datos (`notifications/email/notification-email.ts`, función pura con `switch` exhaustivo: un tipo nuevo sin su correo no compila). Solo texto plano por ahora.
+- **Un canal más de las mismas notificaciones.** Mismos destinatarios, mismos datos y mismas reglas del ADR 0007; no hay un sistema de avisos paralelo. El texto del correo lo redacta la API, como otro cliente de los datos (`notifications/email/notification-email.ts`, función pura con `switch` exhaustivo: un tipo nuevo sin su correo no compila). Cada correo lleva texto plano y una alternativa HTML (tabla y estilos en línea); en el HTML **todo dato se escapa** y el único enlace es `APP_PUBLIC_URL` (solo `http`/`https`, validado al arrancar) más una ruta fija, así que ningún dato llega a un `href`.
 - **Outbox transaccional.** Cada notificación creada con el correo activo se guarda **en la misma transacción** con su fila `EmailDelivery` (`PENDING`). La entrega es de otra tabla, no de la notificación: la notificación es el hecho, y cada canal lleva su estado de entrega.
 - **Un worker envía** (`EMAIL_DISPATCH_INTERVAL_SECONDS`, 30 s): toma lo pendiente cuyo momento llegó y lo **reclama fila a fila** con una actualización condicional, el mismo patrón que `syncLockedAt` en la sincronización. Solo la instancia cuya actualización coincidió envía; un reclamo de más de 5 minutos es de una instancia caída y se puede retomar.
 - **Reintentos con backoff:** 1, 5, 15 y 60 minutos; tras el quinto fallo, `FAILED` con el error del servidor en `detail`. Sin _jitter_: con pocos correos por minuto no hace falta suavizar y los tests pueden afirmar horas exactas.
@@ -29,4 +29,4 @@ Las notificaciones ([ADR 0007](0007-notifications.md)) solo se ven dentro de la 
 - Una notificación nunca espera al correo, y un fallo de SMTP queda registrado y reintentado sin intervención.
 - El texto vive en dos lugares (web y correo). Se acepta: son dos medios con necesidades distintas y los dos `switch` exhaustivos obligan a mantenerlos al día.
 - Los correos caen con la notificación: la retención de 90 días borra ambas (cascada).
-- **Fuera de alcance por ahora:** correo en HTML, resúmenes diarios y proveedores por API (SES, SendGrid), que serían otra implementación de `MailTransport`.
+- **Fuera de alcance por ahora:** resúmenes diarios y proveedores por API (SES, SendGrid), que serían otra implementación de `MailTransport`.

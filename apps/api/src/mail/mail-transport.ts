@@ -4,6 +4,8 @@ export interface MailMessage {
   to: string;
   subject: string;
   text: string;
+  /** Optional HTML alternative; clients that cannot show it read `text`. */
+  html?: string;
 }
 
 /**
