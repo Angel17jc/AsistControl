@@ -22,6 +22,10 @@ x-api-env: &api-env
   DEVICE_SYNC_INTERVAL_SECONDS: ${DEVICE_SYNC_INTERVAL_SECONDS:-300}
   ENABLE_MOCK_DEVICES: ${ENABLE_MOCK_DEVICES:-true}
   APP_TIMEZONE: ${APP_TIMEZONE:-America/Guayaquil}
+  # Email notifications stay off unless SMTP_URL is set (docs/adr/0011-email-notifications.md).
+  SMTP_URL: ${SMTP_URL:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
   SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
 
 services:

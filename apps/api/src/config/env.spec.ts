@@ -26,6 +26,33 @@ describe('validateEnv', () => {
     );
   });
 
+  it('leaves email off unless SMTP_URL is set, and then demands a sender', () => {
+    const env = validateEnv(base);
+    expect(env.SMTP_URL).toBeUndefined();
+    expect(env.EMAIL_DISPATCH_INTERVAL_SECONDS).toBe(30);
+    expect(() => validateEnv({ ...base, SMTP_URL: 'smtp://mail.local:587' })).toThrow(/MAIL_FROM/);
+    expect(() =>
+      validateEnv({ ...base, SMTP_URL: 'https://mail.local', MAIL_FROM: 'a@b.c' }),
+    ).toThrow(/SMTP_URL/);
+    expect(
+      validateEnv({
+        ...base,
+        SMTP_URL: 'smtps://user:secret@mail.local:465',
+        MAIL_FROM: 'AsistControl <no-reply@empresa.com>',
+        APP_PUBLIC_URL: 'https://asistencia.empresa.com/',
+      }).APP_PUBLIC_URL,
+    ).toBe('https://asistencia.empresa.com');
+  });
+
+  it('treats empty values as unset, as Docker Compose passes them', () => {
+    const env = validateEnv({ ...base, SMTP_URL: '', MAIL_FROM: '', APP_PUBLIC_URL: '' });
+    expect(env).toMatchObject({
+      SMTP_URL: undefined,
+      MAIL_FROM: undefined,
+      APP_PUBLIC_URL: undefined,
+    });
+  });
+
   it('rejects invalid timezones', () => {
     expect(() => validateEnv({ ...base, APP_TIMEZONE: 'Mars/Olympus' })).toThrow(/APP_TIMEZONE/);
   });

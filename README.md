@@ -120,19 +120,22 @@ Abrir <http://localhost:8080> e ingresar con un usuario de demo (contraseña `As
 
 La API valida su configuración al arrancar y **se niega a iniciar** si falta algo o, en producción, si detecta secretos de ejemplo. Referencia completa en [`apps/api/.env.example`](apps/api/.env.example).
 
-| Variable                                             | Descripción                                                       | Por defecto             |
-| ---------------------------------------------------- | ----------------------------------------------------------------- | ----------------------- |
-| `DATABASE_URL`                                       | Conexión PostgreSQL                                               | — (obligatoria)         |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`           | Secretos distintos, ≥ 32 caracteres                               | — (obligatorias)        |
-| `JWT_ACCESS_TTL_SECONDS` / `JWT_REFRESH_TTL_SECONDS` | Vida de los tokens                                                | `900` / `604800`        |
-| `DEVICE_SECRETS_KEY`                                 | Clave AES-256 (32 bytes base64) para credenciales de dispositivos | — (obligatoria)         |
-| `APP_TIMEZONE`                                       | Zona horaria IANA de la empresa                                   | `America/Guayaquil`     |
-| `DEVICE_SYNC_INTERVAL_SECONDS`                       | Polling de dispositivos (`0` = desactivado)                       | `300`                   |
-| `ENABLE_MOCK_DEVICES`                                | Habilita el driver `MOCK` y el simulador                          | `true`                  |
-| `CORS_ORIGINS`                                       | Orígenes permitidos (coma)                                        | `http://localhost:5173` |
-| `COOKIE_SECURE`                                      | Cookie de refresh solo por HTTPS                                  | `false`                 |
-| `LOG_LEVEL` / `LOG_FORMAT`                           | Nivel y formato (`json` / `pretty`)                               | `info` / `json`         |
-| `THROTTLE_TTL_SECONDS` / `THROTTLE_LIMIT`            | Rate limiting global                                              | `60` / `120`            |
+| Variable                                             | Descripción                                                                                 | Por defecto             |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------- |
+| `DATABASE_URL`                                       | Conexión PostgreSQL                                                                         | — (obligatoria)         |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`           | Secretos distintos, ≥ 32 caracteres                                                         | — (obligatorias)        |
+| `JWT_ACCESS_TTL_SECONDS` / `JWT_REFRESH_TTL_SECONDS` | Vida de los tokens                                                                          | `900` / `604800`        |
+| `DEVICE_SECRETS_KEY`                                 | Clave AES-256 (32 bytes base64) para credenciales de dispositivos                           | — (obligatoria)         |
+| `APP_TIMEZONE`                                       | Zona horaria IANA de la empresa                                                             | `America/Guayaquil`     |
+| `DEVICE_SYNC_INTERVAL_SECONDS`                       | Polling de dispositivos (`0` = desactivado)                                                 | `300`                   |
+| `ENABLE_MOCK_DEVICES`                                | Habilita el driver `MOCK` y el simulador                                                    | `true`                  |
+| `CORS_ORIGINS`                                       | Orígenes permitidos (coma)                                                                  | `http://localhost:5173` |
+| `COOKIE_SECURE`                                      | Cookie de refresh solo por HTTPS                                                            | `false`                 |
+| `LOG_LEVEL` / `LOG_FORMAT`                           | Nivel y formato (`json` / `pretty`)                                                         | `info` / `json`         |
+| `THROTTLE_TTL_SECONDS` / `THROTTLE_LIMIT`            | Rate limiting global                                                                        | `60` / `120`            |
+| `SMTP_URL` / `MAIL_FROM`                             | Correo de notificaciones: `smtps://usuario:clave@host` y remitente. Sin `SMTP_URL`, apagado | — (apagado)             |
+| `APP_PUBLIC_URL`                                     | Dirección pública de la web, para los enlaces de los correos                                | — (sin enlaces)         |
+| `EMAIL_DISPATCH_INTERVAL_SECONDS`                    | Cada cuánto se envían los correos pendientes (`0` = nunca)                                  | `30`                    |
 
 Para Docker Compose se puede crear un `.env` en la raíz a partir de [`.env.example`](.env.example).
 

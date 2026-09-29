@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Device, LeaveRequest, Notification, Prisma } from '@prisma/client';
 import {
@@ -10,6 +10,7 @@ import {
   rolesWith,
 } from '@asistcontrol/shared';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
+import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail-transport';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -19,6 +20,12 @@ import type { NotificationQueryDto } from './notifications.dto';
 const RETENTION_DAYS = 90;
 
 const FAILED = new Set<Device['status']>(['OFFLINE', 'ERROR']);
+
+export interface NotificationPreferences {
+  emailNotifications: boolean;
+  /** Whether the server can send email at all (SMTP configured). */
+  emailAvailable: boolean;
+}
 
 /** What the platform knew about a device right before a status change. */
 export type DeviceBefore = Pick<Device, 'status' | 'lastSeenAt'> | null;
@@ -39,6 +46,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeService,
+    @Inject(MAIL_TRANSPORT) private readonly mail: MailTransport | null,
   ) {}
 
   // ── Reading: always the caller's own ────────────────────────────────────────────────────
@@ -83,6 +91,26 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
     return { updated: count };
+  }
+
+  async preferences(user: AuthenticatedUser): Promise<NotificationPreferences> {
+    const { emailNotifications } = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { emailNotifications: true },
+    });
+    return { emailNotifications, emailAvailable: this.mail !== null };
+  }
+
+  /** Applies to emails not sent yet too: the worker checks the preference when it sends. */
+  async updatePreferences(
+    dto: { emailNotifications: boolean },
+    user: AuthenticatedUser,
+  ): Promise<NotificationPreferences> {
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailNotifications: dto.emailNotifications },
+    });
+    return this.preferences(user);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM, { name: 'notifications-retention' })
@@ -224,14 +252,23 @@ export class NotificationsService {
   ): Promise<void> {
     const userIds = [...new Set(recipients)];
     if (userIds.length === 0) return;
-    const rows = await this.prisma.notification.createManyAndReturn({
-      data: userIds.map((userId) => ({
-        userId,
-        type,
-        data: data as Prisma.InputJsonObject,
-        entity: about.entity,
-        entityId: about.id,
-      })),
+    const rows = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.notification.createManyAndReturn({
+        data: userIds.map((userId) => ({
+          userId,
+          type,
+          data: data as Prisma.InputJsonObject,
+          entity: about.entity,
+          entityId: about.id,
+        })),
+      });
+      // Queued with the notification or not at all: enabling email later never sends a backlog.
+      if (this.mail) {
+        await tx.emailDelivery.createMany({
+          data: created.map((row) => ({ notificationId: row.id })),
+        });
+      }
+      return created;
     });
     for (const row of rows) this.realtime.notificationCreated(row.userId, toPayload(row));
   }
@@ -283,7 +320,7 @@ function leaveEntity(request: LeaveRequest) {
   return { entity: 'LeaveRequest', id: request.id };
 }
 
-function toPayload(row: Notification): AppNotification {
+export function toPayload(row: Notification): AppNotification {
   return {
     id: row.id,
     type: row.type,

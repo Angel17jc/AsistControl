@@ -15,6 +15,8 @@ Object.assign(process.env, {
   JWT_REFRESH_SECRET: 'e2e-refresh-secret-0123456789abcdefghijklmnop',
   DEVICE_SECRETS_KEY: Buffer.alloc(32, 7).toString('base64'),
   DEVICE_SYNC_INTERVAL_SECONDS: '0',
+  // The email e2e suite drives the worker by hand, with the times it wants.
+  EMAIL_DISPATCH_INTERVAL_SECONDS: '0',
   ENABLE_MOCK_DEVICES: 'true',
   APP_TIMEZONE: 'America/Guayaquil',
   THROTTLE_ENABLED: 'false',

@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient, type Role } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -11,8 +11,11 @@ export const PASSWORD = 'E2eTestPassword2026';
 export const WORK_DATE = '2026-09-14';
 export const TZ_OFFSET = '-05:00';
 
-export async function createApp(): Promise<NestExpressApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+/** `customize` swaps providers for fakes, e.g. the mail transport. */
+export async function createApp(
+  customize: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+): Promise<NestExpressApplication> {
+  const moduleRef = await customize(Test.createTestingModule({ imports: [AppModule] })).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false });
   configureApp(app);
   await app.init();
