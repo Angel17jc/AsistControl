@@ -33,7 +33,7 @@ No abras un issue público. Usa **GitHub → Security → Report a vulnerability
 - El access token es _stateless_: tras revocar una sesión puede seguir siendo válido hasta 15 min. Se acepta por rendimiento; reducir `JWT_ACCESS_TTL_SECONDS` si el riesgo lo requiere.
 - El rate limiting es en memoria por instancia. Con varias réplicas debe usarse un store compartido (Redis) — roadmap.
 - `COOKIE_SECURE=true` es obligatorio detrás de HTTPS en producción.
-- **`deepmerge-ts` < 8 (GHSA-ggr8-5vv4-36mx, agotamiento de pila) se acepta**: llega fijado por `@prisma/config` 6.19.x, que solo lo usa para fusionar los archivos de configuración del propio Prisma en el CLI (migraciones, generación). No procesa datos de usuarios y la API en ejecución no lo usa. Forzar la 8.x con `overrides` rompe `prisma generate`. Se revisa al salir una 6.x de Prisma que lo actualice o al migrar a Prisma 7 (pospuesto a propósito).
+- **`deepmerge-ts` < 8 (GHSA-ggr8-5vv4-36mx, agotamiento de pila) se acepta**: llega fijado por `@prisma/config` 6.19.x, que solo lo usa para fusionar los archivos de configuración del propio Prisma en el CLI (migraciones, generación). No procesa datos de usuarios, y desde el [ADR 0013](adr/0013-migrations-as-a-job.md) ni siquiera está en la imagen de la API: solo en la del migrador, que corre unos segundos por despliegue. Forzar la 8.x con `overrides` rompe `prisma generate`. Se revisa al salir una 6.x de Prisma que lo actualice o al migrar a Prisma 7 (pospuesto a propósito).
 
 ## Checklist de despliegue
 

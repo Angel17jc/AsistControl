@@ -76,7 +76,7 @@ apps/
 packages/
   shared/              Contratos compartidos: enums de dominio, matriz RBAC, eventos en tiempo real
   biometric-core/      Interfaz BiometricDeviceAdapter, errores tipados, registro de drivers y simulador
-infra/docker/          Dockerfiles, nginx, entrypoint
+infra/docker/          Dockerfiles (API y migrador), nginx, prueba de humo
 docs/                  Arquitectura, API, BD, dispositivos, seguridad, ADRs
 .github/               CI, CodeQL, Dependabot, plantillas de issues/PR, CODEOWNERS
 ```
@@ -144,7 +144,8 @@ Para Docker Compose se puede crear un `.env` en la raíz a partir de [`.env.exam
 | Servicio   | Puerto | Descripción                                                              |
 | ---------- | ------ | ------------------------------------------------------------------------ |
 | `postgres` | 5432   | PostgreSQL 17 con volumen persistente                                    |
-| `api`      | 3000   | Aplica migraciones, siembra datos de demo (opcional) y arranca la API    |
+| `migrate`  | —      | Tarea de un solo uso: aplica migraciones y siembra la demo (opcional)    |
+| `api`      | 3000   | La API; arranca cuando `migrate` terminó bien                            |
 | `web`      | 8080   | nginx: sirve la SPA y hace proxy de `/api` y `/socket.io` (mismo origen) |
 | `pgadmin`  | 5050   | Opcional: `docker compose --profile tools up -d`                         |
 
@@ -156,11 +157,14 @@ docker compose down             # detener (conserva datos)
 
 Las imágenes son multi-stage: la de la API no contiene código fuente, dependencias de desarrollo, sourcemaps ni declaraciones de tipos de las dependencias, y corre como usuario sin privilegios.
 
-La CI no solo construye la imagen de la API: la **arranca** contra un PostgreSQL desechable y espera a `/health` (migraciones, seed y servidor). Se puede repetir en local:
+Las migraciones son una **tarea aparte** ([ADR 0013](docs/adr/0013-migrations-as-a-job.md)): la imagen `migrator` las aplica y termina, y la imagen de la API no puede migrar. Fuera de Compose, ejecutar siempre el migrador antes de desplegar la API (en Kubernetes, un `Job` o un `initContainer`).
+
+La CI no solo construye las imágenes: las **arranca** contra un PostgreSQL desechable, primero el migrador y después la API, y espera a `/health`. Se puede repetir en local:
 
 ```bash
+docker build -f infra/docker/api.Dockerfile --target migrator -t asistcontrol-migrate:smoke .
 docker build -f infra/docker/api.Dockerfile -t asistcontrol-api:smoke .
-infra/docker/smoke-test.sh asistcontrol-api:smoke
+infra/docker/smoke-test.sh
 ```
 
 ## Base de datos
