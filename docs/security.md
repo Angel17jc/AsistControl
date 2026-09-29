@@ -33,7 +33,18 @@ No abras un issue público. Usa **GitHub → Security → Report a vulnerability
 - El access token es _stateless_: tras revocar una sesión puede seguir siendo válido hasta 15 min. Se acepta por rendimiento; reducir `JWT_ACCESS_TTL_SECONDS` si el riesgo lo requiere.
 - El rate limiting es en memoria por instancia. Con varias réplicas debe usarse un store compartido (Redis) — roadmap.
 - `COOKIE_SECURE=true` es obligatorio detrás de HTTPS en producción.
-- **`deepmerge-ts` < 8 (GHSA-ggr8-5vv4-36mx, agotamiento de pila) se acepta**: llega fijado por `@prisma/config` 6.19.x, que solo lo usa para fusionar los archivos de configuración del propio Prisma en el CLI (migraciones, generación). No procesa datos de usuarios, y desde el [ADR 0013](adr/0013-migrations-as-a-job.md) ni siquiera está en la imagen de la API: solo en la del migrador, que corre unos segundos por despliegue. Forzar la 8.x con `overrides` rompe `prisma generate`. Se revisa al salir una 6.x de Prisma que lo actualice o al migrar a Prisma 7 (pospuesto a propósito).
+
+### Avisos de dependencias aceptados
+
+Un aviso de `npm audit` se corrige si hay versión compatible. Si no la hay, se decide por escrito si es **alcanzable**: qué código vulnerable se ejecuta, con qué datos y en qué imagen. Los aceptados:
+
+| Paquete                                                | Aviso                                                                 | Dónde vive                                                                                              | Por qué no es alcanzable                                                                                                                               | Se revisa cuando…                                                              |
+| ------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `deepmerge-ts` < 8 (vía `@prisma/config` 6.19.x)       | GHSA-ggr8-5vv4-36mx, agotamiento de pila (alta)                       | Solo la imagen del migrador ([ADR 0013](adr/0013-migrations-as-a-job.md)), unos segundos por despliegue | Solo fusiona los archivos de configuración del propio Prisma en el CLI, nunca datos de usuarios. Forzar la 8.x con `overrides` rompe `prisma generate` | Salga una 6.x de Prisma que lo actualice, o al migrar a Prisma 7               |
+| `js-yaml` 5.3.0 (fijado por `@nestjs/swagger` 11.4.7)  | GHSA-r3ph-w7gj-g6xm, CPU con claves de fusión vacías (moderada)       | Imagen de la API                                                                                        | El fallo está al **parsear** YAML; `@nestjs/swagger` solo llama a `jsyaml.dump()` para serializar el documento OpenAPI que genera la propia API        | Salga un `@nestjs/swagger` 11.x con `js-yaml` ≥ 5.4.1, o al migrar a NestJS 12 |
+| `esbuild` 0.27.x (vía `tsup` 8.5.1, que exige `^0.27`) | Lectura de archivos desde el servidor de desarrollo en Windows (baja) | Solo desarrollo: empaqueta `packages/*`                                                                 | El fallo está en `esbuild --serve`; `tsup` solo compila, y Vite 8 usa Rolldown. Nunca llega a una imagen                                               | `tsup` admita `esbuild` ≥ 0.28.1                                               |
+
+Comprobación: `npm audit --omit=dev` en el repositorio, y dentro de la imagen de la API (`docker run --rm --user root --entrypoint sh <imagen> -c 'cd /app && npm audit --omit=dev'`).
 
 ## Checklist de despliegue
 
