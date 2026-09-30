@@ -10,7 +10,7 @@ npx --no-install prisma migrate deploy
 
 if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
   echo "[migrate] seeding demo data (idempotent)"
-  node dist-seed/seed.js
+  node dist-seed/prisma/seed.js
 fi
 
 echo "[migrate] done"

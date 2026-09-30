@@ -22,7 +22,7 @@ COPY apps/api apps/api
 RUN npm run build -w @asistcontrol/shared \
  && npm run build -w @asistcontrol/biometric-core \
  && npm run build -w @asistcontrol/api \
- && npx tsc apps/api/prisma/seed.ts --outDir apps/api/dist-seed --module commonjs --target es2022 \
+ && npx tsc apps/api/prisma/seed.ts --rootDir apps/api --outDir apps/api/dist-seed --module commonjs --target es2022 \
       --esModuleInterop --skipLibCheck
 
 # ── One-shot job: applies migrations and, in demo setups, seeds (ADR 0013). It is the only

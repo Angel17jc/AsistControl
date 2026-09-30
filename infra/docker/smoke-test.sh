@@ -46,6 +46,18 @@ ENV_ARGS=(
 echo "== migrator"
 docker run --rm --network "$NETWORK" "${ENV_ARGS[@]}" "$MIGRATOR_IMAGE"
 
+# The seed must hash like the API does (src/auth/password-hashing.ts): a login would work
+# with any parameters, so it cannot tell. argon2 may list them in any order.
+seeded=$(docker exec "$DB" psql -U smoke -d smoke -tAc \
+  "select password_hash from users where email = 'admin@asistcontrol.local'")
+for param in m=19456 t=2 p=1; do
+  if [[ ",$(cut -d'$' -f4 <<<"$seeded")," != *",$param,"* ]]; then
+    echo "seeded hash lacks $param: $seeded" >&2
+    exit 1
+  fi
+done
+echo "seed hash parameters: ok"
+
 echo "== api"
 docker run -d --name "$API" --network "$NETWORK" -p "$PORT:3000" "${ENV_ARGS[@]}" \
   "$API_IMAGE" >/dev/null
