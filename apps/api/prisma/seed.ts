@@ -4,7 +4,8 @@
  * using them in a real deployment; the system itself does not hardcode any country rules.
  */
 import { PrismaClient, type Role } from '@prisma/client';
-import * as argon2 from 'argon2';
+// Same parameters as the API: a demo user and a user created in the app hash alike.
+import { hashPassword } from '../src/auth/password-hashing';
 
 const prisma = new PrismaClient();
 
@@ -289,7 +290,7 @@ async function main() {
     }
   }
 
-  const passwordHash = await argon2.hash(DEMO_PASSWORD, { type: argon2.argon2id });
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
   for (const u of users) {
     await prisma.user.upsert({
       where: { email: u.email },
