@@ -6,6 +6,7 @@
  * history: DEVICE_COMM_KEY (ZKTeco) or DEVICE_USERNAME / DEVICE_PASSWORD (Hikvision).
  * Exit code: 0 = works (maybe with warnings), 1 = failed, 2 = wrong usage.
  */
+import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import type { BiometricDeviceAdapter } from './adapter';
 import { HikvisionAdapter } from './hikvision/hikvision.adapter';
@@ -19,7 +20,8 @@ const USAGE = `Uso: npm run device:probe -- --driver <ZKTECO|HIKVISION> --host <
   --timezone <zona>   Zona horaria del reloj del equipo (por defecto, la de este equipo)
   --timeout <ms>      Timeout por operación (10000)
   --protocol <http|https>  Solo HIKVISION
-  --json              Informe en JSON
+  --json              Informe en JSON por la salida estándar
+  --out <archivo>     Además, guarda el informe JSON en ese archivo (UTF-8), para adjuntarlo
 
 Credenciales por variables de entorno:
   ZKTECO     DEVICE_COMM_KEY (0 o vacío si el equipo no tiene clave)
@@ -45,6 +47,7 @@ async function main(): Promise<number> {
         timeout: { type: 'string' },
         protocol: { type: 'string' },
         json: { type: 'boolean', default: false },
+        out: { type: 'string' },
         help: { type: 'boolean', default: false },
       },
     }));
@@ -87,10 +90,18 @@ async function main(): Promise<number> {
     },
   });
   const report = await probeDevice(adapter);
+  const target = `${values.host}:${port}`;
   // The report is the program's output (stdout); usage and errors go to stderr.
   process.stdout.write(
-    `${values.json ? JSON.stringify(report, null, 2) : formatProbeReport(report, `${values.host}:${port}`)}\n`,
+    `${values.json ? JSON.stringify(report, null, 2) : formatProbeReport(report, target)}\n`,
   );
+  if (values.out) {
+    // Written here rather than through a shell redirect: PowerShell 5.1's `>` writes UTF-16,
+    // which most tools do not read as JSON. Never includes the credentials.
+    const saved = { target, probedAt: new Date().toISOString(), ...report };
+    writeFileSync(values.out, `${JSON.stringify(saved, null, 2)}\n`, 'utf8');
+    process.stderr.write(`Informe guardado en ${values.out}\n`);
+  }
   return report.outcome === 'fail' ? 1 : 0;
 }
 

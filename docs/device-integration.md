@@ -112,6 +112,13 @@ DEVICE_USERNAME=asistencia DEVICE_PASSWORD='********' \
   npm run device:probe -- --driver HIKVISION --host 192.168.1.64 --timezone America/Guayaquil
 ```
 
+En Windows con PowerShell, las variables de entorno se definen así:
+
+```powershell
+$env:DEVICE_COMM_KEY = '0'
+npm run device:probe -- --driver ZKTECO --host 192.168.1.201 --timezone America/Guayaquil --out informe.json
+```
+
 | Paso                 | Qué comprueba                                                                                              |
 | -------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Conexión             | Red, puerto y credenciales. Un fallo detiene el resto y explica la causa (`CONNECTION_FAILED`, `TIMEOUT`…) |
@@ -121,7 +128,7 @@ DEVICE_USERNAME=asistencia DEVICE_PASSWORD='********' \
 | Descarga completa    | Marcaciones por tipo y método, horas futuras o muy antiguas (reloj o zona horaria mal configurados)        |
 | Descarga incremental | Que el cursor avance: una segunda descarga no debe traer nada                                              |
 
-Sale con código 0 si funciona (con o sin avisos) y 1 si falla; `--json` entrega el informe completo para adjuntarlo a un issue. Las cifras por tipo y método deben contrastarse con el registro del propio equipo.
+Sale con código 0 si funciona (con o sin avisos) y 1 si falla. **`--out informe.json`** guarda además el informe completo (con el equipo y la fecha, nunca las credenciales) para adjuntarlo a un issue; es mejor que redirigir `--json` con `>`, que en PowerShell 5.1 escribe UTF-16. Las cifras por tipo y método deben contrastarse con el registro del propio equipo.
 
 ## Driver `ZKTECO` (experimental)
 
