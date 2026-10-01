@@ -11,9 +11,11 @@ import {
   LayoutDashboard,
   LogOut,
   ScrollText,
+  UserCog,
   Users,
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
+import { ROLE_LABEL } from '../lib/accounts';
 import { logout } from '../lib/api';
 import { type ConnectionState, useRealtime } from '../lib/realtime';
 import { NotificationBell } from './NotificationBell';
@@ -28,16 +30,9 @@ const NAV: { to: string; label: string; icon: typeof Users; permission: Permissi
   { to: '/dispositivos', label: 'Dispositivos', icon: Cpu, permission: 'devices:read' },
   { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, permission: 'leave:read' },
   { to: '/reportes', label: 'Reportes', icon: FileSpreadsheet, permission: 'reports:read' },
+  { to: '/usuarios', label: 'Usuarios', icon: UserCog, permission: 'users:read' },
   { to: '/auditoria', label: 'Auditoría', icon: ScrollText, permission: 'audit:read' },
 ];
-
-const ROLE_LABEL: Record<string, string> = {
-  SUPER_ADMIN: 'Super administrador',
-  ADMIN: 'Administrador',
-  HR: 'Talento humano',
-  SUPERVISOR: 'Supervisor',
-  EMPLOYEE: 'Empleado',
-};
 
 export function AppShell() {
   const user = useAuth((s) => s.user);

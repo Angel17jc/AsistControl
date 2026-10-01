@@ -19,6 +19,7 @@ test.describe('Permisos en la interfaz', () => {
       'Empleados',
       'Horarios',
       'Dispositivos',
+      'Usuarios',
       'Auditoría',
       'Reportes',
     ]) {
@@ -43,6 +44,7 @@ test.describe('Permisos en la interfaz', () => {
       'Dispositivos',
       'Solicitudes',
       'Reportes',
+      'Usuarios',
       'Auditoría',
     ]) {
       await expect(nav.getByRole('link', { name: label })).toBeVisible();
@@ -55,7 +57,7 @@ test.describe('Permisos en la interfaz', () => {
     const nav = page.getByRole('navigation', { name: 'Principal' });
     await expect(nav.getByRole('link', { name: 'Asistencia' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Empleados' })).toBeVisible();
-    for (const hidden of ['Horarios', 'Dispositivos', 'Auditoría', 'Reportes']) {
+    for (const hidden of ['Horarios', 'Dispositivos', 'Usuarios', 'Auditoría', 'Reportes']) {
       await expect(nav.getByRole('link', { name: hidden })).toHaveCount(0);
     }
 

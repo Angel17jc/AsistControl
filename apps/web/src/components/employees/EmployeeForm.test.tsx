@@ -24,6 +24,7 @@ const LUIS: EmployeeRow = {
   position: null,
   contractType: null,
   supervisor: { id: 'e2', firstName: 'María', lastName: 'Vera' },
+  user: null,
 };
 
 function renderForm(employee?: EmployeeRow) {
