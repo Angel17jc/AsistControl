@@ -7,6 +7,7 @@ import type {
   EmployeeStatus,
   LeaveType,
   RequestStatus,
+  Role,
   SyncStatus,
   SyncTrigger,
   VacationAccrual,
@@ -62,6 +63,20 @@ export interface EmployeeRow {
   position: { id: string; name: string } | null;
   contractType: { id: string; name: string } | null;
   supervisor: { id: string; firstName: string; lastName: string } | null;
+  /** The platform account linked to this person, if any. */
+  user: { id: string; email: string; isActive: boolean } | null;
+}
+
+/** A platform account (GET /users). The API never returns its password hash. */
+export interface UserRow {
+  id: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  employeeId: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  employee: { id: string; firstName: string; lastName: string; employeeCode: string } | null;
 }
 
 export interface ContractTypeRow {

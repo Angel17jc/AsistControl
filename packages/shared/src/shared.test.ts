@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, hasPermission, rolesWith } from './rbac';
 import { NOTIFICATION_TYPES } from './domain';
 import { notificationTypesFor } from './notifications';
+import { isStrongPassword } from './passwords';
 import { formatMinutes } from './time';
 
 describe('RBAC matrix', () => {
@@ -39,6 +40,17 @@ describe('notification audience', () => {
     // HR approves leave but cannot act on devices, so it never hears about outages.
     expect(notificationTypesFor('HR')).not.toContain('DEVICE_DOWN');
     expect(notificationTypesFor('ADMIN')).toEqual([...NOTIFICATION_TYPES]);
+  });
+});
+
+describe('password rule', () => {
+  it('needs 10 to 128 characters with a letter and a number', () => {
+    expect(isStrongPassword('Asist2026Control')).toBe(true);
+    expect(isStrongPassword('corta12')).toBe(false);
+    expect(isStrongPassword('sololetrasaqui')).toBe(false);
+    expect(isStrongPassword('1234567890')).toBe(false);
+    expect(isStrongPassword(`a1${'x'.repeat(126)}`)).toBe(true);
+    expect(isStrongPassword(`a1${'x'.repeat(127)}`)).toBe(false);
   });
 });
 

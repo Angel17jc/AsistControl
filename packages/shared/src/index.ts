@@ -4,3 +4,4 @@ export * from './realtime';
 export * from './notifications';
 export * from './api';
 export * from './time';
+export * from './passwords';

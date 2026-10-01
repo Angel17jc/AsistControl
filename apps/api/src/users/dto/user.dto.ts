@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
-import { ROLES, type Role } from '@asistcontrol/shared';
+import { PASSWORD_RULE, ROLES, type Role } from '@asistcontrol/shared';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
@@ -13,8 +13,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
-
-export const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{10,128}$/;
 
 export class CreateUserDto {
   @ApiProperty({ example: 'rrhh@empresa.com' })

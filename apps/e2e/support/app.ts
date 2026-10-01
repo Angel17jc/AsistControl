@@ -11,10 +11,14 @@ export const USERS = {
 export const PASSWORD = 'AsistControl2026';
 
 /** Signs in through the form, like a person would, and waits for the app shell to be up. */
-export async function signIn(page: Page, user: { email: string }): Promise<void> {
+export async function signIn(
+  page: Page,
+  user: { email: string },
+  password: string = PASSWORD,
+): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Correo electrónico').fill(user.email);
-  await page.getByLabel('Contraseña').fill(PASSWORD);
+  await page.getByLabel('Contraseña').fill(password);
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
 }
