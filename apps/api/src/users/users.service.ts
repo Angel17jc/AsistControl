@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { PRIVILEGED_ROLES, type Role } from '@asistcontrol/shared';
+import { PRIVILEGED_ROLES, type Role, SCOPED_ROLES } from '@asistcontrol/shared';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/password.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
@@ -59,6 +59,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto, actor: AuthenticatedUser, ctx: RequestContext) {
     assertCanGrant(actor, dto.role);
+    assertScopedRoleHasEmployee(dto.role, dto.employeeId ?? null);
     const passwordHash = await this.passwords.hash(dto.password);
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -88,6 +89,12 @@ export class UsersService {
     // Touching a privileged account or granting a privileged role requires SUPER_ADMIN.
     assertCanGrant(actor, current.role);
     if (dto.role) assertCanGrant(actor, dto.role);
+    // Judged on the account as it would end up: a new role, a new link, or both. Not `??`:
+    // employeeId null means "unlink", only an absent one keeps the current link.
+    assertScopedRoleHasEmployee(
+      dto.role ?? current.role,
+      dto.employeeId === undefined ? current.employeeId : dto.employeeId,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.update({ where: { id }, data: dto, select: PUBLIC_USER });
@@ -148,6 +155,16 @@ export class UsersService {
         tx,
       );
     });
+  }
+}
+
+/**
+ * A supervisor or an employee sees data through their linked employee (row scope, ADR 0003):
+ * without one, the account could sign in and see nothing at all.
+ */
+function assertScopedRoleHasEmployee(role: Role, employeeId: string | null): void {
+  if (SCOPED_ROLES.includes(role) && !employeeId) {
+    throw new BadRequestException(`A ${role} account must be linked to an employee`);
   }
 }
 

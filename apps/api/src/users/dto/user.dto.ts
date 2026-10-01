@@ -40,9 +40,16 @@ export class CreateUserDto {
   employeeId?: string;
 }
 
-export class UpdateUserDto extends PartialType(
-  PickType(CreateUserDto, ['role', 'employeeId'] as const),
-) {
+export class UpdateUserDto extends PartialType(PickType(CreateUserDto, ['role'] as const)) {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Employee to link; null unlinks (not allowed for SUPERVISOR or EMPLOYEE)',
+  })
+  @IsOptional()
+  @IsUUID()
+  employeeId?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
