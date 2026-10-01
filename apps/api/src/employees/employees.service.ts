@@ -14,6 +14,8 @@ const EMPLOYEE_INCLUDE = {
   position: { select: { id: true, name: true } },
   contractType: { select: { id: true, name: true } },
   supervisor: { select: { id: true, firstName: true, lastName: true } },
+  // The platform account linked to this person, if any: enough to tell who can sign in.
+  user: { select: { id: true, email: true, isActive: true } },
 } satisfies Prisma.EmployeeInclude;
 
 @Injectable()
