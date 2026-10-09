@@ -236,6 +236,27 @@ export interface HolidayRow {
   name: string;
 }
 
+/** Company-wide labor rules (GET /settings); mirrors the API's attendancePolicySchema. */
+export interface AttendancePolicy {
+  duplicatePunchWindowSeconds: number;
+  lateToleranceMinutes: number;
+  earlyLeaveToleranceMinutes: number;
+  overtimeThresholdMinutes: number;
+  overtimeBasis: 'AFTER_SHIFT_END' | 'EXCESS_WORKED_TIME';
+  countEarlyArrivalAsOvertime: boolean;
+  punchPairing: 'SEQUENTIAL' | 'DEVICE_TYPE';
+  autoDeductUnpunchedBreak: boolean;
+  minBreakMinutes: number;
+  outOfScheduleMarginMinutes: number;
+  punchWindowBeforeShiftMinutes: number;
+  punchWindowAfterShiftMinutes: number;
+}
+
+export interface SettingsResponse {
+  timezone: string;
+  attendancePolicy: AttendancePolicy;
+}
+
 /** One period of an employee's schedule history; dates are `YYYY-MM-DD`, `effectiveTo` inclusive. */
 export interface ScheduleAssignmentRow {
   id: string;

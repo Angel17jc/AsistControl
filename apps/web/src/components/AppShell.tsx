@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   ScrollText,
+  Settings,
   UserCog,
   UserRound,
   Users,
@@ -40,6 +41,7 @@ const NAV: { to: string; label: string; icon: typeof Users; permission: Permissi
   { to: '/reportes', label: 'Reportes', icon: FileSpreadsheet, permission: 'reports:read' },
   { to: '/usuarios', label: 'Usuarios', icon: UserCog, permission: 'users:read' },
   { to: '/auditoria', label: 'Auditoría', icon: ScrollText, permission: 'audit:read' },
+  { to: '/configuracion', label: 'Configuración', icon: Settings, permission: 'settings:read' },
 ];
 
 export function AppShell() {
