@@ -35,6 +35,9 @@ const DevicesPage = lazy(() =>
 const EmployeesPage = lazy(() =>
   import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })),
 );
+const OrganizationPage = lazy(() =>
+  import('./pages/OrganizationPage').then((m) => ({ default: m.OrganizationPage })),
+);
 const ReportsPage = lazy(() =>
   import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
@@ -86,6 +89,14 @@ export function App() {
             element={
               <Guard permission="employees:read">
                 <EmployeesPage />
+              </Guard>
+            }
+          />
+          <Route
+            path="organizacion"
+            element={
+              <Guard permission="organization:read">
+                <OrganizationPage />
               </Guard>
             }
           />
