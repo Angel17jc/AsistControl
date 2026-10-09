@@ -12,7 +12,12 @@ export class PositionsService {
   ) {}
 
   list() {
-    return this.prisma.position.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
+    return this.prisma.position.findMany({
+      where: { deletedAt: null },
+      orderBy: { name: 'asc' },
+      // Same shape as departments: the UI explains why one cannot be deleted yet.
+      include: { _count: { select: { employees: { where: { deletedAt: null } } } } },
+    });
   }
 
   async get(id: string) {
@@ -63,8 +68,9 @@ export class PositionsService {
     const employees = await this.prisma.employee.count({
       where: { positionId: id, deletedAt: null },
     });
-    if (employees > 0)
-      throw new ConflictException(`Position is assigned to ${employees} employee(s)`);
+    if (employees > 0) {
+      throw new ConflictException(`Position has ${employees} employee(s); reassign them first`);
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.position.update({
         where: { id },
