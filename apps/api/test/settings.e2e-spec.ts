@@ -56,6 +56,8 @@ describe('Attendance policy settings (e2e)', () => {
     ['out of range', { lateToleranceMinutes: 9999 }],
     ['wrong type', { autoDeductUnpunchedBreak: 'yes' }],
     ['unknown option', { overtimeBasis: 'WHATEVER' }],
+    // A typo must not answer 200 while changing nothing.
+    ['misspelled', { lateTolerance: 10 }],
   ])('rejects a policy with a %s value naming the field', async (_case, patch) => {
     const res = await http()
       .patch('/api/settings/attendance-policy')

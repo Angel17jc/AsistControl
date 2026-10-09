@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { z } from 'zod';
 import {
   type AttendancePolicy,
   DEFAULT_ATTENDANCE_POLICY,
@@ -42,17 +43,16 @@ export class SettingsService {
   }
 
   async updateAttendancePolicy(
-    patch: Partial<AttendancePolicy>,
+    patch: unknown,
     actor: AuthenticatedUser,
     context: RequestContext,
   ): Promise<AttendancePolicy> {
+    // Strict: a misspelled rule must fail, not answer 200 while changing nothing.
+    const checked = attendancePolicySchema.partial().strict().safeParse(patch);
+    if (!checked.success) throw new BadRequestException(issues(checked.error));
     const current = await this.getAttendancePolicy();
-    const parsed = attendancePolicySchema.safeParse({ ...current, ...patch });
-    if (!parsed.success) {
-      throw new BadRequestException(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-      );
-    }
+    const parsed = attendancePolicySchema.safeParse({ ...current, ...checked.data });
+    if (!parsed.success) throw new BadRequestException(issues(parsed.error));
     await this.prisma.$transaction(async (tx) => {
       await this.upsert(tx, POLICY_KEY, parsed.data, actor.id);
       await this.audit.record(
@@ -100,4 +100,12 @@ export class SettingsService {
       update: { value: json, updatedById: actorId },
     });
   }
+}
+
+function issues(error: z.ZodError): string[] {
+  return error.issues.map((i) =>
+    i.code === 'unrecognized_keys'
+      ? `unknown setting(s): ${i.keys.join(', ')}`
+      : `${i.path.join('.')}: ${i.message}`,
+  );
 }
