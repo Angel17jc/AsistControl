@@ -196,6 +196,14 @@ export interface NamedRef {
   name: string;
 }
 
+/** GET /positions; a department (GET /departments) also has a short code. */
+export interface CatalogRow extends NamedRef {
+  code?: string;
+  description: string | null;
+  /** People who belong to it; while any do, it cannot be deleted. */
+  _count: { employees: number };
+}
+
 export interface WorkShiftRow {
   id: string;
   name: string;

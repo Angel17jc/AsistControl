@@ -2,6 +2,7 @@ import type { Permission } from '@asistcontrol/shared';
 import clsx from 'clsx';
 import {
   Briefcase,
+  Building2,
   CalendarCheck,
   CalendarClock,
   ClipboardList,
@@ -26,6 +27,12 @@ const NAV: { to: string; label: string; icon: typeof Users; permission: Permissi
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
   { to: '/asistencia', label: 'Asistencia', icon: CalendarCheck, permission: 'attendance:read' },
   { to: '/empleados', label: 'Empleados', icon: Users, permission: 'employees:read' },
+  {
+    to: '/organizacion',
+    label: 'Organización',
+    icon: Building2,
+    permission: 'organization:read',
+  },
   { to: '/horarios', label: 'Horarios', icon: CalendarClock, permission: 'schedules:read' },
   { to: '/contratos', label: 'Contratos', icon: Briefcase, permission: 'organization:read' },
   { to: '/dispositivos', label: 'Dispositivos', icon: Cpu, permission: 'devices:read' },

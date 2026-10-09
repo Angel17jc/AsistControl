@@ -98,6 +98,10 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['employees'] }),
         queryClient.invalidateQueries({ queryKey: ['vacation-balance'] }),
+        // Their lists show how many people each one has.
+        queryClient.invalidateQueries({ queryKey: ['departments'] }),
+        queryClient.invalidateQueries({ queryKey: ['positions'] }),
+        queryClient.invalidateQueries({ queryKey: ['contract-types'] }),
       ]);
       onDone();
     },
