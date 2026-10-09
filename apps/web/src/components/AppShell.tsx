@@ -12,9 +12,10 @@ import {
   LogOut,
   ScrollText,
   UserCog,
+  UserRound,
   Users,
 } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
 import { ROLE_LABEL } from '../lib/accounts';
 import { logout } from '../lib/api';
 import { type ConnectionState, useRealtime } from '../lib/realtime';
@@ -46,6 +47,9 @@ export function AppShell() {
           <Fingerprint className="size-6 text-[#86b6ef]" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">AsistControl</span>
           <NotificationBell className="ml-auto" />
+          <Link to="/mi-cuenta" className="lg:hidden" aria-label="Mi cuenta">
+            <UserRound className="size-4" aria-hidden />
+          </Link>
           <button onClick={() => void logout()} className="lg:hidden" aria-label="Cerrar sesión">
             <LogOut className="size-4" aria-hidden />
           </button>
@@ -77,12 +81,17 @@ export function AppShell() {
           <ConnectionIndicator state={connection} />
           <p className="mt-3 truncate font-medium text-white">{user?.displayName}</p>
           <p className="text-sidebar-ink/80">{user ? ROLE_LABEL[user.role] : ''}</p>
-          <button
-            onClick={() => void logout()}
-            className="mt-3 inline-flex items-center gap-1.5 hover:text-white"
-          >
-            <LogOut className="size-3.5" aria-hidden /> Cerrar sesión
-          </button>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+            <Link to="/mi-cuenta" className="inline-flex items-center gap-1.5 hover:text-white">
+              <UserRound className="size-3.5" aria-hidden /> Mi cuenta
+            </Link>
+            <button
+              onClick={() => void logout()}
+              className="inline-flex items-center gap-1.5 hover:text-white"
+            >
+              <LogOut className="size-3.5" aria-hidden /> Cerrar sesión
+            </button>
+          </div>
         </div>
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 lg:py-8">

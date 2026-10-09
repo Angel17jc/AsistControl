@@ -12,6 +12,7 @@ test('el panel es usable en un teléfono', async ({ page }) => {
   const nav = page.getByRole('navigation', { name: 'Principal' });
   await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cerrar sesión' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Mi cuenta' }).first()).toBeVisible();
 
   // Tables scroll inside their card; the page itself must not scroll sideways.
   const overflow = () =>

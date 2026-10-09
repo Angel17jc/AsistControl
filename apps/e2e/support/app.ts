@@ -124,6 +124,13 @@ export class ApiClient {
     return { id: employee.id, name: `Prueba ${lastName}` };
   }
 
+  /** An HR account of its own, so a test may change its password without touching the seed. */
+  async createAccount(label: string, password: string): Promise<{ email: string }> {
+    const email = `${label}-${Date.now().toString().slice(-6)}@e2e.local`;
+    await this.send('post', '/users', { email, password, role: 'HR' });
+    return { email };
+  }
+
   /** A punch registered by hand, the way an operator corrects a missing one. */
   async manualPunch(): Promise<void> {
     const employees = await this.send<{ data: { id: string }[] }>('get', '/employees?pageSize=1');
