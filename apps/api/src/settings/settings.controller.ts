@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { AttendancePolicy } from '../attendance/domain/attendance-policy';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
 import { SettingsService } from './settings.service';
@@ -31,7 +30,7 @@ export class SettingsController {
     },
   })
   update(
-    @Body() body: Partial<AttendancePolicy>,
+    @Body() body: unknown,
     @CurrentUser() user: AuthenticatedUser,
     @ReqContext() ctx: RequestContext,
   ) {
