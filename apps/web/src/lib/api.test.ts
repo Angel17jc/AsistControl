@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../stores/auth';
-import { ApiError, api, buildUrl, refreshSession } from './api';
+import { ApiError, api, buildUrl, login, logout, refreshSession } from './api';
 
 const session = {
   accessToken: 'new-token',
@@ -53,6 +53,30 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(json(401, {})).mockResolvedValueOnce(json(401, {}));
     await expect(api('/employees')).rejects.toBeInstanceOf(ApiError);
     expect(useAuth.getState().status).toBe('anonymous');
+  });
+
+  it('signs out on the server even after the access token expired', async () => {
+    // Otherwise the refresh cookie survives and reloading the page signs the user back in.
+    fetchMock
+      .mockResolvedValueOnce(json(401, { message: 'expired' }))
+      .mockResolvedValueOnce(json(200, session))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await logout();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/auth/logout',
+      '/api/auth/refresh',
+      '/api/auth/logout',
+    ]);
+    expect((fetchMock.mock.calls[2]![1]!.headers as Record<string, string>).Authorization).toBe(
+      'Bearer new-token',
+    );
+    expect(useAuth.getState().status).toBe('anonymous');
+  });
+
+  it('does not refresh when a login is rejected: the credentials are wrong', async () => {
+    fetchMock.mockResolvedValueOnce(json(401, { message: 'Invalid email or password' }));
+    await expect(login('a@b.c', 'nope')).rejects.toThrow('Invalid email or password');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('exposes validation messages from the error contract', async () => {

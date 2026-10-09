@@ -68,9 +68,15 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   });
 }
 
+/**
+ * A 401 from these means wrong credentials or a dead refresh token, not an expired access
+ * token: refreshing would not help. Every other route, logout included, retries once.
+ */
+const NO_REFRESH_ON_401 = new Set(['/auth/login', '/auth/refresh']);
+
 async function withAuthRetry(path: string, options: RequestOptions): Promise<Response> {
   let res = await send(path, options);
-  if (res.status === 401 && !path.startsWith('/auth/')) {
+  if (res.status === 401 && !NO_REFRESH_ON_401.has(path)) {
     if (await refreshSession()) res = await send(path, options);
   }
   if (!res.ok) {
