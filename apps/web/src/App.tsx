@@ -19,6 +19,9 @@ const AccountPage = lazy(() =>
   import('./pages/AccountPage').then((m) => ({ default: m.AccountPage })),
 );
 const AuditPage = lazy(() => import('./pages/AuditPage').then((m) => ({ default: m.AuditPage })));
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
 const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const SchedulesPage = lazy(() =>
   import('./pages/SchedulesPage').then((m) => ({ default: m.SchedulesPage })),
@@ -153,6 +156,14 @@ export function App() {
             element={
               <Guard permission="audit:read">
                 <AuditPage />
+              </Guard>
+            }
+          />
+          <Route
+            path="configuracion"
+            element={
+              <Guard permission="settings:read">
+                <SettingsPage />
               </Guard>
             }
           />
