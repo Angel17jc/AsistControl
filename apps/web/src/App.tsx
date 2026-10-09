@@ -15,6 +15,9 @@ import { useAuth } from './stores/auth';
 const AttendancePage = lazy(() =>
   import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })),
 );
+const AccountPage = lazy(() =>
+  import('./pages/AccountPage').then((m) => ({ default: m.AccountPage })),
+);
 const AuditPage = lazy(() => import('./pages/AuditPage').then((m) => ({ default: m.AuditPage })));
 const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const SchedulesPage = lazy(() =>
@@ -68,6 +71,8 @@ export function App() {
           element={status === 'authenticated' ? <AppShell /> : <Navigate to="/login" replace />}
         >
           <Route index element={<Home />} />
+          {/* Every signed-in person manages their own account: no permission needed. */}
+          <Route path="mi-cuenta" element={<AccountPage />} />
           <Route
             path="asistencia"
             element={

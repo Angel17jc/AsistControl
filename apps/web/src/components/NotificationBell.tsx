@@ -94,8 +94,9 @@ export function NotificationBell({ className }: { className?: string }) {
           id={panelId}
           role="dialog"
           aria-label="Notificaciones"
-          // On phones the bell sits at the right edge; in the sidebar, at the left.
-          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-line bg-surface-1 text-ink-1 shadow-lg lg:left-0 lg:right-auto"
+          // Phones: pinned to the screen edges, wherever the header icons leave the bell.
+          // Wider screens: under the bell, opening leftwards (top bar) or rightwards (sidebar).
+          className="fixed inset-x-4 top-16 z-50 overflow-hidden rounded-xl border border-line bg-surface-1 text-ink-1 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem] lg:left-0 lg:right-auto"
         >
           <header className="flex items-center justify-between border-b border-line px-4 py-3">
             <h2 className="text-sm font-semibold">Notificaciones</h2>
