@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
 import type { AuthSession, AuthUser } from '@asistcontrol/shared';
@@ -142,6 +148,62 @@ export class AuthService {
       entity: 'Session',
       entityId: user.sessionId,
       context: ctx,
+    });
+  }
+
+  /**
+   * Changing a password proves the current one first: a stolen access token alone must not
+   * be enough to lock the owner out. Every other session ends (wherever the old password was
+   * used); the one making the change stays signed in.
+   */
+  async changePassword(
+    actor: AuthenticatedUser,
+    currentPassword: string,
+    newPassword: string,
+    ctx: RequestContext,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: actor.id } });
+    if (!user?.isActive) throw new UnauthorizedException('Session expired');
+
+    if (!(await this.passwords.verify(user.passwordHash, currentPassword))) {
+      this.audit.recordAsync({
+        actorId: user.id,
+        action: 'auth.password_change_failed',
+        entity: 'User',
+        entityId: user.id,
+        context: ctx,
+      });
+      throw new ForbiddenException('Current password is incorrect');
+    }
+    if (await this.passwords.verify(user.passwordHash, newPassword)) {
+      throw new BadRequestException('The new password must be different from the current one');
+    }
+
+    const passwordHash = await this.passwords.hash(newPassword);
+    await this.prisma.$transaction(async (tx) => {
+      // Compare-and-set: a concurrent change already replaced the hash this request verified.
+      const changed = await tx.user.updateMany({
+        where: { id: user.id, passwordHash: user.passwordHash },
+        data: { passwordHash },
+      });
+      if (changed.count === 0) {
+        throw new ConflictException('The password was changed meanwhile; sign in again');
+      }
+      const revoked = await tx.session.updateMany({
+        where: { userId: user.id, id: { not: actor.sessionId }, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.audit.record(
+        {
+          actorId: user.id,
+          action: 'auth.password_changed',
+          entity: 'User',
+          entityId: user.id,
+          context: ctx,
+          metadata: { otherSessionsRevoked: revoked.count },
+        },
+        tx,
+      );
     });
   }
 

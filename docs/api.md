@@ -20,12 +20,13 @@ sequenceDiagram
   B->>A: POST /api/auth/logout
 ```
 
-| Endpoint             | Descripción                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `POST /auth/login`   | Máx. 5 intentos/min por IP. Mensaje idéntico para usuario inexistente, contraseña errónea o cuenta inactiva. |
-| `POST /auth/refresh` | Rota la cookie.                                                                                              |
-| `POST /auth/logout`  | Revoca la sesión actual.                                                                                     |
-| `GET /auth/me`       | Perfil.                                                                                                      |
+| Endpoint                     | Descripción                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /auth/login`           | Máx. 5 intentos/min por IP. Mensaje idéntico para usuario inexistente, contraseña errónea o cuenta inactiva.                                                                                                                                                                                                       |
+| `POST /auth/refresh`         | Rota la cookie.                                                                                                                                                                                                                                                                                                    |
+| `POST /auth/logout`          | Revoca la sesión actual.                                                                                                                                                                                                                                                                                           |
+| `POST /auth/change-password` | `{ currentPassword, newPassword }` → 204. Máx. 5/min por IP. Contraseña actual errónea: **403** (no 401, que el cliente leería como sesión caducada); nueva débil o igual a la actual: 400. Revoca las **demás** sesiones y conserva la actual. Auditado (`auth.password_changed`, `auth.password_change_failed`). |
+| `GET /auth/me`               | Perfil.                                                                                                                                                                                                                                                                                                            |
 
 ## Autorización
 
