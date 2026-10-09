@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { forEachLimit } from '../common/utils/concurrency';
 import { addDays, eachDate, fromDbDate, localDateOf, toDbDate } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -17,6 +18,11 @@ interface EmployeeRef {
 
 const EMPLOYEE_REF = { id: true, supervisorId: true, hireDate: true, terminatedAt: true } as const;
 const FINALIZER_LOOKBACK_DAYS = 7;
+/**
+ * Employees recomputed at once in a range. Each day takes up to two pool connections, and a
+ * small server's pool has about five: more would starve the requests of everyone else.
+ */
+const RANGE_CONCURRENCY = 3;
 
 /**
  * Application service that turns AttendanceEvents into AttendanceRecords.
@@ -84,13 +90,16 @@ export class AttendanceProcessingService {
       params.to,
     );
     let recomputed = 0;
-    for (const employee of employees) {
+    // Employees are independent of each other; one employee's days go in order.
+    await forEachLimit(employees, RANGE_CONCURRENCY, async (employee) => {
       for (const date of eachDate(params.from, params.to)) {
         if (!isEmployed(employee, date)) continue;
-        await this.recomputeWith(calendar, employee, date);
+        // Not announced: one event per person and day would flood every open dashboard,
+        // and dashboards refresh on their own every minute.
+        await this.recomputeWith(calendar, employee, date, { announce: false });
         recomputed++;
       }
-    }
+    });
     return { recomputed };
   }
 
@@ -144,7 +153,12 @@ export class AttendanceProcessingService {
 
   // ───────────────────────────────────────────────────────── internals
 
-  private async recomputeWith(calendar: WorkCalendar, employee: EmployeeRef, workDate: string) {
+  private async recomputeWith(
+    calendar: WorkCalendar,
+    employee: EmployeeRef,
+    workDate: string,
+    { announce = true }: { announce?: boolean } = {},
+  ) {
     const day = calendar.dayFor(employee.id, workDate);
     const [events, leaves] = await Promise.all([
       this.prisma.attendanceEvent.findMany({
@@ -194,6 +208,7 @@ export class AttendanceProcessingService {
       return saved;
     });
 
+    if (!announce) return record;
     this.realtime.attendanceRecordUpdated(
       {
         employeeId: employee.id,
