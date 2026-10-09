@@ -1,6 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -13,6 +16,7 @@ import type { AuthenticatedUser, RequestContext } from '../common/auth/authentic
 import { CurrentUser, Public, ReqContext } from '../common/decorators';
 import { AppConfigService } from '../config/app-config.service';
 import { AuthService, type IssuedSession } from './auth.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 
 export const REFRESH_COOKIE = 'ac_refresh';
@@ -75,6 +79,27 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logout(user, ctx);
     res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  // Proving the current password is a login: same brute-force limit.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change your own password',
+    description:
+      'Requires the current password. Every other session of the account is revoked; this one stays.',
+  })
+  @ApiNoContentResponse({ description: 'Password changed' })
+  @ApiForbiddenResponse({ description: 'The current password is wrong' })
+  @ApiBadRequestResponse({ description: 'The new password is weak or equal to the current one' })
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ): Promise<void> {
+    return this.auth.changePassword(user, dto.currentPassword, dto.newPassword, ctx);
   }
 
   @Get('me')
