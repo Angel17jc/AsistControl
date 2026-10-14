@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "@asistcontrol/biometric-core": "0.1.0",
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.64.0"
   }
 }
