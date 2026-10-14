@@ -42,7 +42,7 @@
     "luxon": "^3.7.0",
     "nestjs-pino": "^5.2.0",
     "nodemailer": "^10.0.10",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "prisma": "~6.19.0",
     "reflect-metadata": "^0.2.2",
