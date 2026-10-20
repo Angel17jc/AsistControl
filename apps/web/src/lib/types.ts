@@ -75,6 +75,8 @@ export interface UserRow {
   isActive: boolean;
   employeeId: string | null;
   lastLoginAt: string | null;
+  /** An administrator chose the password; its owner must replace it when signing in. */
+  mustChangePassword: boolean;
   createdAt: string;
   employee: { id: string; firstName: string; lastName: string; employeeCode: string } | null;
 }

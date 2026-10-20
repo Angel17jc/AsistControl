@@ -184,7 +184,7 @@ export class AuthService {
       // Compare-and-set: a concurrent change already replaced the hash this request verified.
       const changed = await tx.user.updateMany({
         where: { id: user.id, passwordHash: user.passwordHash },
-        data: { passwordHash },
+        data: { passwordHash, mustChangePassword: false },
       });
       if (changed.count === 0) {
         throw new ConflictException('The password was changed meanwhile; sign in again');
@@ -224,6 +224,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       eid: user.employeeId,
+      ...(user.mustChangePassword ? { pwc: true as const } : {}),
       typ: 'access',
     };
     const refresh: RefreshTokenPayload = { sub: user.id, sid: sessionId, typ: 'refresh' };
@@ -260,6 +261,7 @@ function toAuthUser(user: User, name: string): AuthUser {
     role: user.role,
     employeeId: user.employeeId,
     displayName: name,
+    mustChangePassword: user.mustChangePassword,
   };
 }
 

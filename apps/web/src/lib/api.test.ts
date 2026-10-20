@@ -5,7 +5,14 @@ import { ApiError, api, buildUrl, login, logout, refreshSession } from './api';
 const session = {
   accessToken: 'new-token',
   expiresIn: 900,
-  user: { id: 'u1', email: 'a@b.c', role: 'HR' as const, employeeId: null, displayName: 'HR' },
+  user: {
+    id: 'u1',
+    email: 'a@b.c',
+    role: 'HR' as const,
+    employeeId: null,
+    displayName: 'HR',
+    mustChangePassword: false,
+  },
 };
 
 const json = (status: number, body: unknown) =>

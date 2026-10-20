@@ -43,7 +43,14 @@ function renderPage(role: 'HR' | 'SUPERVISOR' = 'HR') {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
-    user: { id: 'u1', email: 'hr@e.local', role, employeeId: null, displayName: 'RRHH' },
+    user: {
+      id: 'u1',
+      email: 'hr@e.local',
+      role,
+      employeeId: null,
+      displayName: 'RRHH',
+      mustChangePassword: false,
+    },
   });
   fetchMock.mockImplementation(async (input, init) => {
     if (init?.method && init.method !== 'GET') return Response.json({ id: 'new' });

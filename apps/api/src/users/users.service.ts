@@ -21,6 +21,7 @@ const PUBLIC_USER = {
   isActive: true,
   employeeId: true,
   lastLoginAt: true,
+  mustChangePassword: true,
   createdAt: true,
   updatedAt: true,
   employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
@@ -63,7 +64,14 @@ export class UsersService {
     const passwordHash = await this.passwords.hash(dto.password);
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: dto.email, passwordHash, role: dto.role, employeeId: dto.employeeId },
+        // The administrator chose this password: its owner replaces it when signing in.
+        data: {
+          email: dto.email,
+          passwordHash,
+          role: dto.role,
+          employeeId: dto.employeeId,
+          mustChangePassword: true,
+        },
         select: PUBLIC_USER,
       });
       await this.audit.record(
@@ -137,7 +145,11 @@ export class UsersService {
     assertCanGrant(actor, target.role);
     const passwordHash = await this.passwords.hash(password);
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id }, data: { passwordHash } });
+      // Someone else now knows it: the owner must replace it. Resetting your own is just a change.
+      await tx.user.update({
+        where: { id },
+        data: { passwordHash, mustChangePassword: id !== actor.id },
+      });
       // Force re-login everywhere after a password reset.
       await tx.session.updateMany({
         where: { userId: id, revokedAt: null },

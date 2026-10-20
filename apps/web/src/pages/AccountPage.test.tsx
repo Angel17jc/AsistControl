@@ -19,6 +19,7 @@ function renderPage(answer: Response = new Response(null, { status: 204 })) {
       role: 'EMPLOYEE',
       employeeId: 'e1',
       displayName: 'Ana Ruiz',
+      mustChangePassword: false,
     },
   });
   fetchMock.mockResolvedValue(answer);

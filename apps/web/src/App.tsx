@@ -5,6 +5,7 @@ import { AppShell } from './components/AppShell';
 import { Spinner } from './components/ui';
 import { refreshSession } from './lib/api';
 import { LoginPage } from './pages/LoginPage';
+import { PasswordChangeRequiredPage } from './pages/PasswordChangeRequiredPage';
 import { useAuth } from './stores/auth';
 
 /**
@@ -61,6 +62,7 @@ function Home() {
 
 export function App() {
   const status = useAuth((s) => s.status);
+  const mustChangePassword = useAuth((s) => s.user?.mustChangePassword ?? false);
 
   // Restore the session from the httpOnly refresh cookie on first load.
   useEffect(() => {
@@ -74,7 +76,16 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
-          element={status === 'authenticated' ? <AppShell /> : <Navigate to="/login" replace />}
+          element={
+            status !== 'authenticated' ? (
+              <Navigate to="/login" replace />
+            ) : mustChangePassword ? (
+              // Every route waits behind it: the API answers nothing else until it is done.
+              <PasswordChangeRequiredPage />
+            ) : (
+              <AppShell />
+            )
+          }
         >
           <Route index element={<Home />} />
           {/* Every signed-in person manages their own account: no permission needed. */}

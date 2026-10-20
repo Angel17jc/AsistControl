@@ -49,7 +49,14 @@ function renderCard({ manage = true, history = HISTORY } = {}) {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
-    user: { id: 'u1', email: 'hr@e.local', role: 'HR', employeeId: null, displayName: 'RRHH' },
+    user: {
+      id: 'u1',
+      email: 'hr@e.local',
+      role: 'HR',
+      employeeId: null,
+      displayName: 'RRHH',
+      mustChangePassword: false,
+    },
   });
   fetchMock.mockImplementation(async (input, init) => {
     if (init?.method && init.method !== 'GET') return new Response(null, { status: 204 });
