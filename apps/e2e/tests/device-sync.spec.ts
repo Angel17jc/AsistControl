@@ -83,6 +83,8 @@ test.describe('Dispositivos y sincronización', () => {
     await page.getByLabel('Hasta').fill(workedDay);
 
     // ON_TIME: everybody arrived within tolerance, so their day comes out as "Presente".
+    // Filtered: the list is paginated, and other tests leave employees without a schedule.
+    await page.getByLabel('Estado').selectOption('PRESENT');
     const records = page.getByRole('row').filter({ hasText: 'Presente' });
     await expect(records.first()).toBeVisible();
 
