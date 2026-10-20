@@ -10,16 +10,32 @@ export const USERS = {
 
 export const PASSWORD = 'AsistControl2026';
 
+/** Submits the sign-in form, without assuming where it leads. */
+export async function logIn(page: Page, email: string, password: string): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'Ingresar' }).click();
+}
+
 /** Signs in through the form, like a person would, and waits for the app shell to be up. */
 export async function signIn(
   page: Page,
   user: { email: string },
   password: string = PASSWORD,
 ): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Correo electrónico').fill(user.email);
-  await page.getByLabel('Contraseña').fill(password);
-  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await logIn(page, user.email, password);
+  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+}
+
+/** The screen an account with an administrator-chosen password lands on: pick your own. */
+export async function chooseOwnPassword(page: Page, given: string, own: string): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Elija su contraseña' })).toBeVisible();
+  const form = page.getByRole('form', { name: 'Cambiar contraseña' });
+  await form.getByLabel('Contraseña actual').fill(given);
+  await form.getByLabel('Nueva contraseña', { exact: true }).fill(own);
+  await form.getByLabel('Repita la nueva contraseña').fill(own);
+  await form.getByRole('button', { name: 'Cambiar contraseña' }).click();
   await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
 }
 
@@ -124,7 +140,10 @@ export class ApiClient {
     return { id: employee.id, name: `Prueba ${lastName}` };
   }
 
-  /** An HR account of its own, so a test may change its password without touching the seed. */
+  /**
+   * An HR account of its own, so a test may change its password without touching the seed.
+   * An administrator chose the password: the first sign-in asks for a new one.
+   */
   async createAccount(label: string, password: string): Promise<{ email: string }> {
     const email = `${label}-${Date.now().toString().slice(-6)}@e2e.local`;
     await this.send('post', '/users', { email, password, role: 'HR' });

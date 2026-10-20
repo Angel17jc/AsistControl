@@ -1,33 +1,37 @@
 import { expect, test } from '@playwright/test';
-import { ApiClient, USERS, signIn } from '../support/app';
+import { ApiClient, USERS, chooseOwnPassword, logIn, signIn } from '../support/app';
 
-const INITIAL = 'Clave-Inicial-2026';
+const GIVEN = 'Clave-Inicial-2026';
 const CHOSEN = 'Clave-Elegida-2026';
+const LATER = 'Clave-Posterior-2026';
 
 /**
- * Someone who received an initial password replaces it with their own, and from then on
- * only the new one opens the account.
+ * Someone receives a password from an administrator. The first sign-in asks for their own
+ * before anything else; from then on only theirs opens the account, and they can change it
+ * again from My account.
  */
-test('una persona cambia la contraseña que le dieron por una propia', async ({ page, request }) => {
+test('una persona reemplaza la contraseña que le dieron y luego la cambia', async ({
+  page,
+  request,
+}) => {
   const admin = await ApiClient.signIn(request, USERS.admin.email);
-  const account = await admin.createAccount('propia', INITIAL);
+  const account = await admin.createAccount('propia', GIVEN);
 
-  await signIn(page, account, INITIAL);
-  await page.getByRole('link', { name: 'Mi cuenta' }).click();
-  await expect(page.getByRole('heading', { name: 'Mi cuenta' })).toBeVisible();
+  await logIn(page, account.email, GIVEN);
+  await chooseOwnPassword(page, GIVEN, CHOSEN);
 
-  const form = page.getByRole('form', { name: 'Cambiar contraseña' });
-  await form.getByLabel('Contraseña actual').fill(INITIAL);
-  await form.getByLabel('Nueva contraseña', { exact: true }).fill(CHOSEN);
-  await form.getByLabel('Repita la nueva contraseña').fill(CHOSEN);
-  await form.getByRole('button', { name: 'Cambiar contraseña' }).click();
-  await expect(form.getByRole('status')).toContainText('Contraseña cambiada');
-
+  // The given password no longer opens the account.
   await page.getByRole('button', { name: 'Cerrar sesión' }).last().click();
-  await page.getByLabel('Correo electrónico').fill(account.email);
-  await page.getByLabel('Contraseña').fill(INITIAL);
-  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await logIn(page, account.email, GIVEN);
   await expect(page.getByRole('alert')).toBeVisible();
 
+  // Theirs does, straight into the app; and they can change it again whenever they want.
   await signIn(page, account, CHOSEN);
+  await page.getByRole('link', { name: 'Mi cuenta' }).click();
+  const form = page.getByRole('form', { name: 'Cambiar contraseña' });
+  await form.getByLabel('Contraseña actual').fill(CHOSEN);
+  await form.getByLabel('Nueva contraseña', { exact: true }).fill(LATER);
+  await form.getByLabel('Repita la nueva contraseña').fill(LATER);
+  await form.getByRole('button', { name: 'Cambiar contraseña' }).click();
+  await expect(form.getByRole('status')).toContainText('Contraseña cambiada');
 });

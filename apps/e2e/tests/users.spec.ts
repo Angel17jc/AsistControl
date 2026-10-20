@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ApiClient, USERS, signIn } from '../support/app';
+import { ApiClient, USERS, chooseOwnPassword, logIn, signIn } from '../support/app';
 
 /**
  * The reason the Users page exists: an administrator gives a new hire an account, and that
@@ -33,9 +33,12 @@ test('un administrador crea la cuenta de un empleado y esa persona puede entrar'
   await expect(row).toContainText(employee.name);
   await expect(row).toContainText('Activa');
 
-  // The new account works: its owner signs in and lands on their own attendance.
+  await expect(row).toContainText('Contraseña temporal');
+
+  // The new account works: its owner replaces the given password and lands on their attendance.
   await page.getByRole('button', { name: 'Cerrar sesión' }).last().click();
-  await signIn(page, { email }, password);
+  await logIn(page, email, password);
+  await chooseOwnPassword(page, password, 'Clave-De-Ana-2026');
   await expect(page).toHaveURL(/\/asistencia$/);
   await expect(
     page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Usuarios' }),

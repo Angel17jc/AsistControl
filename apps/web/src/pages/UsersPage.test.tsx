@@ -15,6 +15,7 @@ const account = (over: Partial<UserRow>): UserRow => ({
   isActive: true,
   employeeId: null,
   lastLoginAt: null,
+  mustChangePassword: false,
   createdAt: '2026-09-01T00:00:00Z',
   employee: null,
   ...over,
@@ -23,7 +24,7 @@ const account = (over: Partial<UserRow>): UserRow => ({
 const USERS: UserRow[] = [
   account({ id: 'u-me', email: 'yo@e.local', role: 'SUPER_ADMIN' }),
   account({ id: 'u-admin', email: 'admin@e.local', role: 'ADMIN' }),
-  account({ id: 'u-hr', email: 'rrhh@e.local', role: 'HR' }),
+  account({ id: 'u-hr', email: 'rrhh@e.local', role: 'HR', mustChangePassword: true }),
   account({
     id: 'u-emp',
     email: 'ana@e.local',
@@ -108,6 +109,8 @@ describe('UsersPage', () => {
     expect(within(ana).getByText('Ana Ruiz · EMP-1')).toBeVisible();
     expect(within(ana).getByText('Activa')).toBeVisible();
     expect(within(await rowOf('yo@e.local')).getByText('(usted)')).toBeVisible();
+    expect(within(await rowOf('rrhh@e.local')).getByText(/Contraseña temporal/)).toBeVisible();
+    expect(within(ana).queryByText(/Contraseña temporal/)).toBeNull();
   });
 
   it('creates an employee account linked to a person who has none yet', async () => {

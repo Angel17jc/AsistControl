@@ -104,7 +104,7 @@ export function AccountForm({
       {!account && (
         <Field
           label="Contraseña inicial"
-          hint={`${PASSWORD_HINT}. Compártala por un canal seguro.`}
+          hint={`${PASSWORD_HINT}. Compártala por un canal seguro; la persona elegirá una propia al entrar.`}
         >
           <div className="flex gap-2">
             <Input

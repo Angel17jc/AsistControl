@@ -183,6 +183,9 @@ function AccountRow({
         <StatusBadge tone={account.isActive ? 'good' : 'neutral'}>
           {account.isActive ? 'Activa' : 'Desactivada'}
         </StatusBadge>
+        {account.mustChangePassword && (
+          <p className="mt-1 text-xs text-ink-3">Contraseña temporal: la cambiará al entrar</p>
+        )}
       </Td>
       <Td className="text-ink-2">{relativeTime(account.lastLoginAt)}</Td>
       <Td>
@@ -283,7 +286,7 @@ function ResetPasswordForm({ account, onDone }: { account: UserRow; onDone: () =
     >
       <Field
         label={`Nueva contraseña para ${account.email}`}
-        hint={`${PASSWORD_HINT}. Se cierran sus sesiones abiertas.`}
+        hint={`${PASSWORD_HINT}. Se cierran sus sesiones abiertas y deberá cambiarla al entrar.`}
       >
         <div className="flex gap-2">
           <Input
@@ -314,7 +317,8 @@ function ResetPasswordForm({ account, onDone }: { account: UserRow; onDone: () =
       </div>
       {reset.isSuccess && (
         <p role="status" className="text-sm text-ink-1 sm:col-span-2">
-          Contraseña restablecida. Compártala con la persona por un canal seguro.
+          Contraseña restablecida. Compártala por un canal seguro: la persona elegirá una propia al
+          entrar.
         </p>
       )}
       {reset.error && (
