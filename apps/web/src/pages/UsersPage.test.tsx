@@ -50,7 +50,14 @@ function renderPage(role: 'SUPER_ADMIN' | 'ADMIN' = 'SUPER_ADMIN') {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
-    user: { id: 'u-me', email: 'yo@e.local', role, employeeId: null, displayName: 'Yo' },
+    user: {
+      id: 'u-me',
+      email: 'yo@e.local',
+      role,
+      employeeId: null,
+      displayName: 'Yo',
+      mustChangePassword: false,
+    },
   });
   fetchMock.mockImplementation(async (input, init) => {
     if (init?.method && init.method !== 'GET') {

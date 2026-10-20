@@ -6,6 +6,8 @@ export interface AccessTokenPayload {
   email: string;
   role: Role;
   eid: string | null;
+  /** Present only while the password must be changed (see AuthUser.mustChangePassword). */
+  pwc?: true;
   typ: 'access';
 }
 

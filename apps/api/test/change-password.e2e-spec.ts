@@ -1,5 +1,8 @@
+import type { AddressInfo } from 'node:net';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
+import { REALTIME_NAMESPACE } from '@asistcontrol/shared';
+import { io } from 'socket.io-client';
 import request from 'supertest';
 import { hashPassword } from '../src/auth/password-hashing';
 import { PASSWORD, bearer, createApp, eventually } from './utils';
@@ -41,6 +44,8 @@ describe('Change own password (e2e)', () => {
 
   beforeAll(async () => {
     app = await createApp();
+    // A real port: the realtime gateway is part of what a pending password change closes.
+    await app.listen(0, '127.0.0.1');
     prisma = new PrismaClient();
   });
 
@@ -117,5 +122,88 @@ describe('Change own password (e2e)', () => {
     const me = await account();
     await prisma.user.update({ where: { id: me.id }, data: { isActive: false } });
     await change(me.token, { currentPassword: PASSWORD, newPassword: NEW_PASSWORD }).expect(401);
+  });
+
+  describe('a password an administrator chose', () => {
+    let admin: { id: string; token: string };
+
+    beforeAll(async () => {
+      const email = 'cpw-admin@e2e.local';
+      const user = await prisma.user.create({
+        data: { email, role: 'SUPER_ADMIN', passwordHash: await hashPassword(PASSWORD) },
+      });
+      admin = { id: user.id, token: (await signIn(email).expect(200)).body.accessToken };
+    });
+
+    /** An account the administrator creates with a password of their choosing. */
+    async function issued() {
+      const email = `cpw-issued-${++seq}@e2e.local`;
+      await http()
+        .post('/api/users')
+        .set(bearer(admin.token))
+        .send({ email, password: PASSWORD, role: 'HR' })
+        .expect(201);
+      const res = await signIn(email).expect(200);
+      return { email, res, token: res.body.accessToken as string, cookie: refreshCookieOf(res) };
+    }
+
+    it('must be replaced before the account can do anything else', async () => {
+      const { res, token, cookie } = await issued();
+      expect(res.body.user.mustChangePassword).toBe(true);
+
+      const blocked = await http().get('/api/employees').set(bearer(token)).expect(403);
+      expect(blocked.body.message).toBe('Password change required');
+      const me = await http().get('/api/auth/me').set(bearer(token)).expect(200);
+      expect(me.body.mustChangePassword).toBe(true);
+
+      await change(token, { currentPassword: PASSWORD, newPassword: NEW_PASSWORD }).expect(204);
+      // The token in hand still says "pending" (it is stateless): a refresh issues a clean one.
+      const renewed = await refresh(cookie).expect(200);
+      expect(renewed.body.user.mustChangePassword).toBe(false);
+      await http().get('/api/employees').set(bearer(renewed.body.accessToken)).expect(200);
+    });
+
+    it('still lets the owner sign out', async () => {
+      const { token, cookie } = await issued();
+      await http().post('/api/auth/logout').set(bearer(token)).expect(204);
+      await refresh(cookie).expect(401);
+    });
+
+    it('opens no realtime connection meanwhile', async () => {
+      const { token } = await issued();
+      const { port } = app.getHttpServer().address() as AddressInfo;
+      const socket = io(`http://127.0.0.1:${port}${REALTIME_NAMESPACE}`, {
+        auth: { token },
+        transports: ['websocket'],
+      });
+      try {
+        const reason = await new Promise<string>((resolve) => socket.once('disconnect', resolve));
+        expect(reason).toBe('io server disconnect');
+      } finally {
+        socket.disconnect();
+      }
+    });
+
+    it('is required again after a reset, unless administrators reset their own', async () => {
+      const me = await account();
+      const target = await prisma.user.findUniqueOrThrow({ where: { email: me.email } });
+      await http()
+        .post(`/api/users/${target.id}/reset-password`)
+        .set(bearer(admin.token))
+        .send({ password: NEW_PASSWORD })
+        .expect(204);
+      expect((await signIn(me.email, NEW_PASSWORD).expect(200)).body.user.mustChangePassword).toBe(
+        true,
+      );
+
+      await http()
+        .post(`/api/users/${admin.id}/reset-password`)
+        .set(bearer(admin.token))
+        .send({ password: NEW_PASSWORD })
+        .expect(204);
+      const own = await signIn('cpw-admin@e2e.local', NEW_PASSWORD).expect(200);
+      expect(own.body.user.mustChangePassword).toBe(false);
+      admin.token = own.body.accessToken;
+    });
   });
 });

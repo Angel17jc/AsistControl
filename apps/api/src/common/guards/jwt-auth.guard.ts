@@ -1,6 +1,7 @@
 import {
   type CanActivate,
   type ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -9,7 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { AppConfigService } from '../../config/app-config.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
-import { IS_PUBLIC_KEY } from '../decorators';
+import { ALLOW_PENDING_PASSWORD_KEY, IS_PUBLIC_KEY } from '../decorators';
 import type { AccessTokenPayload } from '../auth/token-payloads';
 
 /**
@@ -36,6 +37,15 @@ export class JwtAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Missing access token');
 
     request.user = await this.verify(token);
+
+    // An administrator chose this password: nothing else until the owner picks their own.
+    if (request.user.mustChangePassword) {
+      const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_PASSWORD_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (!allowed) throw new ForbiddenException(PASSWORD_CHANGE_REQUIRED);
+    }
     return true;
   }
 
@@ -51,12 +61,15 @@ export class JwtAuthGuard implements CanActivate {
         role: payload.role,
         employeeId: payload.eid,
         sessionId: payload.sid,
+        mustChangePassword: payload.pwc === true,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
   }
 }
+
+export const PASSWORD_CHANGE_REQUIRED = 'Password change required';
 
 export function extractBearer(header: string | undefined): string | null {
   if (!header) return null;

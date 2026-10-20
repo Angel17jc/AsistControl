@@ -13,7 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { AuthSession } from '@asistcontrol/shared';
 import type { CookieOptions, Request, Response } from 'express';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
-import { CurrentUser, Public, ReqContext } from '../common/decorators';
+import { AllowPendingPasswordChange, CurrentUser, Public, ReqContext } from '../common/decorators';
 import { AppConfigService } from '../config/app-config.service';
 import { AuthService, type IssuedSession } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -70,6 +70,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AllowPendingPasswordChange()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke the current session' })
   async logout(
@@ -83,13 +84,15 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AllowPendingPasswordChange()
   // Proving the current password is a login: same brute-force limit.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change your own password',
     description:
-      'Requires the current password. Every other session of the account is revoked; this one stays.',
+      'Requires the current password. Every other session of the account is revoked; this one stays. ' +
+      'Clears mustChangePassword: refresh the session afterwards to get a token without it.',
   })
   @ApiNoContentResponse({ description: 'Password changed' })
   @ApiForbiddenResponse({ description: 'The current password is wrong' })
@@ -103,6 +106,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowPendingPasswordChange()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Current user profile' })
   me(@CurrentUser() user: AuthenticatedUser) {

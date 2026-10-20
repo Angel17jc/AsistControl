@@ -23,7 +23,14 @@ function renderPage(
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
-    user: { id: 'u1', email: 'rrhh@e.local', role, employeeId: null, displayName: 'RRHH' },
+    user: {
+      id: 'u1',
+      email: 'rrhh@e.local',
+      role,
+      employeeId: null,
+      displayName: 'RRHH',
+      mustChangePassword: false,
+    },
   });
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);

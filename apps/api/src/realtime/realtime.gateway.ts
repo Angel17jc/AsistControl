@@ -51,6 +51,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
       const token = (client.handshake.auth as { token?: string } | undefined)?.token;
       if (!token) throw new Error('missing token');
       const user = await this.auth.verify(token);
+      // Same rule as HTTP: nothing streams until an administrator-chosen password is replaced.
+      if (user.mustChangePassword) throw new Error('password change required');
       client.data.user = user;
       await client.join(ROOMS.user(user.id));
 

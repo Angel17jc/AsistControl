@@ -21,6 +21,11 @@ export interface AuthUser {
   role: Role;
   employeeId: string | null;
   displayName: string;
+  /**
+   * An administrator chose this password (new account or reset). Until the owner picks their
+   * own, the API refuses everything except changing it, reading the profile and signing out.
+   */
+  mustChangePassword: boolean;
 }
 
 /**

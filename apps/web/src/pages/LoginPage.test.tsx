@@ -55,7 +55,14 @@ describe('LoginPage', () => {
         JSON.stringify({
           accessToken: 'tok',
           expiresIn: 900,
-          user: { id: '1', email: 'a@b.c', role: 'ADMIN', employeeId: null, displayName: 'Admin' },
+          user: {
+            id: '1',
+            email: 'a@b.c',
+            role: 'ADMIN',
+            employeeId: null,
+            displayName: 'Admin',
+            mustChangePassword: false,
+          },
         }),
         { status: 200 },
       ),

@@ -7,6 +7,8 @@ export interface AuthenticatedUser {
   role: Role;
   employeeId: string | null;
   sessionId: string;
+  /** While true, only routes marked @AllowPendingPasswordChange() answer. */
+  mustChangePassword: boolean;
 }
 
 /** Network context recorded in audit logs. */
