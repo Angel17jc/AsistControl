@@ -56,5 +56,6 @@ Comprobación: `npm audit --omit=dev` en el repositorio, y dentro de la imagen d
 - [ ] Si se usa correo: `SMTP_URL` en el gestor de secretos, con un usuario SMTP dedicado, y `APP_PUBLIC_URL` con la dirección HTTPS
 - [ ] Contraseña de PostgreSQL fuerte; puertos de PostgreSQL y de la API **no publicados** (solo la web): con la API alcanzable desde la red, un cliente podría mandar su propio `X-Forwarded-For`
 - [ ] Con un proxy o túnel delante de nginx, declararlo en `/etc/nginx/real-ip.d/` (ver Controles transversales)
+- [ ] Primer administrador creado con `docker compose exec api node dist/cli/create-admin.js --email …` (se niega si ya existe un super administrador activo; `--reset` recupera uno que perdió su contraseña; ambos quedan en la auditoría)
 - [ ] Backups automáticos de PostgreSQL y prueba de restauración
 - [ ] Rotación de logs / envío a un colector
