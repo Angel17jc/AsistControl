@@ -75,6 +75,16 @@ for _ in $(seq 90); do
       -d '{"email":"admin@asistcontrol.local","password":"AsistControl2026"}' \
       || { echo "demo login failed" >&2; docker logs "$API" >&2; exit 1; }
     echo "login: ok"
+    # The first-administrator command ships in this pruned image and reaches the database.
+    # The demo seed already made a super administrator, so it must refuse to make another.
+    if out=$(printf '%s' 'Smoke-Admin-2026' | docker exec -i "$API" \
+      node dist/cli/create-admin.js --email other@smoke.local --password-stdin 2>&1); then
+      echo "create-admin made a second super administrator: $out" >&2
+      exit 1
+    fi
+    grep -q "A super administrator already exists" <<<"$out" \
+      || { echo "create-admin failed: $out" >&2; exit 1; }
+    echo "create-admin: runs, refuses a second super administrator"
     exit 0
   fi
   sleep 2
