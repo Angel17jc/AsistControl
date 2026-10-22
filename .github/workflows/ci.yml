@@ -175,16 +175,21 @@ jobs:
             type=gha,scope=api
             type=gha,scope=api-runtime
           cache-to: type=gha,mode=max,scope=api-runtime
-      # Building proves the images compile; this proves they migrate, seed and serve.
-      - name: Smoke test API images
-        run: bash infra/docker/smoke-test.sh asistcontrol-api:smoke asistcontrol-migrate:smoke
-      - name: Report image sizes
-        run: docker image ls --format '{{.Repository}} {{.Size}}' | grep asistcontrol | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Build web image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/docker/web.Dockerfile
           push: false
+          load: true
+          tags: asistcontrol-web:smoke
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+      # Building proves the images compile; this proves they migrate, seed and serve, and that
+      # nginx in front of the API does not let a client forge its address.
+      - name: Smoke test images
+        run: >-
+          bash infra/docker/smoke-test.sh
+          asistcontrol-api:smoke asistcontrol-migrate:smoke asistcontrol-web:smoke
+      - name: Report image sizes
+        run: docker image ls --format '{{.Repository}} {{.Size}}' | grep asistcontrol | tee -a "$GITHUB_STEP_SUMMARY"
