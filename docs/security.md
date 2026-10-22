@@ -50,7 +50,8 @@ Comprobación: `npm audit --omit=dev` en el repositorio, y dentro de la imagen d
 
 - [ ] `NODE_ENV=production`, secretos generados (`JWT_*`, `DEVICE_SECRETS_KEY`) y guardados en un gestor de secretos
 - [ ] `COOKIE_SECURE=true` y TLS terminado en el proxy
-- [ ] `ENABLE_MOCK_DEVICES=false`, `SEED_DEMO_DATA=false`
+- [ ] `ENABLE_MOCK_DEVICES=false`, `SEED_DEMO_DATA=false` (en producción el migrador lo ignora igualmente, salvo `SEED_ALLOW_PRODUCTION=true`)
+- [ ] `APP_TIMEZONE` con la zona de la empresa: la API la usa también como reloj de las tareas diarias (07:00, 03:00)
 - [ ] Si se usa correo: `SMTP_URL` en el gestor de secretos, con un usuario SMTP dedicado, y `APP_PUBLIC_URL` con la dirección HTTPS
 - [ ] Contraseña de PostgreSQL fuerte; puerto 5432 no expuesto públicamente
 - [ ] Backups automáticos de PostgreSQL y prueba de restauración
