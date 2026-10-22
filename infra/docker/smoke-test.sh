@@ -46,7 +46,19 @@ ENV_ARGS=(
   -e JWT_REFRESH_SECRET=smoke-refresh-secret-0123456789abcdefghij
   -e DEVICE_SECRETS_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   -e SEED_DEMO_DATA=true
+  -e APP_TIMEZONE=America/Guayaquil
 )
+
+# Production with the compose default (SEED_DEMO_DATA=true) must migrate and skip the demo
+# seed: failing here would keep the API from ever starting.
+echo "== migrator (production, demo seed requested)"
+prod_out=$(docker run --rm --network "$NETWORK" "${ENV_ARGS[@]}" -e NODE_ENV=production \
+  "$MIGRATOR_IMAGE" 2>&1) || { echo "$prod_out" >&2; echo "migrator failed in production" >&2; exit 1; }
+grep -q "demo data NOT seeded" <<<"$prod_out" \
+  || { echo "$prod_out" >&2; echo "production did not skip the demo seed" >&2; exit 1; }
+seeded_users=$(docker exec "$DB" psql -U smoke -d smoke -tAc "select count(*) from users")
+[[ "$seeded_users" == "0" ]] || { echo "production seeded $seeded_users user(s)" >&2; exit 1; }
+echo "production: migrated, demo seed skipped"
 
 echo "== migrator"
 docker run --rm --network "$NETWORK" "${ENV_ARGS[@]}" "$MIGRATOR_IMAGE"
@@ -81,6 +93,10 @@ for _ in $(seq 90); do
       -d '{"email":"admin@asistcontrol.local","password":"AsistControl2026"}' \
       || { echo "demo login failed" >&2; docker logs "$API" >&2; exit 1; }
     echo "login: ok"
+    # Daily jobs ("07:00") follow the process clock: it must be the company's, not UTC.
+    docker logs "$API" 2>&1 | grep -q "Scheduled jobs run on America/Guayaquil time" \
+      || { echo "scheduled jobs do not run on the company's time zone" >&2; docker logs "$API" >&2; exit 1; }
+    echo "scheduled jobs: America/Guayaquil"
     healthy=1
     break
   fi

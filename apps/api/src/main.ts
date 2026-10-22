@@ -7,14 +7,32 @@ import { configureApp, setupSwagger } from './bootstrap';
 import { AppConfigService } from './config/app-config.service';
 
 async function bootstrap(): Promise<void> {
+  // "Every day at 07:00" follows the process clock, and a container's is UTC: the 07:00
+  // notice would arrive at 02:00 in Ecuador. Run on the company's clock instead. It must be
+  // set before Nest creates the scheduled jobs.
+  if (process.env.APP_TIMEZONE) process.env.TZ = process.env.APP_TIMEZONE;
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   configureApp(app);
   setupSwagger(app);
 
-  const port = app.get(AppConfigService).get('PORT');
+  const config = app.get(AppConfigService);
+  const port = config.get('PORT');
   await app.listen(port, '0.0.0.0');
-  app.get(Logger).log(`AsistControl API listening on :${port} — docs at /api/docs`);
+  const logger = app.get(Logger);
+  logger.log(`AsistControl API listening on :${port} — docs at /api/docs`);
+
+  const clock = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (clock === config.get('APP_TIMEZONE')) {
+    logger.log(`Scheduled jobs run on ${clock} time`);
+  } else {
+    // Only when APP_TIMEZONE came from a .env file, read after the jobs were created.
+    logger.warn(
+      `Scheduled jobs run on ${clock} time, not ${config.get('APP_TIMEZONE')}: ` +
+        'set APP_TIMEZONE (or TZ) in the environment',
+    );
+  }
 }
 
 void bootstrap();
