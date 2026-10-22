@@ -23,6 +23,7 @@ No abras un issue público. Usa **GitHub → Security → Report a vulnerability
 - **Validación estricta**: `whitelist` + `forbidNonWhitelisted`; campos desconocidos → 400 (evita mass assignment de `role`, etc.).
 - **Errores sin filtraciones**: filtro global; los 500 no exponen stack, SQL ni rutas; `requestId` para correlación.
 - **Cabeceras**: `helmet` en la API; nginx añade `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`; `server_tokens off`.
+- **IP real del cliente**: el límite de intentos de login (5/min por IP) y la auditoría dependen de ella. nginx es el borde: **reemplaza** `X-Forwarded-For` con `$remote_addr` (nunca añade lo que mande el cliente), y la API confía en los proxies de red privada. Si hay otro proxy o un túnel delante de nginx, se declara en un archivo de `/etc/nginx/real-ip.d/` (montado como volumen) para que `$remote_addr` sea el cliente real; p. ej. con Cloudflare Tunnel: `set_real_ip_from <red del contenedor cloudflared>;` y `real_ip_header CF-Connecting-IP;`. La prueba de humo de Docker (`infra/docker/smoke-test.sh`) intenta el ataque a través de nginx y falla si no aparece el 429.
 - **CORS** restringido a `CORS_ORIGINS`; en Docker el navegador usa un único origen (nginx proxy), por lo que la cookie `SameSite=Strict` no necesita CORS.
 - **Privilegios**: solo `SUPER_ADMIN` crea/modifica administradores; nadie puede cambiarse su propio rol ni desactivarse.
 - **Contenedores**: imágenes multi-stage, la API corre como usuario `node`, sin dependencias de desarrollo.
@@ -52,6 +53,7 @@ Comprobación: `npm audit --omit=dev` en el repositorio, y dentro de la imagen d
 - [ ] `COOKIE_SECURE=true` y TLS terminado en el proxy
 - [ ] `ENABLE_MOCK_DEVICES=false`, `SEED_DEMO_DATA=false`
 - [ ] Si se usa correo: `SMTP_URL` en el gestor de secretos, con un usuario SMTP dedicado, y `APP_PUBLIC_URL` con la dirección HTTPS
-- [ ] Contraseña de PostgreSQL fuerte; puerto 5432 no expuesto públicamente
+- [ ] Contraseña de PostgreSQL fuerte; puertos de PostgreSQL y de la API **no publicados** (solo la web): con la API alcanzable desde la red, un cliente podría mandar su propio `X-Forwarded-For`
+- [ ] Con un proxy o túnel delante de nginx, declararlo en `/etc/nginx/real-ip.d/` (ver Controles transversales)
 - [ ] Backups automáticos de PostgreSQL y prueba de restauración
 - [ ] Rotación de logs / envío a un colector
