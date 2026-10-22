@@ -158,6 +158,14 @@ docker compose down             # detener (conserva datos)
 
 Las imágenes son multi-stage: la de la API no contiene código fuente, dependencias de desarrollo, sourcemaps ni declaraciones de tipos de las dependencias, y corre como usuario sin privilegios.
 
+**Primer administrador.** En producción la base arranca sin cuentas (la demo no se siembra). Se crea el primero desde el servidor; pide la contraseña dos veces sin mostrarla y obliga a cambiarla al entrar:
+
+```bash
+docker compose exec api node dist/cli/create-admin.js --email admin@empresa.com
+```
+
+Solo funciona mientras no haya otro super administrador activo; después, las cuentas se gestionan desde la web. Si el único super administrador perdió su contraseña: añadir `--reset`. Para scripts: `--password-stdin`.
+
 Las migraciones son una **tarea aparte** ([ADR 0013](docs/adr/0013-migrations-as-a-job.md)): la imagen `migrator` las aplica y termina, y la imagen de la API no puede migrar. Fuera de Compose, ejecutar siempre el migrador antes de desplegar la API (en Kubernetes, un `Job` o un `initContainer`).
 
 La CI no solo construye las imágenes: las **arranca** contra un PostgreSQL desechable, primero el migrador y después la API, y espera a `/health`. Se puede repetir en local:
