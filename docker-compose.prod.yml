@@ -1,0 +1,123 @@
+# AsistControl — production stack (docs/deployment.md).
+#
+#   cp .env.production.example .env.production      # fill in every value, keep it secret
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production \
+#     exec api node dist/cli/create-admin.js --email admin@empresa.com
+#
+# What sets it apart from docker-compose.yml (the demo):
+# - no fallback for any secret: it refuses to start and names the missing one;
+# - production mode, no demo data, no device simulator;
+# - only the web port is published: PostgreSQL and the API stay inside Docker's network, so
+#   nobody on the LAN can reach the database or send the API a forged X-Forwarded-For;
+# - bounded logs, so they cannot fill the disk;
+# - its own project name, so it never shares containers or the data volume with the demo.
+
+name: asistcontrol-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '5'
+
+x-api-env: &api-env
+  NODE_ENV: production
+  PORT: 3000
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_FORMAT: json
+  # The password goes inside a URL: use letters, digits, - and _ only (the example shows how).
+  DATABASE_URL: postgresql://asistcontrol:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/asistcontrol?schema=public
+  CORS_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL, the address people open, e.g. https://asistencia.empresa.com}
+  APP_PUBLIC_URL: ${PUBLIC_URL}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+  DEVICE_SECRETS_KEY: ${DEVICE_SECRETS_KEY:?set DEVICE_SECRETS_KEY, and keep a copy apart from the backups}
+  # true behind HTTPS. Over plain HTTP the browser drops a Secure cookie and nobody stays
+  # signed in: only a closed LAN without HTTPS may use false.
+  COOKIE_SECURE: ${COOKIE_SECURE:?set COOKIE_SECURE to true (HTTPS) or false (plain HTTP on a closed LAN)}
+  APP_TIMEZONE: ${APP_TIMEZONE:?set APP_TIMEZONE, the company time zone, e.g. America/Guayaquil}
+  DEVICE_SYNC_INTERVAL_SECONDS: ${DEVICE_SYNC_INTERVAL_SECONDS:-300}
+  ENABLE_MOCK_DEVICES: 'false'
+  SEED_DEMO_DATA: 'false'
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+  # Email notifications stay off unless SMTP_URL is set (docs/adr/0011-email-notifications.md).
+  SMTP_URL: ${SMTP_URL:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: asistcontrol
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: asistcontrol
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U asistcontrol -d asistcontrol']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot job: applies pending migrations, then exits (ADR 0013). Runs on every `up`.
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: migrator
+    image: asistcontrol/migrate:${VERSION:-local}
+    restart: 'no'
+    logging: *logging
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    image: asistcontrol/api:${VERSION:-local}
+    restart: unless-stopped
+    logging: *logging
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    image: asistcontrol/web:${VERSION:-local}
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '${HTTP_PORT:-80}:80'
+    volumes:
+      # Proxies or tunnels in front of nginx (see the example inside and docs/security.md).
+      - ./infra/docker/real-ip.d:/etc/nginx/real-ip.d:ro
+
+volumes:
+  pgdata:

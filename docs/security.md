@@ -57,5 +57,7 @@ Comprobación: `npm audit --omit=dev` en el repositorio, y dentro de la imagen d
 - [ ] Contraseña de PostgreSQL fuerte; puertos de PostgreSQL y de la API **no publicados** (solo la web): con la API alcanzable desde la red, un cliente podría mandar su propio `X-Forwarded-For`
 - [ ] Con un proxy o túnel delante de nginx, declararlo en `/etc/nginx/real-ip.d/` (ver Controles transversales)
 - [ ] Primer administrador creado con `docker compose exec api node dist/cli/create-admin.js --email …` (se niega si ya existe un super administrador activo; `--reset` recupera uno que perdió su contraseña; ambos quedan en la auditoría)
-- [ ] Backups automáticos de PostgreSQL y prueba de restauración
-- [ ] Rotación de logs / envío a un colector
+- [ ] Backups automáticos de PostgreSQL y prueba de restauración (`infra/scripts/backup.sh` hace ambas en cada ejecución) copiados fuera del servidor
+- [ ] Rotación de logs / envío a un colector (`docker-compose.prod.yml` ya limita cada contenedor a 5 × 10 MB)
+- [ ] Swagger (`/api/docs`) apagado en producción salvo que se active con `SWAGGER_ENABLED=true`
+- [ ] `.env.production` guardado en un gestor de contraseñas: sin `DEVICE_SECRETS_KEY` un respaldo restaurado no puede leer las credenciales de los marcadores

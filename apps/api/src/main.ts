@@ -15,13 +15,16 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   configureApp(app);
-  setupSwagger(app);
-
   const config = app.get(AppConfigService);
+  if (config.get('SWAGGER_ENABLED')) setupSwagger(app);
+
   const port = config.get('PORT');
   await app.listen(port, '0.0.0.0');
   const logger = app.get(Logger);
-  logger.log(`AsistControl API listening on :${port} — docs at /api/docs`);
+  logger.log(
+    `AsistControl API listening on :${port}` +
+      (config.get('SWAGGER_ENABLED') ? ' — docs at /api/docs' : ' (API docs off)'),
+  );
 
   const clock = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (clock === config.get('APP_TIMEZONE')) {

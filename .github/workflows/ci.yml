@@ -148,6 +148,22 @@ jobs:
     needs: quality
     steps:
       - uses: actions/checkout@v7
+      # With its settings the production stack must be valid; without a secret it must refuse.
+      - name: Validate the production compose file
+        env:
+          POSTGRES_PASSWORD: ci-password
+          PUBLIC_URL: https://asistencia.ci.local
+          JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdefghijklmnop
+          JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdefghijklmnop
+          DEVICE_SECRETS_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+          COOKIE_SECURE: 'true'
+          APP_TIMEZONE: America/Guayaquil
+        run: |
+          docker compose -f docker-compose.prod.yml config --quiet
+          if env -u JWT_ACCESS_SECRET docker compose -f docker-compose.prod.yml config --quiet 2>/dev/null; then
+            echo "docker-compose.prod.yml started without JWT_ACCESS_SECRET" >&2
+            exit 1
+          fi
       - uses: docker/setup-buildx-action@v4
       - name: Build migrator image
         uses: docker/build-push-action@v7
