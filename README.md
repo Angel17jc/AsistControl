@@ -78,7 +78,7 @@ packages/
   shared/              Contratos compartidos: enums de dominio, matriz RBAC, eventos en tiempo real
   biometric-core/      Interfaz BiometricDeviceAdapter, errores tipados, registro de drivers y simulador
 infra/docker/          Dockerfiles (API y migrador), nginx, prueba de humo
-docs/                  Arquitectura, API, BD, dispositivos, seguridad, ADRs
+docs/                  Arquitectura, API, BD, dispositivos, seguridad, despliegue, ADRs
 .github/               CI, CodeQL, Dependabot, plantillas de issues/PR, CODEOWNERS
 ```
 
@@ -163,6 +163,8 @@ cp .env.production.example .env.production       # completar todos los valores
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 infra/scripts/backup.sh                           # respaldo + restauración de prueba (programarlo a diario)
 ```
+
+Guía completa (requisitos medidos, HTTPS y túnel, marcador, respaldos, restauración y actualizaciones): [`docs/deployment.md`](docs/deployment.md).
 
 Las imágenes son multi-stage: la de la API no contiene código fuente, dependencias de desarrollo, sourcemaps ni declaraciones de tipos de las dependencias, y corre como usuario sin privilegios.
 
