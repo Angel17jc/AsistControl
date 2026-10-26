@@ -1,0 +1,7 @@
+# Cloudflare Tunnel in front of nginx: copy to cloudflared.conf (only *.conf files load).
+# cloudflared runs on Docker's network, so nginx sees its address as the client; trust it to
+# say who the real client is. CF-Connecting-IP, not X-Forwarded-For: Cloudflare sets it
+# itself, while X-Forwarded-For keeps whatever the client sent first.
+set_real_ip_from 172.16.0.0/12;
+set_real_ip_from 10.0.0.0/8;
+real_ip_header CF-Connecting-IP;

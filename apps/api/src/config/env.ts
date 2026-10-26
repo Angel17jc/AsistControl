@@ -73,9 +73,12 @@ export const envSchema = z.object({
   THROTTLE_ENABLED: bool.default(true),
   THROTTLE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
+
+  /** Interactive API docs at /api/docs. Unset: on, except in production. */
+  SWAGGER_ENABLED: optional(bool),
 });
 
-export type Env = z.infer<typeof envSchema>;
+export type Env = Omit<z.infer<typeof envSchema>, 'SWAGGER_ENABLED'> & { SWAGGER_ENABLED: boolean };
 
 export function validateEnv(raw: Record<string, unknown>): Env {
   const parsed = envSchema.safeParse(raw);
@@ -99,7 +102,12 @@ export function validateEnv(raw: Record<string, unknown>): Env {
       );
     }
   }
-  return parsed.data;
+  return {
+    ...parsed.data,
+    // The endpoints stay protected either way, but a production server need not publish the
+    // map of its whole API: opt in with SWAGGER_ENABLED=true.
+    SWAGGER_ENABLED: parsed.data.SWAGGER_ENABLED ?? parsed.data.NODE_ENV !== 'production',
+  };
 }
 
 /** Linear on purpose: a `/\/+$/` regex backtracks quadratically on long runs of slashes. */

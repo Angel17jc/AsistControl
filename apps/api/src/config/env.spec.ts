@@ -20,6 +20,16 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...base, DEVICE_SECRETS_KEY: 'abc' })).toThrow(/DEVICE_SECRETS_KEY/);
   });
 
+  it('publishes the API docs outside production unless told otherwise', () => {
+    expect(validateEnv(base).SWAGGER_ENABLED).toBe(true);
+    const production = { ...base, NODE_ENV: 'production' };
+    expect(validateEnv(production).SWAGGER_ENABLED).toBe(false);
+    expect(validateEnv({ ...production, SWAGGER_ENABLED: 'true' }).SWAGGER_ENABLED).toBe(true);
+    expect(validateEnv({ ...base, SWAGGER_ENABLED: 'false' }).SWAGGER_ENABLED).toBe(false);
+    // Compose passes an unset variable as "".
+    expect(validateEnv({ ...production, SWAGGER_ENABLED: '' }).SWAGGER_ENABLED).toBe(false);
+  });
+
   it('requires different access and refresh secrets', () => {
     expect(() => validateEnv({ ...base, JWT_REFRESH_SECRET: base.JWT_ACCESS_SECRET })).toThrow(
       /must be different/,

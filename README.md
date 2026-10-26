@@ -156,6 +156,14 @@ docker compose logs -f api      # logs estructurados de la API
 docker compose down             # detener (conserva datos)
 ```
 
+**Producción:** `docker-compose.prod.yml` es la pila para una empresa. No tiene secretos por defecto (si falta uno, se niega a arrancar y dice cuál), corre en modo producción sin datos demo ni simulador, **solo publica el puerto de la web** (PostgreSQL y la API quedan dentro de la red de Docker), limita los logs y desactiva Swagger:
+
+```bash
+cp .env.production.example .env.production       # completar todos los valores
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+infra/scripts/backup.sh                           # respaldo + restauración de prueba (programarlo a diario)
+```
+
 Las imágenes son multi-stage: la de la API no contiene código fuente, dependencias de desarrollo, sourcemaps ni declaraciones de tipos de las dependencias, y corre como usuario sin privilegios.
 
 **Primer administrador.** En producción la base arranca sin cuentas (la demo no se siembra). Se crea el primero desde el servidor; pide la contraseña dos veces sin mostrarla y obliga a cambiarla al entrar:
