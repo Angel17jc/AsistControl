@@ -80,7 +80,9 @@ echo "== api"
 docker run -d --name "$API" --network "$NETWORK" --network-alias api -p "$PORT:3000" \
   "${ENV_ARGS[@]}" "$API_IMAGE" >/dev/null
 for _ in $(seq 90); do
-  if ! docker ps -q --filter "name=^$API$" | grep -q .; then
+  # No `| grep -q` under pipefail: grep exits at the first match, the writer gets SIGPIPE and
+  # the pipeline "fails" although it matched. Capture first, then look.
+  if [[ -z "$(docker ps -q --filter "name=^$API$")" ]]; then
     echo "API container exited" >&2
     docker logs "$API" >&2
     exit 1
@@ -94,9 +96,20 @@ for _ in $(seq 90); do
       || { echo "demo login failed" >&2; docker logs "$API" >&2; exit 1; }
     echo "login: ok"
     # Daily jobs ("07:00") follow the process clock: it must be the company's, not UTC.
-    docker logs "$API" 2>&1 | grep -q "Scheduled jobs run on America/Guayaquil time" \
-      || { echo "scheduled jobs do not run on the company's time zone" >&2; docker logs "$API" >&2; exit 1; }
+    api_logs=$(docker logs "$API" 2>&1)
+    grep -q "Scheduled jobs run on America/Guayaquil time" <<<"$api_logs" \
+      || { echo "scheduled jobs do not run on the company's time zone" >&2; echo "$api_logs" >&2; exit 1; }
     echo "scheduled jobs: America/Guayaquil"
+    # The first-administrator command ships in this pruned image and reaches the database.
+    # The demo seed already made a super administrator, so it must refuse to make another.
+    if out=$(printf '%s' 'Smoke-Admin-2026' | docker exec -i "$API" \
+      node dist/cli/create-admin.js --email other@smoke.local --password-stdin 2>&1); then
+      echo "create-admin made a second super administrator: $out" >&2
+      exit 1
+    fi
+    grep -q "A super administrator already exists" <<<"$out" \
+      || { echo "create-admin failed: $out" >&2; exit 1; }
+    echo "create-admin: runs, refuses a second super administrator"
     healthy=1
     break
   fi
