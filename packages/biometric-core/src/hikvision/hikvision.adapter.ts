@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import type { BiometricDeviceAdapter } from '../adapter';
+import { randomBytes } from 'node:crypto';
+import type { BiometricDeviceAdapter, DeviceEventKind } from '../adapter';
 import { formatLocalIso, isValidTimeZone } from '../device-time';
 import {
   BiometricDeviceError,
@@ -16,11 +16,12 @@ import type {
   SyncOptions,
   SyncResult,
 } from '../types';
-import { IsapiClient } from './isapi-client';
+import { IsapiClient, IsapiHttpError } from './isapi-client';
 import {
   ACS_MAJOR_EVENT,
   type AcsEventSearchResponse,
   DEFAULT_EVENT_MINORS,
+  describeMinor,
   type IsapiEvent,
   type SearchStatus,
   type UserInfoSearchResponse,
@@ -33,8 +34,14 @@ import {
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LOOKBACK_DAYS = 31;
 const DEFAULT_OVERLAP_MINUTES = 60;
-/** Terminals cap the page size (commonly at 30); asking for more just returns 30. */
+/** Most terminals cap the page size (commonly at 30); asking for more just returns 30. */
 const DEFAULT_PAGE_SIZE = 30;
+/**
+ * Small fingerprint terminals may REJECT a page size above their limit (badParameters)
+ * instead of capping it; a DS-K1T804AMF published 1–10. On that answer the adapter steps down
+ * to this size for the rest of its life.
+ */
+const SMALL_PAGE_SIZE = 10;
 /** Stops a terminal that keeps answering MORE from looping forever. */
 const MAX_PAGES = 1_000;
 /** Searches end a little after the device clock, so nothing stamped "now" is cut off. */
@@ -86,7 +93,8 @@ export class HikvisionAdapter implements BiometricDeviceAdapter {
   private readonly minors: readonly number[];
   private readonly lookbackMs: number;
   private readonly overlapMs: number;
-  private readonly pageSize: number;
+  /** Lowered to SMALL_PAGE_SIZE once a terminal rejects the configured size. */
+  private pageSize: number;
   private connected = false;
 
   constructor(config: DeviceConnectionConfig) {
@@ -172,7 +180,7 @@ export class HikvisionAdapter implements BiometricDeviceAdapter {
 
   async getUsers(): Promise<DeviceUser[]> {
     this.assertConnected();
-    const searchID = randomUUID();
+    const searchID = newSearchId();
     const users = await this.paginate(async (position) => {
       const res = await this.isapi().postJson<UserInfoSearchResponse>(
         '/ISAPI/AccessControl/UserInfo/Search?format=json',
@@ -227,7 +235,7 @@ export class HikvisionAdapter implements BiometricDeviceAdapter {
 
     // The search takes a single minor, so each kind of successful identification is one search.
     for (const minor of this.minors) {
-      const searchID = randomUUID();
+      const searchID = newSearchId();
       const infos = await this.paginate(async (position) => {
         const res = await this.isapi().postJson<AcsEventSearchResponse>(
           '/ISAPI/AccessControl/AcsEvent?format=json',
@@ -256,16 +264,67 @@ export class HikvisionAdapter implements BiometricDeviceAdapter {
     );
   }
 
+  /**
+   * Every kind of access-control event the terminal keeps in the range (one search for all
+   * minors), counted, and whether sync reads it as a punch. For device:probe.
+   */
+  async describeEventKinds(from: Date, to: Date): Promise<DeviceEventKind[]> {
+    this.assertConnected();
+    const searchID = newSearchId();
+    const infos = await this.paginate(async (position) => {
+      const res = await this.isapi().postJson<AcsEventSearchResponse>(
+        '/ISAPI/AccessControl/AcsEvent?format=json',
+        {
+          AcsEventCond: {
+            searchID,
+            searchResultPosition: position,
+            maxResults: this.pageSize,
+            major: ACS_MAJOR_EVENT,
+            minor: 0,
+            startTime: formatLocalIso(from, this.timezone),
+            endTime: formatLocalIso(to, this.timezone),
+          },
+        },
+      );
+      if (!res.AcsEvent) throw new DeviceProtocolError('Unexpected AcsEvent search reply');
+      return { status: res.AcsEvent.responseStatusStrg, items: res.AcsEvent.InfoList };
+    });
+    const counts = new Map<number, number>();
+    for (const info of infos) counts.set(info.minor, (counts.get(info.minor) ?? 0) + 1);
+    return [...counts]
+      .sort(([, a], [, b]) => b - a)
+      .map(([minor, count]) => ({
+        code: `0x${minor.toString(16).padStart(2, '0')}`,
+        description: describeMinor(minor),
+        count,
+        counted: this.minors.includes(minor),
+      }));
+  }
+
   private async paginate<T>(
     fetchPage: (position: number) => Promise<{ status?: SearchStatus; items?: T[] }>,
   ): Promise<T[]> {
     const all: T[] = [];
     for (let page = 0; page < MAX_PAGES; page++) {
-      const { status, items = [] } = await this.run(() => fetchPage(all.length));
+      const { status, items = [] } = await this.run(() =>
+        this.fetchSizedPage(fetchPage, all.length),
+      );
       all.push(...items);
       if (status !== 'MORE' || items.length === 0) return all;
     }
     throw new DeviceProtocolError(`Search did not finish after ${MAX_PAGES} pages`);
+  }
+
+  /** One page; a terminal that rejects the page size gets the same page asked again, smaller. */
+  private async fetchSizedPage<P>(fetchPage: (position: number) => Promise<P>, position: number) {
+    try {
+      return await fetchPage(position);
+    } catch (error) {
+      const rejected = error instanceof IsapiHttpError && error.status === 400;
+      if (!rejected || this.pageSize <= SMALL_PAGE_SIZE) throw error;
+      this.pageSize = SMALL_PAGE_SIZE;
+      return fetchPage(position);
+    }
   }
 
   private async deviceNow(): Promise<Date> {
@@ -343,4 +402,12 @@ function parseCursor(cursor: string | null | undefined): Cursor | null {
 
 function positive(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * The searchID is made up by the client. Some terminals accept 1–20 characters only (a
+ * DS-K1T804AMF rejected a UUID with badParameters): 16 hex characters fit everywhere.
+ */
+function newSearchId(): string {
+  return randomBytes(8).toString('hex');
 }

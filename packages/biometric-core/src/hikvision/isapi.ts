@@ -30,6 +30,17 @@ export const DEFAULT_EVENT_MINORS: readonly number[] = [
   ACS_MINOR.CARD_PASSED,
 ];
 
+/** The minors the adapter knows, in words for whoever reads a device:probe report. */
+const MINOR_DESCRIPTION: Record<number, string> = {
+  [ACS_MINOR.CARD_PASSED]: 'tarjeta válida',
+  [ACS_MINOR.FINGERPRINT_PASSED]: 'huella válida',
+  [ACS_MINOR.FACE_PASSED]: 'rostro válido',
+};
+
+export function describeMinor(minor: number): string | null {
+  return MINOR_DESCRIPTION[minor] ?? null;
+}
+
 const VERIFY_BY_MINOR: Record<number, VerifyMode> = {
   [ACS_MINOR.CARD_PASSED]: 'CARD',
   [ACS_MINOR.FINGERPRINT_PASSED]: 'FINGERPRINT',

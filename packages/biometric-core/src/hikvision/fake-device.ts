@@ -43,6 +43,11 @@ export interface FakeHikvisionOptions {
   delayMs?: number;
   /** Answer these paths with an error, e.g. an ISAPI ResponseStatus. */
   failures?: Record<string, { status: number; body: string }>;
+  /**
+   * Small fingerprint terminals (a DS-K1T804AMF was seen doing it) REJECT a search whose
+   * searchID or page size exceed their limits, instead of capping them: 400 badParameters.
+   */
+  strictSearch?: { maxSearchIdLength: number; maxResults: number };
 }
 
 export interface FakeHikRequest {
@@ -130,8 +135,10 @@ export class FakeHikvisionDevice {
           ? json(res, { AcsEventTotalNum: { totalNum: this.options.events!.length } })
           : notSupported(res);
       case 'POST /ISAPI/AccessControl/UserInfo/Search':
+        if (this.rejects((body as UserSearchBody)?.UserInfoSearchCond)) return badParameters(res);
         return this.userSearch(res, body as UserSearchBody);
       case 'POST /ISAPI/AccessControl/AcsEvent':
+        if (this.rejects((body as EventSearchBody)?.AcsEventCond)) return badParameters(res);
         return this.eventSearch(res, body as EventSearchBody);
       default:
         return send(res, 404, statusXml('Invalid Operation', 'notSupport'), 'application/xml');
@@ -221,6 +228,15 @@ export class FakeHikvisionDevice {
         })),
       },
     });
+  }
+
+  private rejects(cond?: { searchID?: string; maxResults?: number }): boolean {
+    const strict = this.options.strictSearch;
+    if (!strict || !cond) return false;
+    return (
+      (cond.searchID ?? '').length > strict.maxSearchIdLength ||
+      (cond.maxResults ?? 0) > strict.maxResults
+    );
   }
 
   private eventSearch(res: ServerResponse, body: EventSearchBody): void {
@@ -319,6 +335,19 @@ function send(res: ServerResponse, status: number, body: string, type = 'applica
 
 function json(res: ServerResponse, body: unknown): void {
   send(res, 200, JSON.stringify(body));
+}
+
+/** What a strict terminal answers to a searchID or page size beyond its limits. */
+function badParameters(res: ServerResponse): void {
+  send(
+    res,
+    400,
+    JSON.stringify({
+      statusCode: 6,
+      statusString: 'Invalid Content',
+      subStatusCode: 'badParameters',
+    }),
+  );
 }
 
 function notSupported(res: ServerResponse): void {

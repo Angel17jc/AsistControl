@@ -12,7 +12,7 @@ import { BiometricDeviceError } from './errors';
 export type ProbeStatus = 'ok' | 'warn' | 'fail' | 'skipped';
 
 export interface ProbeStep {
-  id: 'connect' | 'identity' | 'clock' | 'users' | 'download' | 'incremental';
+  id: 'connect' | 'identity' | 'clock' | 'users' | 'download' | 'incremental' | 'events';
   label: string;
   status: ProbeStatus;
   /** What was found, in words for whoever runs the probe. */
@@ -43,6 +43,15 @@ export interface ProbeOptions {
 }
 
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
+/** Window of the event kinds census: the same the first sync reads. */
+const EVENT_KINDS_MS = 31 * 86_400_000;
+/**
+ * Hikvision fingerprint terminals (DS-K1A…) may be managed only through iVMS-4200 on port
+ * 8000, without ISAPI over HTTP: worth saying when port 80 does not answer.
+ */
+const HIKVISION_PORT_HINT =
+  '. Si el equipo responde en el puerto 8000 pero no en el 80 (Test-NetConnection), no expone ' +
+  'ISAPI por HTTP: se gestiona con iVMS-4200 y este driver no puede leerlo';
 /** A punch older than this usually means a wrong clock or time zone, not old data. */
 const OLD_PUNCH_MS = 5 * 365 * 86_400_000;
 
@@ -82,7 +91,15 @@ export async function probeDevice(
 
   try {
     const connected = await run('connect', async () => {
-      await adapter.connect();
+      try {
+        await adapter.connect();
+      } catch (err) {
+        const unreachable =
+          err instanceof BiometricDeviceError &&
+          (err.code === 'CONNECTION_FAILED' || err.code === 'TIMEOUT');
+        if (adapter.driver !== 'HIKVISION' || !unreachable) throw err;
+        return { status: 'fail', detail: describeError(err) + HIKVISION_PORT_HINT };
+      }
       return { status: 'ok', detail: 'Conectado y autenticado' };
     });
     if (!connected) {
@@ -187,6 +204,35 @@ export async function probeDevice(
             };
       });
     }
+    if (downloaded) {
+      await run('events', async () => {
+        if (!adapter.describeEventKinds) {
+          return { status: 'skipped', detail: 'El driver no distingue tipos de evento' };
+        }
+        const until = now().getTime() + FUTURE_TOLERANCE_MS;
+        const kinds = await adapter.describeEventKinds(
+          new Date(until - EVENT_KINDS_MS),
+          new Date(until),
+        );
+        if (kinds.length === 0) {
+          return { status: 'warn', detail: 'El equipo no tiene eventos de los últimos 31 días' };
+        }
+        const list = kinds
+          .map(
+            (k) =>
+              `${k.code}${k.description ? ` (${k.description})` : ''} ×${k.count}` +
+              (k.counted ? '' : ' — NO se cuenta'),
+          )
+          .join('; ');
+        if (kinds.every((k) => k.counted)) return { status: 'ok', detail: list };
+        return {
+          status: 'warn',
+          detail:
+            `${list}. Los que no se cuentan pueden ser intentos fallidos o marcaciones con otro ` +
+            'método (por ejemplo, PIN): envíe este informe para decidir si se añaden',
+        };
+      });
+    }
     skipRest('No se ejecutó: la descarga completa falló');
     return report(adapter.driver, steps, punches);
   } finally {
@@ -201,6 +247,7 @@ const STEPS: [ProbeStep['id'], string][] = [
   ['users', 'Usuarios'],
   ['download', 'Descarga completa'],
   ['incremental', 'Descarga incremental'],
+  ['events', 'Tipos de evento'],
 ];
 
 function labelOf(id: ProbeStep['id']): string {

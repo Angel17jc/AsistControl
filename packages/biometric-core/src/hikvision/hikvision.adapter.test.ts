@@ -205,6 +205,79 @@ describe('HikvisionAdapter', () => {
       expect(logs).toHaveLength(75);
     });
 
+    describe('on a small terminal with strict search limits (DS-K1A-like)', () => {
+      const STRICT = { maxSearchIdLength: 20, maxResults: 10 };
+      const many = Array.from({ length: 25 }, (_, i) => ({
+        serialNo: i + 1,
+        employeeNo: '1001',
+        time: `2026-09-21T08:${String(i).padStart(2, '0')}:00-05:00`,
+      }));
+      const searches = () =>
+        device.requests
+          .filter((r) => r.path.endsWith('/AcsEvent') || r.path.endsWith('/UserInfo/Search'))
+          .map(
+            (r) =>
+              Object.values(r.body as Record<string, { searchID: string; maxResults: number }>)[0]!,
+          );
+
+      it('keeps every searchID within 20 characters', async () => {
+        await (await start({ strictSearch: STRICT, events: many })).connect();
+        await adapter.sync();
+        await adapter.getUsers();
+        expect(searches().length).toBeGreaterThan(0);
+        expect(searches().every((s) => s.searchID.length <= 20)).toBe(true);
+      });
+
+      it('steps down to pages of 10 when the terminal rejects 30, and reads everything', async () => {
+        await (await start({ strictSearch: STRICT, events: many })).connect();
+        const { logs } = await adapter.sync();
+        expect(logs).toHaveLength(25);
+        // One search per punch kind (face, fingerprint, card); the 25 punches are all faces.
+        // Face: 30 rejected, then 10 + 10 + 5. Fingerprint and card: one page of 10 each.
+        expect(searches().map((s) => s.maxResults)).toEqual([30, 10, 10, 10, 10, 10]);
+        expect(await adapter.getUsers()).toEqual([]);
+        expect(searches().at(-1)!.maxResults).toBe(10);
+      });
+
+      it('keeps pages of 30 on a terminal that accepts them', async () => {
+        await (await start({ events: many })).connect();
+        await adapter.sync();
+        expect(new Set(searches().map((s) => s.maxResults))).toEqual(new Set([30]));
+      });
+
+      it('does not loop on a search the terminal rejects for another reason', async () => {
+        const rejected = {
+          status: 400,
+          body: '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"badParameters"}',
+        };
+        await (await start({ failures: { '/ISAPI/AccessControl/AcsEvent': rejected } })).connect();
+        await expect(adapter.sync()).rejects.toThrow('badParameters');
+        // The first try at 30, one retry at 10, and no more.
+        expect(device.requests.filter((r) => r.path.endsWith('/AcsEvent'))).toHaveLength(2);
+      });
+    });
+
+    it('counts every kind of event the terminal keeps, and which ones are punches', async () => {
+      await (
+        await start({
+          events: [
+            ...EVENTS,
+            { serialNo: 104, employeeNo: '1003', time: '2026-09-21T09:00:00-05:00', minor: 0x99 },
+          ],
+        })
+      ).connect();
+      const kinds = await adapter.describeEventKinds(
+        new Date('2026-09-21T00:00:00-05:00'),
+        new Date('2026-09-21T23:59:00-05:00'),
+      );
+      expect(kinds).toEqual([
+        { code: '0x4b', description: 'rostro válido', count: 1, counted: true },
+        { code: '0x26', description: 'huella válida', count: 1, counted: true },
+        { code: '0x99', description: null, count: 1, counted: false },
+        { code: '0x01', description: 'tarjeta válida', count: 1, counted: true },
+      ]);
+    });
+
     it('only reads the minors configured as punches', async () => {
       await (await start({}, { options: { eventMinors: [ACS_MINOR.CARD_PASSED] } })).connect();
       const { logs } = await adapter.sync();
