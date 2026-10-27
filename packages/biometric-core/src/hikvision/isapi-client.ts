@@ -108,7 +108,17 @@ export class IsapiClient {
         `The device user is not allowed to call ${path}${suffix}`,
       );
     }
-    throw new DeviceProtocolError(`${path} answered HTTP ${res.status}${suffix}`);
+    throw new IsapiHttpError(res.status, `${path} answered HTTP ${res.status}${suffix}`);
+  }
+}
+
+/** A terminal answered with an error status; `status` lets callers tell 400 from 404. */
+export class IsapiHttpError extends DeviceProtocolError {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
   }
 }
 

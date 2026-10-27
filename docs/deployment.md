@@ -155,6 +155,9 @@ npm run device:probe -- --driver HIKVISION --host <IP> --timezone America/Guayaq
   gestionan con iVMS-4200 (puerto 8000). Si solo responde el puerto 8000 y no el 80, el equipo **no
   expone ISAPI por HTTP**, que es lo que usa el driver. Ver el modelo y el firmware en el propio equipo:
   OK 3 s → **Info. → Device**.
+- El diagnóstico termina con **Tipos de evento**: cuántos eventos de cada tipo guarda el equipo y si se
+  cuentan como marcación. Si aparece un tipo frecuente con «NO se cuenta» (por ejemplo, marcaciones con
+  PIN), hay que añadir su código a `config.eventMinors` del dispositivo antes de usarlo.
 
 Si el diagnóstico es correcto: **Dispositivos → Nuevo**, con la IP, el puerto y el usuario → **Probar
 conexión** (modelo, hora, desfase de reloj) → **Sincronizar**. Después, la API lo consulta sola cada

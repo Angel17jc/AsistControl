@@ -64,8 +64,12 @@ describe('probeDevice', () => {
       users: 'ok',
       download: 'ok',
       incremental: 'ok',
+      events: 'ok',
     });
     expect(report.steps.find((s) => s.id === 'identity')!.detail).toContain('DS-K1T671M');
+    expect(report.steps.find((s) => s.id === 'events')!.detail).toBe(
+      '0x4b (rostro válido) ×1; 0x26 (huella válida) ×1',
+    );
     expect(report.punches).toMatchObject({
       total: 2,
       byPunchType: { CHECK_IN: 1, CHECK_OUT: 1 },
@@ -119,6 +123,39 @@ describe('probeDevice', () => {
       status: 'fail',
       detail: expect.stringContaining('CONNECTION_FAILED'),
     });
+    expect(report.steps[0]!.detail).not.toContain('8000');
+  });
+
+  it('tells a Hikvision that does not answer on port 80 to check port 8000', async () => {
+    // DS-K1A fingerprint terminals may be managed only through iVMS-4200, on port 8000.
+    const adapter = new HikvisionAdapter({
+      host: '127.0.0.1',
+      port: 1,
+      timeoutMs: 500,
+      credentials: { username: 'admin', password: 'x' },
+    });
+    const report = await probeDevice(adapter);
+    expect(report.steps[0]).toMatchObject({ status: 'fail' });
+    expect(report.steps[0]!.detail).toContain('CONNECTION_FAILED');
+    expect(report.steps[0]!.detail).toContain('puerto 8000');
+  });
+
+  it('lists the kinds of event the driver does not count, such as PIN punches', async () => {
+    const { device, adapter } = await hikvision();
+    // An unknown minor: on a DS-K1A it could be a PIN punch, or a failed attempt.
+    device.options.events = [
+      ...device.options.events!,
+      { serialNo: 3, employeeNo: '1001', time: '2026-09-21T12:00:00-05:00', minor: 0x99 },
+      { serialNo: 4, employeeNo: '1001', time: '2026-09-21T13:00:00-05:00', minor: 0x99 },
+    ];
+    const report = await probeDevice(adapter, { now: at('2026-09-21T18:00:30-05:00') });
+    const events = report.steps.find((s) => s.id === 'events')!;
+    expect(events.status).toBe('warn');
+    expect(events.detail).toContain('0x99 ×2 — NO se cuenta');
+    expect(events.detail).toContain('PIN');
+    // Counted kinds are still marked as such, and the punches are unaffected.
+    expect(events.detail).toContain('0x26 (huella válida) ×1');
+    expect(report.punches.total).toBe(2);
   });
 
   it('checks a ZKTeco terminal too, warning about punches it cannot classify', async () => {
@@ -187,6 +224,7 @@ describe('probeDevice', () => {
       users: 'skipped',
       download: 'warn',
       incremental: 'ok',
+      events: 'skipped',
     });
     expect(disconnected).toBe(true);
   });
