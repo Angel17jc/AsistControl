@@ -53,7 +53,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col bg-sidebar text-sidebar-ink lg:sticky lg:top-0 lg:h-screen lg:w-60">
+      <aside className="flex shrink-0 flex-col bg-sidebar text-sidebar-ink lg:sticky lg:top-0 lg:h-screen lg:w-60 print:hidden">
         <div className="flex items-center gap-2 px-5 py-5 text-white">
           <Fingerprint className="size-6 text-[#86b6ef]" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">AsistControl</span>

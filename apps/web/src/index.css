@@ -65,6 +65,21 @@
   --sidebar-ink: #b4bfce;
 }
 
+/* Paper is white: printing always uses the light tokens, whatever the screen theme. */
+@media print {
+  :root {
+    color-scheme: light !important;
+    --surface-0: #ffffff !important;
+    --surface-1: #ffffff !important;
+    --surface-2: #f0efec !important;
+    --border: #e2e1dc !important;
+    --ink-1: #0b0b0b !important;
+    --ink-2: #52514e !important;
+    --ink-3: #75746f !important;
+    --accent: #1c5cab !important;
+  }
+}
+
 @theme inline {
   --color-surface-0: var(--surface-0);
   --color-surface-1: var(--surface-1);

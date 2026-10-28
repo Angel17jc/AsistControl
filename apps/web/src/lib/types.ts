@@ -28,7 +28,11 @@ export interface AttendanceRecordRow {
   scheduledEnd: string | null;
   firstIn: string | null;
   lastOut: string | null;
+  /** Work stretches in order; the gaps between them are lunch and other exits. */
+  segments: { in: string | null; out: string | null }[];
   workedMinutes: number;
+  /** Punched pauses, or the scheduled lunch when it was deducted without punches. */
+  breakMinutes: number;
   lateMinutes: number;
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
