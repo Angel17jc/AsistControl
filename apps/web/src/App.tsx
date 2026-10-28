@@ -42,6 +42,9 @@ const EmployeesPage = lazy(() =>
 const OrganizationPage = lazy(() =>
   import('./pages/OrganizationPage').then((m) => ({ default: m.OrganizationPage })),
 );
+const PresencePage = lazy(() =>
+  import('./pages/PresencePage').then((m) => ({ default: m.PresencePage })),
+);
 const ReportsPage = lazy(() =>
   import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
@@ -90,6 +93,14 @@ export function App() {
           <Route index element={<Home />} />
           {/* Every signed-in person manages their own account: no permission needed. */}
           <Route path="mi-cuenta" element={<AccountPage />} />
+          <Route
+            path="presencia"
+            element={
+              <Guard permission="dashboard:read">
+                <PresencePage />
+              </Guard>
+            }
+          />
           <Route
             path="asistencia"
             element={

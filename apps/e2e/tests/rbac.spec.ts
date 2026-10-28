@@ -16,6 +16,7 @@ test.describe('Permisos en la interfaz', () => {
     await expect(nav.getByRole('link', { name: 'Asistencia' })).toBeVisible();
     for (const hidden of [
       'Dashboard',
+      'Presencia',
       'Empleados',
       'Horarios',
       'Dispositivos',
@@ -38,6 +39,7 @@ test.describe('Permisos en la interfaz', () => {
     const nav = page.getByRole('navigation', { name: 'Principal' });
     for (const label of [
       'Dashboard',
+      'Presencia',
       'Asistencia',
       'Empleados',
       'Horarios',
@@ -57,6 +59,7 @@ test.describe('Permisos en la interfaz', () => {
     const nav = page.getByRole('navigation', { name: 'Principal' });
     await expect(nav.getByRole('link', { name: 'Asistencia' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Empleados' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Presencia' })).toBeVisible();
     for (const hidden of ['Horarios', 'Dispositivos', 'Usuarios', 'Auditoría', 'Reportes']) {
       await expect(nav.getByRole('link', { name: hidden })).toHaveCount(0);
     }

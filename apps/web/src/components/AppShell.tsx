@@ -13,6 +13,7 @@ import {
   LogOut,
   ScrollText,
   Settings,
+  UserCheck,
   UserCog,
   UserRound,
   Users,
@@ -26,6 +27,7 @@ import { useAuth } from '../stores/auth';
 
 const NAV: { to: string; label: string; icon: typeof Users; permission: Permission }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
+  { to: '/presencia', label: 'Presencia', icon: UserCheck, permission: 'dashboard:read' },
   { to: '/asistencia', label: 'Asistencia', icon: CalendarCheck, permission: 'attendance:read' },
   { to: '/empleados', label: 'Empleados', icon: Users, permission: 'employees:read' },
   {

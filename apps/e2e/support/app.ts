@@ -151,9 +151,9 @@ export class ApiClient {
   }
 
   /** A punch registered by hand, the way an operator corrects a missing one. */
-  async manualPunch(): Promise<void> {
+  async manualPunch(forEmployee?: string): Promise<void> {
     const employees = await this.send<{ data: { id: string }[] }>('get', '/employees?pageSize=1');
-    const employeeId = employees.data[0]?.id;
+    const employeeId = forEmployee ?? employees.data[0]?.id;
     if (!employeeId) throw new Error('The seed left no employees to punch for');
     await this.send('post', '/attendance/events', {
       employeeId,
