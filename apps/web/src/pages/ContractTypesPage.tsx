@@ -14,6 +14,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Select,
   Spinner,
   Table,
@@ -28,6 +29,17 @@ import {
 } from '../lib/format';
 import type { ContractTypeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
+
+/** What each choice means, under the field that picks it. */
+const ACCRUAL_HINT: Record<VacationAccrual, string> = {
+  ANNUAL: 'Se ganan todos de una vez en cada aniversario de ingreso',
+  MONTHLY: 'Se gana la doceava parte cada mes trabajado',
+  CALENDAR_YEAR: 'Se dan cada 1 de enero; el primer y el último año, en proporción',
+};
+const COUNTING_HINT: Record<VacationDayCounting, string> = {
+  WORKING_DAYS: 'Solo los días que le toca trabajar según su horario, sin feriados',
+  CALENDAR_DAYS: 'Todos los días del período, incluidos descansos y feriados',
+};
 
 /**
  * Contract types and the vacation rules each one carries. The values are the company's
@@ -64,6 +76,18 @@ export function ContractTypesPage() {
           )
         }
       />
+      <PageHelp>
+        <p>
+          Cada empleado tiene un tipo de contrato, y el contrato decide sus vacaciones: cuántos días
+          por año, cómo se ganan, qué días descuenta una vacación, si los días no usados caducan y
+          si hay días extra por antigüedad.
+        </p>
+        <p>
+          El saldo de cada persona se calcula solo a partir de estas reglas (Empleados →
+          Vacaciones); no se escribe a mano. Para corregirlo, use un ajuste con su motivo. Cambiar
+          una regla cambia al momento el saldo de todos los que tienen ese contrato.
+        </p>
+      </PageHelp>
       {editing && (
         <Card className="mb-6">
           <ContractTypeForm
@@ -214,7 +238,7 @@ function ContractTypeForm({
       aria-label={contractType ? `Editar ${contractType.name}` : 'Nuevo tipo de contrato'}
       className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <Field label="Nombre">
+      <Field label="Nombre" hint="P. ej. «Tiempo completo», «Medio tiempo» o «Pasantía»">
         <Input
           required
           minLength={2}
@@ -222,7 +246,10 @@ function ContractTypeForm({
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         />
       </Field>
-      <Field label="Días de vacaciones por año">
+      <Field
+        label="Días de vacaciones por año"
+        hint="Los que da este contrato por cada año trabajado"
+      >
         <Input
           type="number"
           required
@@ -233,7 +260,7 @@ function ContractTypeForm({
           onChange={(e) => setForm((f) => ({ ...f, vacationDaysPerYear: e.target.value }))}
         />
       </Field>
-      <Field label="Devengo">
+      <Field label="Devengo" hint={ACCRUAL_HINT[form.vacationAccrual]}>
         <Select
           value={form.vacationAccrual}
           onChange={(e) =>
@@ -247,7 +274,7 @@ function ContractTypeForm({
           ))}
         </Select>
       </Field>
-      <Field label="Qué días descuenta una vacación">
+      <Field label="Qué días descuenta una vacación" hint={COUNTING_HINT[form.vacationDayCounting]}>
         <Select
           value={form.vacationDayCounting}
           onChange={(e) =>
@@ -315,7 +342,10 @@ function ContractTypeForm({
 
       {seniority && (
         <>
-          <Field label="A partir de (años cumplidos)">
+          <Field
+            label="A partir de (años cumplidos)"
+            hint="Con 5, los días extra empiezan en el sexto año"
+          >
             <Input
               type="number"
               required
@@ -325,7 +355,10 @@ function ContractTypeForm({
               onChange={(e) => setBonus((b) => ({ ...b, afterYears: e.target.value }))}
             />
           </Field>
-          <Field label="Días extra por cada año más">
+          <Field
+            label="Días extra por cada año más"
+            hint="Se suman por cada año de servicio después de ese"
+          >
             <Input
               type="number"
               required
@@ -336,7 +369,10 @@ function ContractTypeForm({
               onChange={(e) => setBonus((b) => ({ ...b, extraDaysPerYear: e.target.value }))}
             />
           </Field>
-          <Field label="Máximo de días extra">
+          <Field
+            label="Máximo de días extra"
+            hint="Tope de los días extra; los días por año van aparte"
+          >
             <Input
               type="number"
               required

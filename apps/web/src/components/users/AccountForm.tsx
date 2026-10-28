@@ -13,6 +13,15 @@ export const PASSWORD_HINT = 'Al menos 10 caracteres, con letras y números';
  * Creates an account, or changes the role and the employee of an existing one. Only offers
  * the roles the signed-in user may grant, and asks for an employee whenever the role needs one.
  */
+/** What each role can do, under the field that picks it (the matrix lives in shared RBAC). */
+const ROLE_HINT: Record<Role, string> = {
+  SUPER_ADMIN: 'Todo, incluido dar el rol de administrador',
+  ADMIN: 'Todo, salvo dar el rol de administrador',
+  HR: 'Empleados, horarios, asistencia, permisos y reportes. Ve dispositivos y configuración sin cambiarlos',
+  SUPERVISOR: 'Solo su equipo: ve su asistencia y aprueba sus permisos y horas extra',
+  EMPLOYEE: 'Solo lo suyo: su asistencia y sus solicitudes',
+};
+
 export function AccountForm({
   account,
   actorRole,
@@ -76,7 +85,7 @@ export function AccountForm({
       className="grid gap-4 border-b border-line p-5 lg:grid-cols-2"
     >
       {!account && (
-        <Field label="Correo">
+        <Field label="Correo" hint="Con él entra al sistema y a él le llegan los avisos">
           <Input
             type="email"
             required
@@ -86,7 +95,7 @@ export function AccountForm({
           />
         </Field>
       )}
-      <Field label="Rol" hint={isSelf ? 'No puede cambiar su propio rol' : undefined}>
+      <Field label="Rol" hint={isSelf ? 'No puede cambiar su propio rol' : ROLE_HINT[role]}>
         <Select value={role} disabled={isSelf} onChange={(e) => setRole(e.target.value as Role)}>
           {roles.map((r) => (
             <option key={r} value={r}>

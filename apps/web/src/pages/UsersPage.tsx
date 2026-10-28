@@ -10,6 +10,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Pagination,
   Select,
   Spinner,
@@ -62,6 +63,18 @@ export function UsersPage() {
           )
         }
       />
+      <PageHelp>
+        <p>
+          Una <strong className="text-ink-1">cuenta</strong> es para entrar al sistema; un{' '}
+          <strong className="text-ink-1">empleado</strong> es quien marca. Supervisores y empleados
+          necesitan su ficha de empleado vinculada: así el sistema sabe cuál es su equipo o su
+          asistencia.
+        </p>
+        <p>
+          La contraseña inicial es temporal: al entrar por primera vez, la persona elige una propia.
+          Restablecer una contraseña cierra las sesiones abiertas de esa cuenta.
+        </p>
+      </PageHelp>
       {editing && (
         <Card className="mb-6">
           <AccountForm

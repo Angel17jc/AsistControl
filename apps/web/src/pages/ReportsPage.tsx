@@ -8,6 +8,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Select,
   Spinner,
   Table,
@@ -67,6 +68,18 @@ export function ReportsPage() {
           </Button>
         }
       />
+      <PageHelp>
+        <p>
+          Elija un reporte y un período: se muestra aquí y se descarga en CSV, que se abre en Excel.
+          El <strong className="text-ink-1">resumen mensual</strong> trae los totales de cada
+          persona para la nómina; los demás detallan atrasos, ausencias, horas extra o cada
+          marcación.
+        </p>
+        <p>
+          Revise antes los días incompletos (Asistencia → tarjeta de tiempo): al tramo que quedó sin
+          salida no se le cuentan horas trabajadas.
+        </p>
+      </PageHelp>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <Field label="Reporte" hint={meta[2]}>
           <Select value={kind} onChange={(e) => setKind(e.target.value as Kind)} className="w-56">
