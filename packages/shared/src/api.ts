@@ -1,3 +1,4 @@
+import type { LeaveType, PresenceState, PunchReading } from './domain';
 import type { AttendanceEventCreatedPayload } from './realtime';
 import type { Role } from './rbac';
 
@@ -55,4 +56,35 @@ export interface DashboardSummary {
   devices: { total: number; online: number; offline: number; error: number };
   hourlyPunches: { hour: number; count: number }[];
   latestEvents: AttendanceEventCreatedPayload[];
+}
+
+/** A person on the presence board: where they are now and since when. */
+export interface PresenceEntry {
+  employee: {
+    id: string;
+    employeeCode: string;
+    firstName: string;
+    lastName: string;
+    department: string | null;
+  };
+  state: PresenceState;
+  /** The work day "now" belongs to: yesterday's during a night shift that crosses midnight. */
+  workDate: string;
+  shift: { start: string; end: string; breakStart: string | null; breakEnd: string | null } | null;
+  /** When the person is expected, moved by approved leave (e.g. a morning permission). */
+  expectedStart: string | null;
+  expectedEnd: string | null;
+  firstIn: string | null;
+  lateMinutes: number;
+  lastPunch: { at: string; reading: PunchReading; deviceName: string | null } | null;
+  /** The approved leave covering this moment, if any. */
+  leaveType: LeaveType | null;
+}
+
+/** GET /attendance/presence */
+export interface PresenceBoard {
+  at: string;
+  timezone: string;
+  counts: Record<PresenceState, number>;
+  entries: PresenceEntry[];
 }

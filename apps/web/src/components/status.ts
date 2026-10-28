@@ -1,6 +1,7 @@
 import type {
   AttendanceStatus,
   DeviceStatus,
+  PresenceState,
   RequestStatus,
   SyncStatus,
 } from '@asistcontrol/shared';
@@ -15,6 +16,18 @@ export const ATTENDANCE_STATUS: Record<AttendanceStatus, { label: string; tone: 
   REST_DAY: { label: 'Día libre', tone: 'neutral' },
   HOLIDAY: { label: 'Feriado', tone: 'neutral' },
   NO_SCHEDULE: { label: 'Sin horario', tone: 'neutral' },
+};
+
+/** Presence board: where a person is right now. */
+export const PRESENCE_STATE: Record<PresenceState, { label: string; tone: Tone }> = {
+  IN: { label: 'En la empresa', tone: 'good' },
+  ON_BREAK: { label: 'En almuerzo', tone: 'info' },
+  LEFT: { label: 'Ya salió', tone: 'neutral' },
+  NOT_ARRIVED: { label: 'No ha llegado', tone: 'critical' },
+  NOT_YET: { label: 'Aún no es su hora', tone: 'neutral' },
+  ON_LEAVE: { label: 'Permiso', tone: 'info' },
+  DAY_OFF: { label: 'Día libre', tone: 'neutral' },
+  NO_SCHEDULE: { label: 'Sin horario', tone: 'warning' },
 };
 
 export const DEVICE_STATUS: Record<DeviceStatus, { label: string; tone: Tone }> = {

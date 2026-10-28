@@ -4,6 +4,7 @@ import { AttendanceProcessingService } from './attendance-processing.service';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceScheduler } from './attendance.scheduler';
 import { AttendanceService } from './attendance.service';
+import { PresenceService } from './presence.service';
 import { WorkCalendarService } from './work-calendar.service';
 
 @Module({
@@ -14,6 +15,7 @@ import { WorkCalendarService } from './work-calendar.service';
     AttendanceEventsPublisher,
     WorkCalendarService,
     AttendanceScheduler,
+    PresenceService,
   ],
   exports: [AttendanceProcessingService, AttendanceEventsPublisher],
 })

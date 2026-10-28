@@ -2,6 +2,7 @@ import type { DashboardSummary } from '@asistcontrol/shared';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, CircleDashed, Clock, Cpu, Timer, XCircle } from 'lucide-react';
 import { useEffect } from 'react';
+import { Link } from 'react-router';
 import { AttendanceComposition } from '../components/dashboard/AttendanceComposition';
 import { HourlyPunchesChart } from '../components/dashboard/HourlyPunchesChart';
 import { KpiTile } from '../components/dashboard/KpiTile';
@@ -92,7 +93,15 @@ export function DashboardPage() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-5">
         <Card className="xl:col-span-3">
-          <CardHeader title="Asistencia de hoy" subtitle="Personas con turno programado" />
+          <CardHeader
+            title="Asistencia de hoy"
+            subtitle="Personas con turno programado"
+            actions={
+              <Link to="/presencia" className="text-sm font-medium text-accent hover:underline">
+                Ver quién está
+              </Link>
+            }
+          />
           <div className="p-5">
             <AttendanceComposition
               attendance={attendance}
