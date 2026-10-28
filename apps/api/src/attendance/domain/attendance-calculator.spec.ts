@@ -1,6 +1,11 @@
 import type { PunchType } from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
-import { calculateAttendance, dropDoublePresses, pairByPunchType } from './attendance-calculator';
+import {
+  calculateAttendance,
+  dropDoublePresses,
+  pairByPunchType,
+  readPunches,
+} from './attendance-calculator';
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from './attendance-policy';
 import type { CalculationInput, LeaveInterval, Punch } from './types';
 import { type ShiftTemplate, assignWorkDate, buildWorkDay } from './work-day';
@@ -417,25 +422,85 @@ describe('dropDoublePresses', () => {
 
 describe('pairByPunchType', () => {
   it('closes an unmatched entry when a new entry arrives', () => {
-    const segments = pairByPunchType([
+    const [a, b, c] = [
       punch('08:00', 'CHECK_IN'),
       punch('13:00', 'CHECK_IN'),
       punch('17:00', 'CHECK_OUT'),
-    ]);
-    expect(segments).toEqual([
-      { in: t('08:00'), out: null },
-      { in: t('13:00'), out: t('17:00') },
+    ];
+    expect(pairByPunchType([a, b, c])).toEqual([
+      { in: a, out: null },
+      { in: b, out: c },
     ]);
   });
 
   it('infers UNKNOWN punches from the current state', () => {
-    const segments = pairByPunchType([
+    const pairs = pairByPunchType([
       punch('08:00'),
       punch('12:00'),
       punch('13:00', 'BREAK_IN'),
       punch('17:00'),
     ]);
-    expect(segments).toHaveLength(2);
-    expect(segments.every((s) => s.in && s.out)).toBe(true);
+    expect(pairs).toHaveLength(2);
+    expect(pairs.every((s) => s.in && s.out)).toBe(true);
+  });
+});
+
+describe('readPunches', () => {
+  function read(punches: Punch[], policy: Partial<AttendancePolicy> = {}, template = DAY_SHIFT) {
+    const merged = { ...DEFAULT_ATTENDANCE_POLICY, ...policy };
+    const day = buildWorkDay({
+      workDate: DATE,
+      timezone: TZ,
+      policy: merged,
+      template,
+      isHoliday: false,
+      hasSchedule: true,
+    });
+    const readings = readPunches({ day, punches, policy: merged });
+    return punches.map((p) => readings.get(p.id));
+  }
+
+  it('reads a full day with lunch in order, whatever was pressed on the terminal', () => {
+    const day = [
+      punch('17:00', 'CHECK_IN'),
+      punch('08:00', 'CHECK_OUT'),
+      punch('12:00'),
+      punch('13:00'),
+    ];
+    expect(read(day)).toEqual(['CHECK_OUT', 'CHECK_IN', 'BREAK_OUT', 'BREAK_IN']);
+  });
+
+  it('reads a lone punch as the entry and a second one as the exit', () => {
+    expect(read([punch('08:03')])).toEqual(['CHECK_IN']);
+    expect(read([punch('08:03'), punch('17:01')])).toEqual(['CHECK_IN', 'CHECK_OUT']);
+  });
+
+  it('follows the keys pressed when the policy pairs by device type', () => {
+    const day = [
+      punch('08:00', 'CHECK_IN'),
+      punch('13:00', 'CHECK_IN'),
+      punch('17:00', 'CHECK_OUT'),
+    ];
+    expect(read(day, { punchPairing: 'DEVICE_TYPE' })).toEqual([
+      'CHECK_IN',
+      'BREAK_IN',
+      'CHECK_OUT',
+    ]);
+  });
+
+  it('marks double presses and punches of another work day', () => {
+    const first = punch('08:00');
+    const again: Punch = {
+      id: 'again',
+      at: new Date(first.at.getTime() + 10_000),
+      type: 'UNKNOWN',
+    };
+    const nextDay = punch('08:00', 'UNKNOWN', '2026-09-22');
+    expect(read([first, again, nextDay])).toEqual(['CHECK_IN', 'DUPLICATE', 'OTHER_DAY']);
+  });
+
+  it('gives the morning exit of a night shift to the day it started', () => {
+    const night = [punch('22:01'), punch('06:02', 'UNKNOWN', '2026-09-22')];
+    expect(read(night, {}, NIGHT_SHIFT)).toEqual(['CHECK_IN', 'CHECK_OUT']);
   });
 });

@@ -1,4 +1,9 @@
-import type { AttendanceAnomaly, AttendanceStatus, PunchType } from '@asistcontrol/shared';
+import type {
+  AttendanceAnomaly,
+  AttendanceStatus,
+  PunchReading,
+  PunchType,
+} from '@asistcontrol/shared';
 import type { AttendancePolicy } from './attendance-policy';
 import type {
   CalculationInput,
@@ -24,10 +29,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   const isFinal = now.getTime() >= day.window.to.getTime();
   const anomalies = new Set<AttendanceAnomaly>();
 
-  const inWindow = input.punches
-    .filter((p) => p.at >= day.window.from && p.at < day.window.to)
-    .sort((a, b) => a.at.getTime() - b.at.getTime());
-  const { kept, ignored } = dropDoublePresses(inWindow, policy.duplicatePunchWindowSeconds);
+  const { kept, ignored } = selectPunches(input);
   if (ignored.length > 0) anomalies.add('DUPLICATE_PUNCH');
 
   if (kept.length === 0) {
@@ -39,8 +41,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
     };
   }
 
-  const segments =
-    policy.punchPairing === 'SEQUENTIAL' ? pairSequentially(kept) : pairByPunchType(kept);
+  const segments = pairPunches(kept, policy.punchPairing).map(toSegment);
   const complete = segments.filter(isComplete);
 
   segments.forEach((s, i) => {
@@ -155,7 +156,40 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   };
 }
 
+/**
+ * Reads each punch the way `calculateAttendance` does: the first entry, the exits and returns
+ * in between (lunch), the last exit, double presses and punches outside the day's window.
+ * Lets people see why a day came out as it did.
+ */
+export function readPunches(
+  input: Pick<CalculationInput, 'day' | 'punches' | 'policy'>,
+): Map<string, PunchReading> {
+  const readings = new Map<string, PunchReading>(
+    input.punches.map((p) => [p.id, 'OTHER_DAY' as PunchReading]),
+  );
+  const { kept, ignored } = selectPunches(input);
+  for (const p of ignored) readings.set(p.id, 'DUPLICATE');
+  const pairs = pairPunches(kept, input.policy.punchPairing);
+  pairs.forEach((pair, i) => {
+    if (pair.in) readings.set(pair.in.id, i === 0 ? 'CHECK_IN' : 'BREAK_IN');
+    if (pair.out) readings.set(pair.out.id, i === pairs.length - 1 ? 'CHECK_OUT' : 'BREAK_OUT');
+  });
+  return readings;
+}
+
 // ───────────────────────────────────────────────────────────── steps
+
+/** The punches of the work day in order, without double presses. */
+function selectPunches({
+  day,
+  punches,
+  policy,
+}: Pick<CalculationInput, 'day' | 'punches' | 'policy'>): { kept: Punch[]; ignored: Punch[] } {
+  const inWindow = punches
+    .filter((p) => p.at >= day.window.from && p.at < day.window.to)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+  return dropDoublePresses(inWindow, policy.duplicatePunchWindowSeconds);
+}
 
 /** Collapses punches closer than `windowSeconds` to the previous kept punch. */
 export function dropDoublePresses(
@@ -175,31 +209,45 @@ export function dropDoublePresses(
   return { kept, ignored };
 }
 
+/** A work segment that still knows which punch opened it and which closed it. */
+export interface PunchPair {
+  in: Punch | null;
+  out: Punch | null;
+}
+
+function pairPunches(punches: Punch[], pairing: AttendancePolicy['punchPairing']): PunchPair[] {
+  return pairing === 'SEQUENTIAL' ? pairSequentially(punches) : pairByPunchType(punches);
+}
+
 /** in, out, in, out… regardless of the key pressed on the terminal. */
-export function pairSequentially(punches: Punch[]): WorkSegment[] {
-  const segments: WorkSegment[] = [];
+export function pairSequentially(punches: Punch[]): PunchPair[] {
+  const pairs: PunchPair[] = [];
   for (let i = 0; i < punches.length; i += 2) {
-    segments.push({ in: punches[i]!.at, out: punches[i + 1]?.at ?? null });
+    pairs.push({ in: punches[i]!, out: punches[i + 1] ?? null });
   }
-  return segments;
+  return pairs;
 }
 
 /** Uses the punch type reported by the device; UNKNOWN is inferred from the current state. */
-export function pairByPunchType(punches: Punch[]): WorkSegment[] {
-  const segments: WorkSegment[] = [];
-  let open: Date | null = null;
+export function pairByPunchType(punches: Punch[]): PunchPair[] {
+  const pairs: PunchPair[] = [];
+  let open: Punch | null = null;
   for (const punch of punches) {
     const direction = directionOf(punch.type) ?? (open ? 'OUT' : 'IN');
     if (direction === 'IN') {
-      if (open) segments.push({ in: open, out: null });
-      open = punch.at;
+      if (open) pairs.push({ in: open, out: null });
+      open = punch;
     } else {
-      segments.push({ in: open, out: punch.at });
+      pairs.push({ in: open, out: punch });
       open = null;
     }
   }
-  if (open) segments.push({ in: open, out: null });
-  return segments;
+  if (open) pairs.push({ in: open, out: null });
+  return pairs;
+}
+
+function toSegment(pair: PunchPair): WorkSegment {
+  return { in: pair.in?.at ?? null, out: pair.out?.at ?? null };
 }
 
 function directionOf(type: PunchType): 'IN' | 'OUT' | null {

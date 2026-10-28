@@ -18,6 +18,20 @@ export type DeviceDriver = (typeof DEVICE_DRIVERS)[number];
 export const PUNCH_TYPES = values('CHECK_IN', 'CHECK_OUT', 'BREAK_OUT', 'BREAK_IN', 'UNKNOWN');
 export type PunchType = (typeof PUNCH_TYPES)[number];
 
+/**
+ * How the attendance calculation reads a punch of a work day. Derived, never stored:
+ * DUPLICATE is too close to the previous punch, OTHER_DAY falls outside this work day.
+ */
+export const PUNCH_READINGS = values(
+  'CHECK_IN',
+  'BREAK_OUT',
+  'BREAK_IN',
+  'CHECK_OUT',
+  'DUPLICATE',
+  'OTHER_DAY',
+);
+export type PunchReading = (typeof PUNCH_READINGS)[number];
+
 export const VERIFY_MODES = values('FINGERPRINT', 'FACE', 'CARD', 'PASSWORD', 'OTHER');
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 

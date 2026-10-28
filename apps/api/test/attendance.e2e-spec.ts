@@ -192,4 +192,110 @@ describe('Attendance corrections, leave and reports (e2e)', () => {
       .set(bearer(hr))
       .expect(400);
   });
+
+  describe('manual corrections with preview', () => {
+    const DAY = '2026-09-15';
+    const recordOn = async (employeeId: string, date: string) =>
+      (
+        await http()
+          .get(`/api/attendance/records?from=${date}&to=${date}&employeeId=${employeeId}`)
+          .set(bearer(hr))
+          .expect(200)
+      ).body.data[0];
+    const batch = (punches: { occurredAt: string; punchType?: string }[], date = DAY) =>
+      http()
+        .post('/api/attendance/events/batch')
+        .set(bearer(hr))
+        .send({ employeeId: fx.teammate.id, punches, reason: `No marcó el ${date} (e2e)` });
+
+    it('previews a forgotten exit without saving it', async () => {
+      await http()
+        .post('/api/attendance/events')
+        .set(bearer(hr))
+        .send({ employeeId: fx.employee.id, occurredAt: at('08:03', DAY), reason: 'Entrada (e2e)' })
+        .expect(201);
+
+      const res = await http()
+        .post('/api/attendance/events/preview')
+        .set(bearer(hr))
+        .send({ employeeId: fx.employee.id, punches: [{ occurredAt: at('17:00', DAY) }] })
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        workDate: DAY,
+        dayType: 'WORKDAY',
+        employed: true,
+        punchPairing: 'SEQUENTIAL',
+        shift: { start: at('08:00', DAY), end: at('17:00', DAY) },
+        before: { status: 'INCOMPLETE' },
+        // 08:03 → 17:00 minus the scheduled lunch nobody punched.
+        after: { status: 'PRESENT', workedMinutes: 477 },
+      });
+      expect(
+        res.body.punches.map((p: { reading: string; proposed: boolean }) => [
+          p.reading,
+          p.proposed,
+        ]),
+      ).toEqual([
+        ['CHECK_IN', false],
+        ['CHECK_OUT', true],
+      ]);
+      expect(
+        await prisma.attendanceEvent.count({
+          where: { employeeId: fx.employee.id, occurredAt: { gte: new Date(at('00:00', DAY)) } },
+        }),
+      ).toBe(1);
+    });
+
+    it('registers a whole forgotten day at once and audits each punch', async () => {
+      const res = await batch([
+        { occurredAt: at('08:00', DAY), punchType: 'CHECK_IN' },
+        { occurredAt: at('17:00', DAY), punchType: 'CHECK_OUT' },
+      ]).expect(201);
+
+      expect(res.body).toHaveLength(2);
+      expect(await recordOn(fx.teammate.id, DAY)).toMatchObject({
+        status: 'PRESENT',
+        workedMinutes: 480,
+      });
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            action: 'attendance.manual_event',
+            entityId: { in: res.body.map((e: { id: string }) => e.id) },
+          },
+        }),
+      ).toBe(2);
+    });
+
+    it('saves none of the punches when one of them is wrong', async () => {
+      const DAY2 = '2026-09-16';
+      const before = await prisma.attendanceEvent.count({ where: { employeeId: fx.teammate.id } });
+
+      await batch([{ occurredAt: at('08:00', DAY) }, { occurredAt: at('12:00', DAY2) }]).expect(
+        409,
+      );
+      await batch([{ occurredAt: at('08:00', DAY2) }, { occurredAt: at('08:00', DAY2) }]).expect(
+        400,
+      );
+      await batch([
+        { occurredAt: at('08:00', DAY2) },
+        { occurredAt: new Date(Date.now() + 3_600_000).toISOString() },
+      ]).expect(400);
+      await batch([1, 2, 3, 4, 5].map((h) => ({ occurredAt: at(`0${h}:00`, DAY2) }))).expect(400);
+
+      expect(await prisma.attendanceEvent.count({ where: { employeeId: fx.teammate.id } })).toBe(
+        before,
+      );
+    });
+
+    it('lets only those who can correct attendance preview it', async () => {
+      const supervisor = await login(app, fx.emails.supervisor);
+      await http()
+        .post('/api/attendance/events/preview')
+        .set(bearer(supervisor))
+        .send({ employeeId: fx.employee.id, punches: [{ occurredAt: at('17:00', DAY) }] })
+        .expect(403);
+    });
+  });
 });

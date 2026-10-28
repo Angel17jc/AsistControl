@@ -1,3 +1,4 @@
+import type { PunchType } from '@asistcontrol/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { forEachLimit } from '../common/utils/concurrency';
@@ -5,7 +6,7 @@ import { addDays, eachDate, fromDbDate, localDateOf, toDbDate } from '../common/
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { SettingsService } from '../settings/settings.service';
-import { calculateAttendance } from './domain/attendance-calculator';
+import { calculateAttendance, readPunches } from './domain/attendance-calculator';
 import type { CalculationResult } from './domain/types';
 import { type WorkCalendar, WorkCalendarService } from './work-calendar.service';
 
@@ -112,6 +113,89 @@ export class AttendanceProcessingService {
   }
 
   /**
+   * The work day some proposed punches fall on, read with and without them. Saves nothing:
+   * it lets a person see how a manual correction will be read before making it.
+   */
+  async previewDay(employeeId: string, proposed: { occurredAt: Date; punchType: PunchType }[]) {
+    const employee = (await this.employeesById([employeeId])).get(employeeId);
+    if (!employee || proposed.length === 0) return null;
+
+    // The earliest punch decides the day: a night shift's exit belongs to the day it started.
+    const earliest = proposed.reduce((a, b) => (b.occurredAt < a.occurredAt ? b : a));
+    const local = localDateOf(earliest.occurredAt, await this.settings.getTimezone());
+    const calendar = await this.loadCalendar([employeeId], local, local);
+    const workDate = calendar.workDateOf(employeeId, earliest.occurredAt);
+    const day = calendar.dayFor(employeeId, workDate);
+
+    const [events, leaves] = await Promise.all([
+      this.prisma.attendanceEvent.findMany({
+        where: {
+          employeeId,
+          voidedAt: null,
+          occurredAt: { gte: day.window.from, lt: day.window.to },
+        },
+        select: {
+          id: true,
+          occurredAt: true,
+          punchType: true,
+          source: true,
+          note: true,
+          device: { select: { name: true } },
+        },
+      }),
+      this.leavesDuring(employeeId, day.window),
+    ]);
+
+    const saved = events.map((e) => ({ id: e.id, at: e.occurredAt, type: e.punchType }));
+    const all = [
+      ...saved,
+      ...proposed.map((p, i) => ({ id: proposedId(i), at: p.occurredAt, type: p.punchType })),
+    ];
+    const input = { day, leaves, policy: calendar.policy, now: new Date() };
+    const before = calculateAttendance({ ...input, punches: saved });
+    const readings = readPunches({ ...input, punches: all });
+
+    return {
+      workDate,
+      dayType: day.dayType,
+      hasSchedule: day.hasSchedule,
+      employed: isEmployed(employee, workDate),
+      punchPairing: calendar.policy.punchPairing,
+      shift: day.shift && {
+        start: day.shift.start,
+        end: day.shift.end,
+        breakStart: day.shift.breakStart,
+        breakEnd: day.shift.breakEnd,
+      },
+      punches: [
+        ...events.map((e) => ({
+          id: e.id as string | null,
+          occurredAt: e.occurredAt,
+          punchType: e.punchType,
+          source: e.source,
+          deviceName: e.device?.name ?? null,
+          note: e.note,
+          proposed: false,
+          reading: readings.get(e.id)!,
+        })),
+        ...proposed.map((p, i) => ({
+          id: null,
+          occurredAt: p.occurredAt,
+          punchType: p.punchType,
+          source: 'MANUAL' as const,
+          deviceName: null,
+          note: null,
+          proposed: true,
+          reading: readings.get(proposedId(i))!,
+        })),
+      ].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime()),
+      // Like recomputeWith: a day without punches that is still open has no record yet.
+      before: saved.length === 0 && !before.isFinal ? null : summarize(before),
+      after: summarize(calculateAttendance({ ...input, punches: all })),
+    };
+  }
+
+  /**
    * Closes open work days: finalizes provisional records whose window has ended and creates
    * the ABSENT records for employees that never punched. Safe to run repeatedly.
    */
@@ -169,21 +253,13 @@ export class AttendanceProcessingService {
         },
         select: { id: true, occurredAt: true, punchType: true },
       }),
-      this.prisma.leaveRequest.findMany({
-        where: {
-          employeeId: employee.id,
-          status: 'APPROVED',
-          startsAt: { lt: day.window.to },
-          endsAt: { gt: day.window.from },
-        },
-        select: { id: true, startsAt: true, endsAt: true },
-      }),
+      this.leavesDuring(employee.id, day.window),
     ]);
 
     const result = calculateAttendance({
       day,
       punches: events.map((e) => ({ id: e.id, at: e.occurredAt, type: e.punchType })),
-      leaves: leaves.map((l) => ({ id: l.id, start: l.startsAt, end: l.endsAt })),
+      leaves,
       policy: calendar.policy,
       now: new Date(),
     });
@@ -260,6 +336,20 @@ export class AttendanceProcessingService {
     }
   }
 
+  /** Approved leave overlapping a work day window. */
+  private async leavesDuring(employeeId: string, window: { from: Date; to: Date }) {
+    const leaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId,
+        status: 'APPROVED',
+        startsAt: { lt: window.to },
+        endsAt: { gt: window.from },
+      },
+      select: { id: true, startsAt: true, endsAt: true },
+    });
+    return leaves.map((l) => ({ id: l.id, start: l.startsAt, end: l.endsAt }));
+  }
+
   private async loadCalendar(employeeIds: string[], from: string, to: string) {
     const [timezone, policy] = await Promise.all([
       this.settings.getTimezone(),
@@ -280,6 +370,23 @@ export class AttendanceProcessingService {
 function isEmployed(employee: EmployeeRef, date: string): boolean {
   if (date < fromDbDate(employee.hireDate)) return false;
   return !employee.terminatedAt || date <= fromDbDate(employee.terminatedAt);
+}
+
+const proposedId = (index: number) => `proposed:${index}`;
+
+function summarize(result: CalculationResult) {
+  return {
+    status: result.status,
+    firstIn: result.firstIn,
+    lastOut: result.lastOut,
+    workedMinutes: result.workedMinutes,
+    breakMinutes: result.breakMinutes,
+    lateMinutes: result.lateMinutes,
+    earlyLeaveMinutes: result.earlyLeaveMinutes,
+    overtimeMinutes: result.overtimeMinutes,
+    anomalies: result.anomalies,
+    isFinal: result.isFinal,
+  };
 }
 
 function toRecordData(
