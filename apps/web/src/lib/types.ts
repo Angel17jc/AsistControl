@@ -2,10 +2,13 @@ import type {
   AttendanceAnomaly,
   AttendanceEventCreatedPayload,
   AttendanceStatus,
+  DayType,
   DeviceDriver,
   DeviceStatus,
   EmployeeStatus,
   LeaveType,
+  PunchReading,
+  PunchType,
   RequestStatus,
   Role,
   SyncStatus,
@@ -45,6 +48,44 @@ export interface AttendanceEventRow extends AttendanceEventCreatedPayload {
   note: string | null;
   voidedAt: string | null;
   voidReason: string | null;
+}
+
+export interface DaySummary {
+  status: AttendanceStatus;
+  firstIn: string | null;
+  lastOut: string | null;
+  workedMinutes: number;
+  breakMinutes: number;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  overtimeMinutes: number;
+  anomalies: AttendanceAnomaly[];
+  isFinal: boolean;
+}
+
+/** POST /attendance/events/preview: a work day read with the proposed manual punches. */
+export interface DayPreview {
+  workDate: string;
+  dayType: DayType;
+  hasSchedule: boolean;
+  /** False when the day is before the hire date or after the termination. */
+  employed: boolean;
+  punchPairing: 'SEQUENTIAL' | 'DEVICE_TYPE';
+  shift: { start: string; end: string; breakStart: string | null; breakEnd: string | null } | null;
+  punches: {
+    /** Null for a proposed punch, not saved yet. */
+    id: string | null;
+    occurredAt: string;
+    punchType: PunchType;
+    source: 'DEVICE' | 'MANUAL' | 'IMPORT';
+    deviceName: string | null;
+    note: string | null;
+    proposed: boolean;
+    reading: PunchReading;
+  }[];
+  /** Null while the day is open and nobody punched: there is no record yet. */
+  before: DaySummary | null;
+  after: DaySummary;
 }
 
 export interface EmployeeRow {

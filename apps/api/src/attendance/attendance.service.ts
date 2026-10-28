@@ -21,7 +21,9 @@ import {
 import { AttendanceProcessingService } from './attendance-processing.service';
 import type {
   CreateManualEventDto,
+  CreateManualEventsDto,
   EventsQueryDto,
+  PreviewManualEventsDto,
   RecomputeDto,
   RecordsQueryDto,
   VoidEventDto,
@@ -127,61 +129,100 @@ export class AttendanceService {
     actor: AuthenticatedUser,
     ctx: RequestContext,
   ) {
+    const { occurredAt, punchType, ...rest } = dto;
+    const [event] = await this.createManualEvents(
+      { ...rest, punches: [{ occurredAt, punchType }] },
+      actor,
+      ctx,
+    );
+    return event!;
+  }
+
+  /** Several forgotten punches of one person (e.g. a whole day): all are saved, or none. */
+  async createManualEvents(
+    dto: CreateManualEventsDto,
+    actor: AuthenticatedUser,
+    ctx: RequestContext,
+  ) {
     await this.scope.assertCanAccessEmployee(actor, dto.employeeId);
     const employee = await this.prisma.employee.findFirst({
       where: { id: dto.employeeId, deletedAt: null },
     });
     if (!employee) throw new NotFoundException('Employee not found');
 
-    const occurredAt = new Date(dto.occurredAt);
-    if (occurredAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
+    const punches = dto.punches.map((p) => {
+      const occurredAt = new Date(p.occurredAt);
+      const dedupKey = buildDedupKey({
+        source: 'MANUAL',
+        scope: 'manual',
+        subject: employee.id,
+        occurredAt,
+      });
+      return { occurredAt, punchType: p.punchType ?? 'UNKNOWN', dedupKey };
+    });
+    if (punches.some((p) => p.occurredAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS)) {
       throw new BadRequestException('A punch cannot be registered in the future');
     }
+    const keys = punches.map((p) => p.dedupKey);
+    if (new Set(keys).size !== keys.length) {
+      throw new BadRequestException('Two of the punches are at the same time');
+    }
+    const existing = await this.prisma.attendanceEvent.count({ where: { dedupKey: { in: keys } } });
+    if (existing > 0) throw new ConflictException('A manual punch already exists at that time');
 
-    const dedupKey = buildDedupKey({
-      source: 'MANUAL',
-      scope: 'manual',
-      subject: employee.id,
-      occurredAt,
-    });
-    const existing = await this.prisma.attendanceEvent.findUnique({ where: { dedupKey } });
-    if (existing) throw new ConflictException('A manual punch already exists at that time');
-
-    const event = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.attendanceEvent.create({
-        data: {
-          employeeId: employee.id,
-          deviceUserId: employee.biometricId ?? `manual:${employee.employeeCode}`,
-          occurredAt,
-          punchType: dto.punchType ?? 'UNKNOWN',
-          source: 'MANUAL',
-          dedupKey,
-          note: dto.reason,
-          createdById: actor.id,
-        },
-      });
-      await this.audit.record(
-        {
-          actorId: actor.id,
-          action: 'attendance.manual_event',
-          entity: 'AttendanceEvent',
-          entityId: created.id,
-          context: ctx,
-          metadata: {
+    const events = await this.prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const punch of punches) {
+        const event = await tx.attendanceEvent.create({
+          data: {
             employeeId: employee.id,
-            occurredAt: dto.occurredAt,
-            punchType: created.punchType,
-            reason: dto.reason,
+            deviceUserId: employee.biometricId ?? `manual:${employee.employeeCode}`,
+            occurredAt: punch.occurredAt,
+            punchType: punch.punchType,
+            source: 'MANUAL',
+            dedupKey: punch.dedupKey,
+            note: dto.reason,
+            createdById: actor.id,
           },
-        },
-        tx,
-      );
+        });
+        await this.audit.record(
+          {
+            actorId: actor.id,
+            action: 'attendance.manual_event',
+            entity: 'AttendanceEvent',
+            entityId: event.id,
+            context: ctx,
+            metadata: {
+              employeeId: employee.id,
+              occurredAt: punch.occurredAt.toISOString(),
+              punchType: event.punchType,
+              reason: dto.reason,
+            },
+          },
+          tx,
+        );
+        created.push(event);
+      }
       return created;
     });
 
-    await this.processing.processEvents([event]);
-    await this.publisher.publishCreated([event.id]);
-    return event;
+    await this.processing.processEvents(events);
+    await this.publisher.publishCreated(events.map((e) => e.id));
+    return events;
+  }
+
+  /** How the work day will read with the proposed manual punches. Saves nothing. */
+  async previewManualEvents(dto: PreviewManualEventsDto, actor: AuthenticatedUser) {
+    await this.scope.assertCanAccessEmployee(actor, dto.employeeId);
+    const preview = await this.processing.previewDay(
+      dto.employeeId,
+      dto.punches.map((p) => ({
+        occurredAt: new Date(p.occurredAt),
+        punchType: p.punchType ?? 'UNKNOWN',
+      })),
+    );
+    if (!preview) throw new NotFoundException('Employee not found');
+    return preview;
   }
 
   /** Voiding keeps the original row (and why it was discarded) for the audit trail. */

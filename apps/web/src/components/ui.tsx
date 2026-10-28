@@ -2,7 +2,9 @@ import clsx from 'clsx';
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   CircleDashed,
+  CircleHelp,
   Clock,
   Loader2,
   MinusCircle,
@@ -64,6 +66,31 @@ export function PageHeader({
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
+  );
+}
+
+/** A short explanation of a screen, closed until someone needs it. */
+export function PageHelp({
+  title = '¿Cómo funciona esta pantalla?',
+  children,
+}: {
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group mb-6 rounded-xl border border-line bg-surface-1 text-sm">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 font-medium text-ink-1 hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+        <CircleHelp className="size-4 shrink-0 text-accent" aria-hidden />
+        {title}
+        <ChevronDown
+          className="ml-auto size-4 text-ink-3 transition group-open:rotate-180"
+          aria-hidden
+        />
+      </summary>
+      <div className="space-y-2 border-t border-line px-4 py-3 leading-relaxed text-ink-2">
+        {children}
+      </div>
+    </details>
   );
 }
 

@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
 import { AttendanceService } from './attendance.service';
 import {
   CreateManualEventDto,
+  CreateManualEventsDto,
   EventsQueryDto,
+  PreviewManualEventsDto,
   RecomputeDto,
   RecordsQueryDto,
   VoidEventDto,
@@ -43,6 +45,33 @@ export class AttendanceController {
     @ReqContext() ctx: RequestContext,
   ) {
     return this.attendance.createManualEvent(dto, actor, ctx);
+  }
+
+  @Post('events/batch')
+  @RequirePermissions('attendance:write')
+  @ApiOperation({
+    summary: 'Register several manual punches of one employee at once (e.g. a whole day)',
+    description: 'All of them are saved, or none. Each one is audited with the same reason.',
+  })
+  createManualBatch(
+    @Body() dto: CreateManualEventsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ) {
+    return this.attendance.createManualEvents(dto, actor, ctx);
+  }
+
+  @Post('events/preview')
+  @HttpCode(200)
+  @RequirePermissions('attendance:write')
+  @ApiOperation({
+    summary: 'Show how manual punches would be read, without saving them',
+    description:
+      'Returns the work day they fall on: its shift, every punch with how it is read ' +
+      '(entry, lunch, exit, duplicate, another day) and the summary before and after.',
+  })
+  preview(@Body() dto: PreviewManualEventsDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.attendance.previewManualEvents(dto, actor);
   }
 
   @Post('events/:id/void')

@@ -2,7 +2,8 @@ import { ATTENDANCE_STATUSES, type PaginatedResponse } from '@asistcontrol/share
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Plus } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { useState } from 'react';
+import { ManualPunchForm } from '../components/attendance/ManualPunchForm';
 import { ATTENDANCE_STATUS } from '../components/status';
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Pagination,
   Select,
   Spinner,
@@ -28,7 +30,7 @@ import {
   formatTime,
   todayIso,
 } from '../lib/format';
-import type { AttendanceEventRow, AttendanceRecordRow, EmployeeRow } from '../lib/types';
+import type { AttendanceEventRow, AttendanceRecordRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
 export function AttendancePage() {
@@ -55,7 +57,34 @@ export function AttendancePage() {
           )
         }
       />
-      {showManual && <ManualEventForm onDone={() => setShowManual(false)} />}
+      <PageHelp>
+        <p>
+          <strong className="text-ink-1">Marcaciones.</strong> Cada vez que alguien pone el dedo, la
+          tarjeta o su clave en el marcador queda una marcación con fecha y hora. El marcador solo
+          guarda eso: quién y cuándo.
+        </p>
+        <p>
+          <strong className="text-ink-1">Jornadas.</strong> El sistema junta las marcaciones de cada
+          persona en su día y las lee en orden: entrada, salida al almuerzo, regreso y salida. Con
+          su horario calcula lo trabajado, el atraso y las horas extra (estas se aprueban en
+          Solicitudes). «Provisional» quiere decir que el día aún no termina y puede cambiar si
+          llegan más marcaciones.
+        </p>
+        <p>
+          <strong className="text-ink-1">Novedades.</strong> Lo que el sistema detectó en el día,
+          por ejemplo «Sin salida» (olvidó marcar al irse) o «Fuera de horario».
+        </p>
+        <p>
+          <strong className="text-ink-1">Corrección manual.</strong> Si alguien olvidó marcar o el
+          marcador falló, agregue lo que falta. Antes de guardar verá cómo queda el día. Pide un
+          motivo porque queda en Auditoría.
+        </p>
+        <p>
+          <strong className="text-ink-1">Anular</strong> (pestaña Marcaciones). Para una marcación
+          que no debe contar. No se borra: sigue a la vista, marcada como anulada y con su motivo.
+        </p>
+      </PageHelp>
+      {showManual && <ManualPunchForm onDone={() => setShowManual(false)} />}
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex rounded-lg border border-line bg-surface-1 p-1" role="tablist">
@@ -250,93 +279,6 @@ function EventsTable({ from, to }: { from: string; to: string }) {
           <Pagination page={data.meta.page} totalPages={data.meta.totalPages} onChange={setPage} />
         </>
       )}
-    </Card>
-  );
-}
-
-function ManualEventForm({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient();
-  const employees = useQuery({
-    queryKey: ['employees', 'options'],
-    queryFn: () =>
-      api<PaginatedResponse<EmployeeRow>>('/employees', {
-        query: { pageSize: 100, status: 'ACTIVE' },
-      }),
-  });
-  const [employeeId, setEmployeeId] = useState('');
-  const [date, setDate] = useState(todayIso());
-  const [time, setTime] = useState('08:00');
-  const [reason, setReason] = useState('');
-  const create = useMutation({
-    mutationFn: () =>
-      api('/attendance/events', {
-        method: 'POST',
-        // The browser interprets date+time in the user's local zone, matching the operator's intent.
-        body: { employeeId, occurredAt: new Date(`${date}T${time}:00`).toISOString(), reason },
-      }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      onDone();
-    },
-  });
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    create.mutate();
-  }
-
-  return (
-    <Card className="mb-6">
-      <form onSubmit={submit} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Empleado">
-          <Select required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-            <option value="">Seleccione…</option>
-            {employees.data?.data.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.lastName} {emp.firstName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Fecha">
-          <Input
-            type="date"
-            required
-            value={date}
-            max={todayIso()}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <Field label="Hora">
-          <Input type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
-        </Field>
-        <Field label="Justificación" hint="Queda registrada en auditoría">
-          <Input
-            required
-            minLength={5}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </Field>
-        <div className="flex items-end gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            loading={create.isPending}
-            disabled={!employeeId || reason.trim().length < 5}
-          >
-            Registrar
-          </Button>
-          <Button type="button" variant="ghost" onClick={onDone}>
-            Cancelar
-          </Button>
-        </div>
-        {create.error && (
-          <p role="alert" className="text-sm text-critical sm:col-span-2 lg:col-span-5">
-            {create.error.message}
-          </p>
-        )}
-      </form>
     </Card>
   );
 }

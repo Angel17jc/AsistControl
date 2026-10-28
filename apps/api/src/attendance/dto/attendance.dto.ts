@@ -5,8 +5,11 @@ import {
   PUNCH_TYPES,
   type PunchType,
 } from '@asistcontrol/shared';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsISO8601,
@@ -16,6 +19,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { DATE_ONLY_REGEX } from '../../common/utils/date-only';
@@ -76,6 +80,42 @@ export class CreateManualEventDto {
   @IsIn(PUNCH_TYPES)
   punchType?: PunchType;
 
+  @ApiProperty({ description: 'Mandatory justification, kept in the audit trail' })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason: string;
+}
+
+export class ManualPunchDto {
+  @ApiProperty({ example: '2026-09-21T13:02:00.000Z' })
+  @IsISO8601({ strict: true })
+  occurredAt: string;
+
+  @ApiPropertyOptional({ enum: PUNCH_TYPES, default: 'UNKNOWN' })
+  @IsOptional()
+  @IsIn(PUNCH_TYPES)
+  punchType?: PunchType;
+}
+
+/** A forgotten exit is one punch; a day nobody punched is an entry and an exit (and lunch). */
+export const MAX_MANUAL_PUNCHES = 4;
+
+export class PreviewManualEventsDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  employeeId: string;
+
+  @ApiProperty({ type: [ManualPunchDto], minItems: 1, maxItems: MAX_MANUAL_PUNCHES })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_MANUAL_PUNCHES)
+  @ValidateNested({ each: true })
+  @Type(() => ManualPunchDto)
+  punches: ManualPunchDto[];
+}
+
+export class CreateManualEventsDto extends PreviewManualEventsDto {
   @ApiProperty({ description: 'Mandatory justification, kept in the audit trail' })
   @IsString()
   @MinLength(5)
