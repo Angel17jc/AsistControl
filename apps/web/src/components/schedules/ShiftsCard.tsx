@@ -139,29 +139,37 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
       aria-label={shift ? `Editar turno ${shift.name}` : 'Nuevo turno'}
       className="grid gap-4 border-b border-line p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <Field label="Nombre">
+      <Field label="Nombre" hint="Para reconocerlo al armar horarios, p. ej. «Oficina» o «Noche»">
         <Input required minLength={2} value={form.name} onChange={set('name')} />
       </Field>
-      <Field label="Entrada">
+      <Field label="Entrada" hint="Los atrasos se miden desde esta hora">
         <Input type="time" required value={form.startTime} onChange={set('startTime')} />
       </Field>
       <Field
         label="Salida"
         hint={
-          form.endTime && form.endTime <= form.startTime ? 'Termina al día siguiente' : undefined
+          form.endTime && form.endTime <= form.startTime
+            ? 'Termina al día siguiente (turno de noche)'
+            : 'Si es menor que la entrada, el turno termina al día siguiente'
         }
       >
         <Input type="time" required value={form.endTime} onChange={set('endTime')} />
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Almuerzo desde">
+        <Field label="Almuerzo desde" hint="Opcional">
           <Input type="time" value={form.breakStart} onChange={set('breakStart')} />
         </Field>
-        <Field label="Almuerzo hasta">
+        <Field
+          label="Almuerzo hasta"
+          hint="Si no lo marcan, puede descontarse solo (Configuración)"
+        >
           <Input type="time" value={form.breakEnd} onChange={set('breakEnd')} />
         </Field>
       </div>
-      <Field label="Tolerancia de atraso (min)" hint="Vacío: la de la política">
+      <Field
+        label="Tolerancia de atraso (min)"
+        hint="Minutos de gracia: llegar dentro de ellos no es atraso. Vacío: lo de Configuración"
+      >
         <Input
           type="number"
           min={0}
@@ -170,7 +178,10 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
           onChange={set('lateToleranceMinutes')}
         />
       </Field>
-      <Field label="Tolerancia de salida (min)" hint="Vacío: la de la política">
+      <Field
+        label="Tolerancia de salida (min)"
+        hint="Salir hasta estos minutos antes no es salida anticipada. Vacío: lo de Configuración"
+      >
         <Input
           type="number"
           min={0}
@@ -179,7 +190,10 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
           onChange={set('earlyLeaveToleranceMinutes')}
         />
       </Field>
-      <Field label="Horas extra desde (min)" hint="Vacío: lo de la política">
+      <Field
+        label="Horas extra desde (min)"
+        hint="Menos minutos extra que estos no se proponen como horas extra. Vacío: lo de Configuración"
+      >
         <Input
           type="number"
           min={0}

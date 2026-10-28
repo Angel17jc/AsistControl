@@ -84,7 +84,7 @@ describe('DeviceForm', () => {
     // The advice is the field's description, read after its name, not part of the name.
     expect(user).toHaveAccessibleName('Usuario ISAPI');
     expect(user).toHaveAccessibleDescription(
-      'Mejor un usuario dedicado que el administrador del equipo',
+      'Un usuario del equipo que pueda consultar registros (Log Search), mejor que «admin»',
     );
     const password = screen.getByLabelText('Contraseña ISAPI');
     expect(password).toBeRequired();

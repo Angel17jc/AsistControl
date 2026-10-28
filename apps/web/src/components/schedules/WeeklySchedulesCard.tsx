@@ -129,15 +129,18 @@ function ScheduleForm({ schedule, onDone }: { schedule?: WorkScheduleRow; onDone
       className="grid gap-4 border-b border-line p-5 lg:grid-cols-[1fr_2fr]"
     >
       <div className="space-y-4">
-        <Field label="Nombre">
+        <Field label="Nombre" hint="P. ej. «Administrativo L-V» o «Rotativo noche»">
           <Input required minLength={2} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Descripción">
+        <Field label="Descripción" hint="Opcional: para quién es o cuándo se usa">
           <Input value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
       </div>
       <fieldset className="grid gap-2 sm:grid-cols-2">
         <legend className="mb-2 text-sm font-medium text-ink-2">Turno de cada día</legend>
+        <p className="text-xs text-ink-3 sm:col-span-2">
+          «Descanso» es día libre: no se espera trabajo ni se marcan ausencias.
+        </p>
         {WEEKDAYS.map(([weekday, label]) => (
           <Field key={weekday} label={label}>
             <Select

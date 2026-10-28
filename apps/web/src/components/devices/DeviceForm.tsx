@@ -129,10 +129,10 @@ export function DeviceForm({ device, onDone }: { device?: DeviceRow; onDone: () 
       aria-label={editing ? `Editar ${device.name}` : 'Registrar dispositivo'}
       className={clsx('grid gap-4 p-5 sm:grid-cols-2', wide && 'lg:grid-cols-4')}
     >
-      <Field label="Nombre">
+      <Field label="Nombre" hint="Para reconocerlo en listados y avisos">
         <Input required value={form.name} onChange={set('name')} placeholder="Entrada planta 2" />
       </Field>
-      <Field label="Driver">
+      <Field label="Driver" hint="Cómo hablar con el equipo según su marca. MOCK es un simulador">
         <Select value={form.driver} onChange={(e) => changeDriver(e.target.value)}>
           {(drivers.data ?? [form.driver]).map((d) => (
             <option key={d} value={d}>
@@ -141,16 +141,16 @@ export function DeviceForm({ device, onDone }: { device?: DeviceRow; onDone: () 
           ))}
         </Select>
       </Field>
-      <Field label="Fabricante">
+      <Field label="Fabricante" hint="No cambia cómo se conecta: eso lo decide el driver">
         <Input required value={form.manufacturer} onChange={set('manufacturer')} />
       </Field>
-      <Field label="Modelo">
+      <Field label="Modelo" hint="El que figura en el equipo, p. ej. DS-K1A802AEF">
         <Input required value={form.model} onChange={set('model')} />
       </Field>
-      <Field label="IP / host">
+      <Field label="IP / host" hint="La dirección del marcador en la red, p. ej. 192.168.1.50">
         <Input required value={form.host} onChange={set('host')} />
       </Field>
-      <Field label="Puerto">
+      <Field label="Puerto" hint={preset.portHint || undefined}>
         <Input
           required
           type="number"
@@ -168,7 +168,7 @@ export function DeviceForm({ device, onDone }: { device?: DeviceRow; onDone: () 
           </Select>
         </Field>
       )}
-      <Field label="Ubicación">
+      <Field label="Ubicación" hint="Opcional: dónde está, p. ej. «Puerta principal»">
         <Input value={form.location} onChange={set('location')} />
       </Field>
       {preset.credentials.map((field) => (

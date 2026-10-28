@@ -108,7 +108,10 @@ function HolidayForm({ year, onAdded }: { year: number; onAdded: () => Promise<u
       aria-label="Nuevo feriado"
       className="grid gap-3 border-b border-line p-5 sm:grid-cols-[11rem_1fr_auto] sm:items-end"
     >
-      <Field label="Fecha">
+      <Field
+        label="Fecha"
+        hint="Nadie tiene que trabajar; lo trabajado se propone como horas extra"
+      >
         <Input
           type="date"
           required
