@@ -32,6 +32,22 @@ export const PUNCH_READINGS = values(
 );
 export type PunchReading = (typeof PUNCH_READINGS)[number];
 
+/**
+ * Where a person is right now, for the presence board. Derived, never stored. Ordered as
+ * the board shows them: NOT_ARRIVED is someone whose (tolerated) start time already passed.
+ */
+export const PRESENCE_STATES = values(
+  'IN',
+  'ON_BREAK',
+  'LEFT',
+  'NOT_ARRIVED',
+  'NOT_YET',
+  'ON_LEAVE',
+  'DAY_OFF',
+  'NO_SCHEDULE',
+);
+export type PresenceState = (typeof PRESENCE_STATES)[number];
+
 export const VERIFY_MODES = values('FINGERPRINT', 'FACE', 'CARD', 'PASSWORD', 'OTHER');
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 

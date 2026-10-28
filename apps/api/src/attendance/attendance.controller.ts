@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
 import { AttendanceService } from './attendance.service';
+import { PresenceService } from './presence.service';
 import {
   CreateManualEventDto,
   CreateManualEventsDto,
@@ -17,7 +18,10 @@ import {
 @ApiBearerAuth()
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendance: AttendanceService) {}
+  constructor(
+    private readonly attendance: AttendanceService,
+    private readonly presence: PresenceService,
+  ) {}
 
   @Get('records')
   @RequirePermissions('attendance:read')
@@ -27,6 +31,18 @@ export class AttendanceController {
   })
   records(@Query() query: RecordsQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return this.attendance.listRecords(query, user);
+  }
+
+  @Get('presence')
+  @RequirePermissions('dashboard:read')
+  @ApiOperation({
+    summary: 'Who is in right now',
+    description:
+      'Each active employee in scope with their state (in, at lunch, gone, not arrived, ' +
+      'not yet, on leave, day off, no schedule), first entry, lateness and last punch.',
+  })
+  presenceBoard(@CurrentUser() user: AuthenticatedUser) {
+    return this.presence.board(user);
   }
 
   @Get('events')
