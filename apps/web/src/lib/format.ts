@@ -1,4 +1,9 @@
-import { type LeaveType, type VacationAccrual, formatMinutes } from '@asistcontrol/shared';
+import {
+  type LeaveType,
+  type PunchReading,
+  type VacationAccrual,
+  formatMinutes,
+} from '@asistcontrol/shared';
 
 export { formatMinutes };
 
@@ -52,7 +57,12 @@ export function formatDateWithYear(isoDate: string): string {
 }
 
 export function todayIso(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: displayTimezone }).format(new Date());
+  return localDate(new Date().toISOString());
+}
+
+/** "2026-09-18": the company's calendar date of an instant. */
+export function localDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: displayTimezone }).format(new Date(iso));
 }
 
 export function relativeTime(iso: string | null | undefined, now = Date.now()): string {
@@ -106,6 +116,16 @@ export const PUNCH_LABEL: Record<string, string> = {
   BREAK_OUT: 'Salida almuerzo',
   BREAK_IN: 'Regreso',
   UNKNOWN: 'Marcación',
+};
+
+/** How the attendance calculation read a punch of the day. */
+export const READING_LABEL: Record<PunchReading, string> = {
+  CHECK_IN: 'Entrada',
+  BREAK_OUT: 'Salida almuerzo',
+  BREAK_IN: 'Regreso',
+  CHECK_OUT: 'Salida',
+  DUPLICATE: 'Repetida: no cuenta',
+  OTHER_DAY: 'Fuera de esta jornada',
 };
 
 export const ANOMALY_LABEL: Record<string, string> = {
