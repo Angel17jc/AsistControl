@@ -64,7 +64,7 @@ export function PageHeader({
         <h1 className="text-2xl font-semibold tracking-tight text-ink-1">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-2">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
     </div>
   );
 }
@@ -78,7 +78,7 @@ export function PageHelp({
   children: ReactNode;
 }) {
   return (
-    <details className="group mb-6 rounded-xl border border-line bg-surface-1 text-sm">
+    <details className="group mb-6 rounded-xl border border-line bg-surface-1 text-sm print:hidden">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 font-medium text-ink-1 hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
         <CircleHelp className="size-4 shrink-0 text-accent" aria-hidden />
         {title}

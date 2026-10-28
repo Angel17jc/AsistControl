@@ -1,10 +1,10 @@
-import { ATTENDANCE_STATUSES, type PaginatedResponse } from '@asistcontrol/shared';
+import type { PaginatedResponse } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ManualPunchForm } from '../components/attendance/ManualPunchForm';
-import { ATTENDANCE_STATUS } from '../components/status';
+import { RecordsTable } from '../components/attendance/RecordsTable';
 import {
   Button,
   Card,
@@ -14,24 +14,29 @@ import {
   PageHeader,
   PageHelp,
   Pagination,
-  Select,
   Spinner,
-  StatusBadge,
   Table,
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
-import {
-  ANOMALY_LABEL,
-  PUNCH_LABEL,
-  formatDate,
-  formatDateTime,
-  formatMinutes,
-  formatTime,
-  todayIso,
-} from '../lib/format';
-import type { AttendanceEventRow, AttendanceRecordRow } from '../lib/types';
+import { PUNCH_LABEL, formatDateTime, todayIso } from '../lib/format';
+import type { AttendanceEventRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
+
+/** [label, today → [from, to]]: the periods people pick most, in one click. */
+const QUICK_PERIODS: [string, (today: string) => [string, string]][] = [
+  ['Hoy', (today) => [today, today]],
+  ['Este mes', (today) => [`${today.slice(0, 8)}01`, today]],
+  [
+    'Mes anterior',
+    (today) => {
+      const [y, m] = today.split('-').map(Number) as [number, number];
+      // Day 0 of this month is the last day of the previous one.
+      const last = new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10);
+      return [`${last.slice(0, 8)}01`, last];
+    },
+  ],
+];
 
 export function AttendancePage() {
   const [tab, setTab] = useState<'records' | 'events'>('records');
@@ -75,6 +80,11 @@ export function AttendancePage() {
           por ejemplo «Sin salida» (olvidó marcar al irse) o «Fuera de horario».
         </p>
         <p>
+          <strong className="text-ink-1">Tarjeta de tiempo.</strong> Elija un empleado en Jornadas y
+          un período (por ejemplo «Este mes»): verá cada día con su entrada, almuerzo y salida, los
+          totales del período y un botón para imprimirla y firmarla.
+        </p>
+        <p>
           <strong className="text-ink-1">Corrección manual.</strong> Si alguien olvidó marcar o el
           marcador falló, agregue lo que falta. Antes de guardar verá cómo queda el día. Pide un
           motivo porque queda en Auditoría.
@@ -84,9 +94,13 @@ export function AttendancePage() {
           que no debe contar. No se borra: sigue a la vista, marcada como anulada y con su motivo.
         </p>
       </PageHelp>
-      {showManual && <ManualPunchForm onDone={() => setShowManual(false)} />}
+      {showManual && (
+        <div className="print:hidden">
+          <ManualPunchForm onDone={() => setShowManual(false)} />
+        </div>
+      )}
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 print:hidden">
         <div className="flex rounded-lg border border-line bg-surface-1 p-1" role="tablist">
           {(['records', 'events'] as const).map((t) => (
             <button
@@ -109,6 +123,21 @@ export function AttendancePage() {
         <Field label="Hasta">
           <Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
         </Field>
+        <div className="flex gap-1" role="group" aria-label="Período rápido">
+          {QUICK_PERIODS.map(([label, period]) => (
+            <Button
+              key={label}
+              variant="ghost"
+              onClick={() => {
+                const [start, end] = period(todayIso());
+                setFrom(start);
+                setTo(end);
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </div>
       {tab === 'records' ? (
         <RecordsTable from={from} to={to} />
@@ -116,102 +145,6 @@ export function AttendancePage() {
         <EventsTable from={from} to={to} />
       )}
     </>
-  );
-}
-
-function RecordsTable({ from, to }: { from: string; to: string }) {
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['attendance', 'records', from, to, status, page],
-    queryFn: () =>
-      api<PaginatedResponse<AttendanceRecordRow>>('/attendance/records', {
-        query: { from, to, status, page, pageSize: 25 },
-      }),
-  });
-
-  return (
-    <Card>
-      <div className="flex justify-end border-b border-line px-4 py-3">
-        <Select
-          aria-label="Estado"
-          className="w-48"
-          value={status}
-          onChange={(e) => (setStatus(e.target.value), setPage(1))}
-        >
-          <option value="">Todos los estados</option>
-          {ATTENDANCE_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {ATTENDANCE_STATUS[s].label}
-            </option>
-          ))}
-        </Select>
-      </div>
-      {isLoading && <Spinner />}
-      {error && <ErrorState error={error} />}
-      {data && (
-        <>
-          <Table
-            head={[
-              'Fecha',
-              'Empleado',
-              'Estado',
-              'Horario',
-              'Entrada',
-              'Salida',
-              'Trabajado',
-              'Atraso',
-              'Extra',
-              'Novedades',
-            ]}
-            empty={data.data.length === 0}
-          >
-            {data.data.map((r) => (
-              <tr key={r.id}>
-                <Td className="whitespace-nowrap text-ink-2">{formatDate(r.workDate)}</Td>
-                <Td>
-                  <p className="font-medium">
-                    {r.employee.lastName} {r.employee.firstName}
-                  </p>
-                  <p className="text-xs text-ink-3">
-                    {r.employee.department?.name ?? r.employee.employeeCode}
-                  </p>
-                </Td>
-                <Td>
-                  <StatusBadge tone={ATTENDANCE_STATUS[r.status].tone}>
-                    {ATTENDANCE_STATUS[r.status].label}
-                  </StatusBadge>
-                  {!r.isFinal && (
-                    <p
-                      className="mt-1 text-xs text-ink-3"
-                      title="La ventana de la jornada aún no cierra; puede cambiar si llegan más marcaciones"
-                    >
-                      provisional
-                    </p>
-                  )}
-                </Td>
-                <Td className="tabular whitespace-nowrap text-ink-2">
-                  {r.scheduledStart
-                    ? `${formatTime(r.scheduledStart)}–${formatTime(r.scheduledEnd)}`
-                    : '—'}
-                </Td>
-                <Td className="tabular">{formatTime(r.firstIn)}</Td>
-                <Td className="tabular">{formatTime(r.lastOut)}</Td>
-                <Td className="tabular whitespace-nowrap">{formatMinutes(r.workedMinutes)}</Td>
-                <Td className="tabular">{r.lateMinutes > 0 ? `${r.lateMinutes} min` : '—'}</Td>
-                <Td className="tabular">
-                  {r.overtimeMinutes > 0 ? formatMinutes(r.overtimeMinutes) : '—'}
-                </Td>
-                <Td className="text-xs text-ink-2">
-                  {r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · ') || '—'}
-                </Td>
-              </tr>
-            ))}
-          </Table>
-          <Pagination page={data.meta.page} totalPages={data.meta.totalPages} onChange={setPage} />
-        </>
-      )}
-    </Card>
   );
 }
 
