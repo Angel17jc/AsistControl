@@ -121,28 +121,37 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         aria-label={editing ? `Editar ${fullName}` : 'Nuevo empleado'}
         className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <Field label="Código interno">
+        <Field
+          label="Código interno"
+          hint="Lo define la empresa, p. ej. EMP-0001: letras, números o guion"
+        >
           <Input required value={form.employeeCode} onChange={set('employeeCode')} />
         </Field>
-        <Field label="Identificación">
+        <Field label="Identificación" hint="Cédula o pasaporte">
           <Input required value={form.identification} onChange={set('identification')} />
         </Field>
-        <Field label="Nombres">
+        <Field label="Nombres" hint="Como en la cédula">
           <Input required value={form.firstName} onChange={set('firstName')} />
         </Field>
-        <Field label="Apellidos">
+        <Field label="Apellidos" hint="Los listados se ordenan por apellido">
           <Input required value={form.lastName} onChange={set('lastName')} />
         </Field>
-        <Field label="Correo">
+        <Field
+          label="Correo"
+          hint="Solo de contacto. Los avisos van al correo de su cuenta de usuario"
+        >
           <Input type="email" value={form.email} onChange={set('email')} />
         </Field>
-        <Field label="Teléfono">
+        <Field label="Teléfono" hint="Solo de contacto">
           <Input type="tel" value={form.phone} onChange={set('phone')} />
         </Field>
-        <Field label="Fecha de ingreso">
+        <Field label="Fecha de ingreso" hint="Desde este día cuentan sus jornadas y sus vacaciones">
           <Input type="date" required value={form.hireDate} onChange={set('hireDate')} />
         </Field>
-        <Field label="Departamento">
+        <Field
+          label="Departamento"
+          hint="Agrupa a las personas en listados y reportes. Se crean en Organización"
+        >
           <Select value={form.departmentId} onChange={set('departmentId')}>
             <option value="">—</option>
             {departments.data?.map((d) => (
@@ -152,7 +161,7 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
             ))}
           </Select>
         </Field>
-        <Field label="Cargo">
+        <Field label="Cargo" hint="Se crean en Organización">
           <Select value={form.positionId} onChange={set('positionId')}>
             <option value="">—</option>
             {positions.data?.map((p) => (
@@ -162,7 +171,7 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
             ))}
           </Select>
         </Field>
-        <Field label="Supervisor">
+        <Field label="Supervisor" hint="Verá su asistencia y aprobará sus permisos">
           <Select value={form.supervisorId} onChange={set('supervisorId')}>
             <option value="">—</option>
             {supervisors.data?.data
@@ -175,7 +184,10 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
               ))}
           </Select>
         </Field>
-        <Field label="Tipo de contrato" hint="Decide sus vacaciones">
+        <Field
+          label="Tipo de contrato"
+          hint="Decide sus vacaciones. Sin contrato no tiene saldo de vacaciones"
+        >
           <Select value={form.contractTypeId} onChange={set('contractTypeId')}>
             <option value="">—</option>
             {contractTypes.data?.map((t) => (
@@ -190,14 +202,17 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
           hint={
             editing
               ? 'Las marcaciones sin empleado con este ID se le asignarán'
-              : 'El mismo número enrolado en los marcadores'
+              : 'Su número de usuario en el marcador, escrito igual (1 no es 0001). Sin él, sus marcaciones no se le asignan'
           }
         >
           <Input value={form.biometricId} onChange={set('biometricId')} />
         </Field>
         {editing && (
           <>
-            <Field label="Estado">
+            <Field
+              label="Estado"
+              hint="Inactivo o suspendido: no aparece en Presencia ni se le marcan ausencias"
+            >
               <Select
                 value={form.status}
                 onChange={(e) => changeStatus(e.target.value as EmployeeStatus)}
@@ -212,7 +227,9 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
             <Field
               label="Fecha de baja"
               hint={
-                form.status === 'ACTIVE' ? 'Solo si deja de estar activo' : 'Último día trabajado'
+                form.status === 'ACTIVE'
+                  ? 'Solo si deja de estar activo'
+                  : 'Último día trabajado: después no se calculan jornadas ni vacaciones'
               }
             >
               <Input
@@ -225,6 +242,9 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
             </Field>
           </>
         )}
+        <p className="text-xs text-ink-3 sm:col-span-2 lg:col-span-4">
+          <span className="text-critical">*</span> Obligatorio. Lo demás se puede completar después.
+        </p>
         <div className="flex items-end gap-2 sm:col-span-2">
           <Button type="submit" variant="primary" loading={save.isPending}>
             {editing ? 'Guardar cambios' : 'Guardar'}

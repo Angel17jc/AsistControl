@@ -10,6 +10,7 @@ import {
   ErrorState,
   Input,
   PageHeader,
+  PageHelp,
   Pagination,
   Spinner,
   StatusBadge,
@@ -62,6 +63,29 @@ export function EmployeesPage() {
           )
         }
       />
+      <PageHelp>
+        <p>
+          Registre aquí a cada persona que marca. Lo único que la conecta con el marcador es el{' '}
+          <strong className="text-ink-1">ID biométrico</strong>: su número de usuario en el aparato,
+          escrito igual. Si falta o no coincide, sus marcaciones se guardan como «sin empleado» y se
+          le asignan solas en cuanto lo corrija.
+        </p>
+        <p>
+          Los campos con <span className="text-critical">*</span> son obligatorios; el resto se
+          puede completar después. Nombre, cédula y demás datos no tienen que coincidir con lo que
+          diga el marcador.
+        </p>
+        <p>
+          En cada fila: <strong className="text-ink-1">Editar</strong> (datos, estado y baja),{' '}
+          <strong className="text-ink-1">Vacaciones</strong> (saldo y ajustes) y{' '}
+          <strong className="text-ink-1">Horario</strong> (qué turno le toca cada día; sin horario
+          no se calculan atrasos ni horas extra).
+        </p>
+        <p>
+          Para que la persona entre al sistema con su propio usuario, créele una cuenta en Usuarios
+          y vincúlela a su ficha.
+        </p>
+      </PageHelp>
       {creating && <EmployeeForm onDone={() => setCreating(false)} />}
       {editing && (
         <EmployeeForm key={editing.id} employee={editing} onDone={() => setEditing(null)} />

@@ -138,26 +138,63 @@ export function Field({
   hint?: string;
   children: ReactNode;
 }) {
+  const controlId = useId();
   const hintId = useId();
-  // The hint describes the control; inside the <label> it would become part of its name.
-  const control =
-    hint && isValidElement(children)
-      ? cloneElement(children as ReactElement<{ 'aria-describedby'?: string }>, {
-          'aria-describedby': hintId,
-        })
-      : children;
+  // Anything other than one control (e.g. a password input with its show button) keeps the
+  // wrapping label, which names the control inside it.
+  if (!isControl(children)) {
+    return (
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label className="flex flex-col gap-1.5">
+          <span className="font-medium text-ink-2">{label}</span>
+          {children}
+        </label>
+        {hint && (
+          <span id={hintId} className="text-xs text-ink-3">
+            {hint}
+          </span>
+        )}
+      </div>
+    );
+  }
+  // The label names the control alone: the hint describes it and the required mark is only
+  // for the eye (screen readers already announce the control as required).
+  const id = children.props.id ?? controlId;
+  const control = cloneElement(children as ReactElement<ControlProps>, {
+    id,
+    ...(hint && { 'aria-describedby': hintId }),
+  });
   return (
     <div className="flex flex-col gap-1.5 text-sm">
-      <label className="flex flex-col gap-1.5">
-        <span className="font-medium text-ink-2">{label}</span>
-        {control}
-      </label>
+      <span className="font-medium text-ink-2">
+        <label htmlFor={id}>{label}</label>
+        {children.props.required && (
+          <span className="text-critical" aria-hidden>
+            {' '}
+            *
+          </span>
+        )}
+      </span>
+      {control}
       {hint && (
         <span id={hintId} className="text-xs text-ink-3">
           {hint}
         </span>
       )}
     </div>
+  );
+}
+
+type ControlProps = { id?: string; required?: boolean; 'aria-describedby'?: string };
+
+function isControl(node: ReactNode): node is ReactElement<ControlProps> {
+  return (
+    isValidElement(node) &&
+    (node.type === Input ||
+      node.type === Select ||
+      node.type === 'input' ||
+      node.type === 'select' ||
+      node.type === 'textarea')
   );
 }
 

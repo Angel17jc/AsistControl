@@ -13,6 +13,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Select,
   Spinner,
   StatusBadge,
@@ -63,6 +64,35 @@ export function DevicesPage() {
           )
         }
       />
+      <PageHelp>
+        <p>
+          Cada marcador se registra una vez con su IP. Cada pocos minutos el sistema se conecta y
+          descarga las marcaciones nuevas; <strong className="text-ink-1">Sincronizar</strong> lo
+          hace al momento. Solo lee: nunca cambia ni borra nada del equipo, y descargar dos veces lo
+          mismo no duplica marcaciones.
+        </p>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>
+            <strong className="text-ink-1">Registrar dispositivo</strong> con su IP, puerto y el
+            usuario del equipo.
+          </li>
+          <li>
+            <strong className="text-ink-1">Probar conexión</strong>: confirma que responde y que el
+            usuario sirve.
+          </li>
+          <li>
+            <strong className="text-ink-1">Sincronizar</strong> y revisar en Asistencia →
+            Marcaciones. Las que dicen «sin empleado» traen un ID biométrico que aún no está en
+            ninguna ficha de Empleados.
+          </li>
+        </ol>
+        <p>
+          <strong className="text-ink-1">En línea</strong>: responde.{' '}
+          <strong className="text-ink-1">Desconectado</strong>: no responde (red, IP o energía).{' '}
+          <strong className="text-ink-1">Error</strong>: respondió pero algo falló (usuario,
+          contraseña o permisos). Para practicar sin equipo, registre uno con el driver MOCK.
+        </p>
+      </PageHelp>
       {creating && (
         <Card className="mb-6">
           <DeviceForm onDone={() => setCreating(false)} />

@@ -111,7 +111,7 @@ describe('SchedulesPage — shifts', () => {
     await userEvent.clear(within(form).getByLabelText('Salida'));
     await userEvent.type(within(form).getByLabelText('Salida'), '07:00');
     expect(within(form).getByLabelText('Salida')).toHaveAccessibleDescription(
-      'Termina al día siguiente',
+      'Termina al día siguiente (turno de noche)',
     );
     await userEvent.click(within(form).getByRole('button', { name: 'Crear turno' }));
 
