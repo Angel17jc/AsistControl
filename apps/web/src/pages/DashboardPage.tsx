@@ -12,6 +12,7 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  PageHelp,
   Spinner,
   Table,
   Td,
@@ -48,6 +49,19 @@ export function DashboardPage() {
         title="Dashboard"
         description={`Hoy, ${formatDate(data.date)} · ${data.employees.active} empleados activos`}
       />
+      <PageHelp>
+        <p>
+          <strong className="text-ink-1">Presentes</strong>: marcaron hoy, aunque ya se hayan ido.{' '}
+          <strong className="text-ink-1">Ausentes</strong>: ya pasó su hora de entrada más la
+          tolerancia y no han marcado. <strong className="text-ink-1">Permisos</strong>: tienen uno
+          aprobado para este momento. <strong className="text-ink-1">Horas extra</strong>: las del
+          mes, propuestas y aprobadas.
+        </p>
+        <p>
+          Para ver quién está ahora mismo, con nombres, abra Presencia («Ver quién está»). Las
+          marcaciones llegan solas: no hace falta recargar.
+        </p>
+      </PageHelp>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <KpiTile

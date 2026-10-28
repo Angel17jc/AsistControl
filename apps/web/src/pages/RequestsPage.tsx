@@ -12,6 +12,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Select,
   Spinner,
   StatusBadge,
@@ -46,6 +47,19 @@ export function RequestsPage() {
           )
         }
       />
+      <PageHelp>
+        <p>
+          <strong className="text-ink-1">Permisos y vacaciones.</strong> Se piden con «Solicitar
+          permiso» y los aprueba el supervisor o Talento Humano. Mientras están pendientes, los días
+          de vacaciones quedan reservados en el saldo. Al aprobarse, esos días no cuentan como
+          ausencia ni atraso; un permiso de la mañana mueve la hora de entrada esperada.
+        </p>
+        <p>
+          <strong className="text-ink-1">Horas extra.</strong> El sistema las propone solo al
+          calcular cada jornada. Otra persona las aprueba o rechaza (nadie aprueba las suyas), y las
+          aprobadas son las que valen para la nómina.
+        </p>
+      </PageHelp>
       {/* What is left, before asking for more. */}
       {ownEmployeeId && (
         <VacationBalanceCard className="mb-6" employeeId={ownEmployeeId} title="Mis vacaciones" />
@@ -242,7 +256,7 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
   return (
     <Card className="mb-6">
       <form onSubmit={submit} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Tipo">
+        <Field label="Tipo" hint="Solo las vacaciones descuentan del saldo">
           <Select value={type} onChange={(e) => setType(e.target.value as LeaveType)}>
             {LEAVE_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -251,7 +265,7 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
         </Field>
-        <Field label="Desde">
+        <Field label="Desde" hint="Día y hora en que empieza">
           <Input
             type="datetime-local"
             required
@@ -259,7 +273,7 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setStartsAt(e.target.value)}
           />
         </Field>
-        <Field label="Hasta">
+        <Field label="Hasta" hint="Para un día entero, que cubra todo su turno">
           <Input
             type="datetime-local"
             required
@@ -268,7 +282,7 @@ function LeaveForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setEndsAt(e.target.value)}
           />
         </Field>
-        <Field label="Motivo">
+        <Field label="Motivo" hint="Lo verá quien lo apruebe">
           <Input
             required
             minLength={3}

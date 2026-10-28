@@ -7,6 +7,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Pagination,
   Spinner,
   Table,
@@ -34,15 +35,27 @@ export function AuditPage() {
         title="Auditoría"
         description="Registro inmutable de operaciones: quién hizo qué, cuándo y desde dónde"
       />
+      <PageHelp>
+        <p>
+          Cada cambio importante queda anotado aquí con su autor, la hora y el equipo desde donde se
+          hizo: altas y bajas, correcciones de marcaciones con su motivo, cambios de horario o de
+          configuración, inicios de sesión. Nadie puede editarlo ni borrarlo.
+        </p>
+        <p>
+          Los filtros usan los nombres técnicos, por ejemplo Entidad «AttendanceEvent» (marcación) o
+          Acción «attendance.manual_event» (corrección manual). Pase el cursor sobre una fila para
+          ver su detalle.
+        </p>
+      </PageHelp>
       <div className="mb-4 flex flex-wrap gap-3">
-        <Field label="Entidad">
+        <Field label="Entidad" hint="Qué se cambió">
           <Input
             placeholder="Employee, Device…"
             value={entity}
             onChange={(e) => (setEntity(e.target.value), setPage(1))}
           />
         </Field>
-        <Field label="Acción">
+        <Field label="Acción" hint="Qué se hizo">
           <Input
             placeholder="auth.login, update…"
             value={action}

@@ -8,6 +8,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Select,
   Spinner,
 } from '../components/ui';
@@ -164,6 +165,17 @@ export function SettingsPage() {
         title="Configuración"
         description="Reglas de asistencia de la empresa. Son política interna: ajústelas a su reglamento."
       />
+      <PageHelp>
+        <p>
+          Estas reglas valen para todos. Un turno puede tener sus propias tolerancias (Horarios); si
+          las deja vacías, usa las de aquí.
+        </p>
+        <p>
+          Un cambio vale para los cálculos que se hagan desde ahora. Para aplicarlo a días ya
+          calculados, use «Recalcular jornadas» con el período que quiera: las marcaciones no
+          cambian, solo se vuelven a leer.
+        </p>
+      </PageHelp>
       {settings.isLoading && <Spinner />}
       {settings.error && <ErrorState error={settings.error} />}
       {settings.data && (

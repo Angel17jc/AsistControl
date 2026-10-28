@@ -9,6 +9,7 @@ import {
   Field,
   Input,
   PageHeader,
+  PageHelp,
   Spinner,
   Table,
   Td,
@@ -54,6 +55,15 @@ export function OrganizationPage() {
         title="Organización"
         description="Departamentos y cargos que se asignan a cada empleado"
       />
+      <PageHelp>
+        <p>
+          <strong className="text-ink-1">Departamentos</strong> son las áreas (Ventas, Bodega…) y{' '}
+          <strong className="text-ink-1">cargos</strong> los puestos (Cajero, Supervisor de turno…).
+          Sirven para ordenar al personal y filtrar listados y Presencia. Se asignan en la ficha de
+          cada empleado.
+        </p>
+        <p>Solo se puede eliminar un departamento o un cargo que no tenga empleados.</p>
+      </PageHelp>
       <div className="grid gap-6">
         <CatalogCard catalog={DEPARTMENTS} />
         <CatalogCard catalog={POSITIONS} />
@@ -221,7 +231,7 @@ function CatalogForm({
           />
         </Field>
       )}
-      <Field label="Nombre">
+      <Field label="Nombre" hint="Como aparecerá en las fichas y los listados">
         <Input required minLength={2} maxLength={100} value={form.name} onChange={set('name')} />
       </Field>
       <div className={catalog.hasCode ? 'lg:col-span-2' : 'sm:col-span-2 lg:col-span-3'}>
