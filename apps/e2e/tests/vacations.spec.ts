@@ -20,8 +20,11 @@ test.describe('Vacaciones', () => {
     await expect(mine).toContainText('Tiempo completo');
     const pendingBefore = await figure(mine, 'Pendientes');
 
-    // Sixty days is more than anyone here has earned.
-    await requestVacation(page, daysFromToday(40), daysFromToday(100));
+    // More working days than the balance, measured now: a local database keeps the balance
+    // adjustments of earlier runs. The margin covers what accrues before the start date.
+    const workingDays = Math.ceil(await available(mine)) + 10;
+    const start = daysFromToday(40);
+    await requestVacation(page, start, addDays(start, Math.ceil((workingDays * 7) / 5) + 7));
     await expect(page.getByRole('alert')).toContainText('Insufficient vacation balance');
 
     // Three weekdays well ahead do fit, and are held in reserve at once.
