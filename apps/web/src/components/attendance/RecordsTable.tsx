@@ -280,6 +280,13 @@ function TimecardHeader({
           período.
         </p>
       )}
+      {t.strayDays > 0 && (
+        <p className="mt-2 flex items-start gap-2 text-xs text-ink-1">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+          {t.strayDays === 1 ? 'En 1 día hay' : `En ${t.strayDays} días hay`} marcaciones fuera de
+          jornada que no se contaron. Revíselas en la pestaña Marcaciones.
+        </p>
+      )}
     </section>
   );
 }

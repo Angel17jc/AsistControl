@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { SettingsService } from '../settings/settings.service';
 import { calculateAttendance, readPunches } from './domain/attendance-calculator';
-import type { CalculationResult } from './domain/types';
+import type { CalculationResult, Punch } from './domain/types';
 import { type WorkCalendar, WorkCalendarService } from './work-calendar.service';
 
 interface EmployeeRef {
@@ -127,12 +127,13 @@ export class AttendanceProcessingService {
     const workDate = calendar.workDateOf(employeeId, earliest.occurredAt);
     const day = calendar.dayFor(employeeId, workDate);
 
-    const [events, leaves] = await Promise.all([
+    const reach = calendar.reachOf(day);
+    const [loaded, leaves] = await Promise.all([
       this.prisma.attendanceEvent.findMany({
         where: {
           employeeId,
           voidedAt: null,
-          occurredAt: { gte: day.window.from, lt: day.window.to },
+          occurredAt: { gte: reach.from, lt: reach.to },
         },
         select: {
           id: true,
@@ -145,15 +146,31 @@ export class AttendanceProcessingService {
       }),
       this.leavesDuring(employeeId, day.window),
     ]);
+    const saved = calendar.split(employeeId, day, loaded);
+    // Strays are listed too: they are why the day reports "Marcación fuera de jornada".
+    const events = [...saved.counted, ...saved.strays];
+    const proposedEvents = proposed.map((p, i) => ({
+      id: proposedId(i),
+      occurredAt: p.occurredAt,
+      punchType: p.punchType,
+    }));
+    const added = calendar.split(employeeId, day, proposedEvents);
 
-    const saved = events.map((e) => ({ id: e.id, at: e.occurredAt, type: e.punchType }));
-    const all = [
-      ...saved,
-      ...proposed.map((p, i) => ({ id: proposedId(i), at: p.occurredAt, type: p.punchType })),
-    ];
     const input = { day, leaves, policy: calendar.policy, now: new Date() };
-    const before = calculateAttendance({ ...input, punches: saved });
-    const readings = readPunches({ ...input, punches: all });
+    const before = calculateAttendance({
+      ...input,
+      punches: saved.counted.map(toPunch),
+      strays: saved.strays.map(toPunch),
+    });
+    const after = calculateAttendance({
+      ...input,
+      punches: [...saved.counted, ...added.counted].map(toPunch),
+      strays: [...saved.strays, ...added.strays].map(toPunch),
+    });
+    const readings = readPunches({
+      ...input,
+      punches: [...events, ...proposedEvents].map(toPunch),
+    });
 
     return {
       workDate,
@@ -190,8 +207,8 @@ export class AttendanceProcessingService {
         })),
       ].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime()),
       // Like recomputeWith: a day without punches that is still open has no record yet.
-      before: saved.length === 0 && !before.isFinal ? null : summarize(before),
-      after: summarize(calculateAttendance({ ...input, punches: all })),
+      before: saved.counted.length === 0 && !before.isFinal ? null : summarize(before),
+      after: summarize(after),
     };
   }
 
@@ -244,28 +261,31 @@ export class AttendanceProcessingService {
     { announce = true }: { announce?: boolean } = {},
   ) {
     const day = calendar.dayFor(employee.id, workDate);
+    const reach = calendar.reachOf(day);
     const [events, leaves] = await Promise.all([
       this.prisma.attendanceEvent.findMany({
         where: {
           employeeId: employee.id,
           voidedAt: null,
-          occurredAt: { gte: day.window.from, lt: day.window.to },
+          occurredAt: { gte: reach.from, lt: reach.to },
         },
         select: { id: true, occurredAt: true, punchType: true },
       }),
       this.leavesDuring(employee.id, day.window),
     ]);
+    const { counted, strays } = calendar.split(employee.id, day, events);
 
     const result = calculateAttendance({
       day,
-      punches: events.map((e) => ({ id: e.id, at: e.occurredAt, type: e.punchType })),
+      punches: counted.map(toPunch),
+      strays: strays.map(toPunch),
       leaves,
       policy: calendar.policy,
       now: new Date(),
     });
 
     const dbDate = toDbDate(workDate);
-    if (events.length === 0 && !result.isFinal) {
+    if (counted.length === 0 && !result.isFinal) {
       // Nothing to say yet (e.g. the day has not started). Drop a stale provisional row.
       await this.prisma.attendanceRecord.deleteMany({
         where: { employeeId: employee.id, workDate: dbDate, isFinal: false },
@@ -373,6 +393,10 @@ function isEmployed(employee: EmployeeRef, date: string): boolean {
 }
 
 const proposedId = (index: number) => `proposed:${index}`;
+
+function toPunch(e: { id: string; occurredAt: Date; punchType: PunchType }): Punch {
+  return { id: e.id, at: e.occurredAt, type: e.punchType };
+}
 
 function summarize(result: CalculationResult) {
   return {

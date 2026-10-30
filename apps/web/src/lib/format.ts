@@ -139,4 +139,5 @@ export const ANOMALY_LABEL: Record<string, string> = {
   SHORT_BREAK: 'Almuerzo corto',
   WORKED_ON_REST_DAY: 'Trabajó en día libre',
   WORKED_ON_HOLIDAY: 'Trabajó en feriado',
+  STRAY_PUNCH: 'Marcación fuera de jornada',
 };

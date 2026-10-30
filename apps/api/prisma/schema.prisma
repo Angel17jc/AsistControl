@@ -122,6 +122,8 @@ enum AttendanceAnomaly {
   SHORT_BREAK
   WORKED_ON_REST_DAY
   WORKED_ON_HOLIDAY
+  /// A punch of this calendar day outside every work day window: not counted, reported.
+  STRAY_PUNCH
 }
 
 enum SyncStatus {

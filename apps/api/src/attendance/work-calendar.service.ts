@@ -3,7 +3,14 @@ import { addDays, fromDbDate, localDateOf, toDbDate } from '../common/utils/date
 import { PrismaService } from '../prisma/prisma.service';
 import type { AttendancePolicy } from './domain/attendance-policy';
 import type { WorkDayContext } from './domain/types';
-import { type ShiftTemplate, assignWorkDate, buildWorkDay } from './domain/work-day';
+import {
+  type ShiftTemplate,
+  assignWorkDate,
+  buildWorkDay,
+  calendarDay,
+  inWindow,
+  isStrayPunch,
+} from './domain/work-day';
 
 interface Assignment {
   effectiveFrom: string;
@@ -49,6 +56,38 @@ export class WorkCalendar {
       this.dayFor(employeeId, addDays(local, -1)),
       this.dayFor(employeeId, local),
     );
+  }
+
+  /** What to load for a work day: its window and its whole calendar day, where strays are. */
+  reachOf(day: WorkDayContext): { from: Date; to: Date } {
+    const calendar = calendarDay(day.workDate, this.timezone);
+    return {
+      from: new Date(Math.min(day.window.from.getTime(), calendar.from.getTime())),
+      to: new Date(Math.max(day.window.to.getTime(), calendar.to.getTime())),
+    };
+  }
+
+  /**
+   * Splits punches loaded with `reachOf` into the ones the day counts (its window) and the
+   * strays of its calendar day, which it only reports. The rest belong to another day.
+   */
+  split<T extends { occurredAt: Date }>(
+    employeeId: string,
+    day: WorkDayContext,
+    punches: T[],
+  ): { counted: T[]; strays: T[] } {
+    const previous = this.dayFor(employeeId, addDays(day.workDate, -1));
+    const counted: T[] = [];
+    const strays: T[] = [];
+    for (const p of punches) {
+      if (inWindow(p.occurredAt, day)) counted.push(p);
+      else if (
+        localDateOf(p.occurredAt, this.timezone) === day.workDate &&
+        isStrayPunch(p.occurredAt, previous, day)
+      )
+        strays.push(p);
+    }
+    return { counted, strays };
   }
 }
 

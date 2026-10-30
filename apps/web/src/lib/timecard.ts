@@ -24,6 +24,8 @@ export interface TimecardTotals {
   absences: number;
   /** Days missing an entry or an exit: they need a correction. */
   incomplete: number;
+  /** Days with a punch no work day counted: someone should look at it. */
+  strayDays: number;
 }
 
 /** What a time card adds up at the bottom: one employee, a period. */
@@ -37,6 +39,7 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
     overtimeMinutes: 0,
     absences: 0,
     incomplete: 0,
+    strayDays: 0,
   };
   for (const r of records) {
     if (r.firstIn) totals.daysWorked++;
@@ -47,6 +50,7 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
     totals.overtimeMinutes += r.overtimeMinutes;
     if (r.status === 'ABSENT') totals.absences++;
     if (r.status === 'INCOMPLETE') totals.incomplete++;
+    if (r.anomalies.includes('STRAY_PUNCH')) totals.strayDays++;
   }
   return totals;
 }

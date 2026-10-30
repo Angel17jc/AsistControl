@@ -96,13 +96,13 @@ Decisiones clave:
 
 `calculateAttendance(input)` recibe la jornada resuelta (turno anclado a fechas absolutas en la zona horaria de la empresa), las marcaciones, los permisos aprobados, la política y `now`; devuelve la jornada calculada. Pasos:
 
-1. Filtrar marcaciones a la **ventana** de la jornada (por defecto de 4 h antes del inicio a 6 h después del fin). Así una marcación a las 02:00 pertenece al turno nocturno del día anterior.
+1. Filtrar marcaciones a la **ventana** de la jornada (por defecto de 4 h antes del inicio a 6 h después del fin). Así una marcación a las 02:00 pertenece al turno nocturno del día anterior. Una marcación de un día calendario que no cae en su ventana ni en la del turno nocturno anterior (17:05 con un turno de 22:00; 23:30 tras un turno que termina a las 17:00) **no se cuenta, pero no se pierde**: el procesamiento la pasa como `strays` y la jornada de ese día la reporta con la novedad `STRAY_PUNCH`.
 2. **Doble marcación**: marcaciones a menos de `duplicatePunchWindowSeconds` (60 s) de la anterior se ignoran.
 3. **Emparejado** entrada/salida: `SEQUENTIAL` (alterna, robusto frente a quien presiona la tecla equivocada) o `DEVICE_TYPE` (confía en el tipo que reporta el equipo).
 4. Tiempo trabajado, pausas, descuento del almuerzo no marcado (configurable).
 5. Atraso y salida anticipada contra la **presencia esperada**, que se desplaza si hay un permiso aprobado al inicio o al final del turno.
 6. Horas extra según `AFTER_SHIFT_END` o `EXCESS_WORKED_TIME`, con umbral mínimo. En día libre o feriado todo lo trabajado es extra de ese tipo.
-7. Estado final y **novedades** (`LATE_ARRIVAL`, `MISSING_CHECK_OUT`, `OUT_OF_SCHEDULE_PUNCH`, …).
+7. Estado final y **novedades** (`LATE_ARRIVAL`, `MISSING_CHECK_OUT`, `OUT_OF_SCHEDULE_PUNCH`, `STRAY_PUNCH`, …).
 
 `isFinal = false` mientras la ventana de la jornada está abierta: una salida al almuerzo no se reporta como "salida anticipada" y un empleado que aún trabaja no aparece como "sin salida". El job horario `attendance-finalizer` cierra las jornadas y genera las ausencias.
 

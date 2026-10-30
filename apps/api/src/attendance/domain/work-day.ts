@@ -103,9 +103,27 @@ export function assignWorkDate(
   previousDay: WorkDayContext,
   currentDay: WorkDayContext,
 ): string {
-  const inPrevious =
-    previousDay.shift !== null &&
-    punchAt >= previousDay.window.from &&
-    punchAt < previousDay.window.to;
-  return inPrevious ? previousDay.workDate : currentDay.workDate;
+  return claimedByPrevious(punchAt, previousDay) ? previousDay.workDate : currentDay.workDate;
+}
+
+export function inWindow(punchAt: Date, day: WorkDayContext): boolean {
+  return punchAt >= day.window.from && punchAt < day.window.to;
+}
+
+/**
+ * A punch no work day counts: on its calendar day but outside that day's window, and not
+ * taken by the night shift of the day before. A 17:05 punch for a 22:00 night shift, or one
+ * at 23:30 after a shift ending at 17:00 with a 6 h window. The calculation leaves it out;
+ * its work date (the calendar day) reports it so a person can look at it.
+ */
+export function isStrayPunch(
+  punchAt: Date,
+  previousDay: WorkDayContext,
+  currentDay: WorkDayContext,
+): boolean {
+  return !claimedByPrevious(punchAt, previousDay) && !inWindow(punchAt, currentDay);
+}
+
+function claimedByPrevious(punchAt: Date, previousDay: WorkDayContext): boolean {
+  return previousDay.shift !== null && inWindow(punchAt, previousDay);
 }
