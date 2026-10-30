@@ -10,6 +10,7 @@ const record = (rest: Partial<AttendanceRecordRow>): AttendanceRecordRow =>
     lateMinutes: 0,
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
+    anomalies: [],
     ...rest,
   }) as AttendanceRecordRow;
 
@@ -42,7 +43,7 @@ describe('timecardTotals', () => {
   it('adds up a period for one person', () => {
     const totals = timecardTotals([
       record({ lateMinutes: 12, workedMinutes: 468 }),
-      record({ overtimeMinutes: 90, workedMinutes: 570 }),
+      record({ overtimeMinutes: 90, workedMinutes: 570, anomalies: ['OVERTIME', 'STRAY_PUNCH'] }),
       record({ status: 'INCOMPLETE', earlyLeaveMinutes: 30, workedMinutes: 0 }),
       record({ status: 'ABSENT', firstIn: null, workedMinutes: 0 }),
       record({ status: 'REST_DAY', firstIn: null, workedMinutes: 0 }),
@@ -56,6 +57,7 @@ describe('timecardTotals', () => {
       overtimeMinutes: 90,
       absences: 1,
       incomplete: 1,
+      strayDays: 1,
     });
   });
 });

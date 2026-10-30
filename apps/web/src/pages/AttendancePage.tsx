@@ -80,6 +80,13 @@ export function AttendancePage() {
           por ejemplo «Sin salida» (olvidó marcar al irse) o «Fuera de horario».
         </p>
         <p>
+          <strong className="text-ink-1">Marcación fuera de jornada.</strong> Una marcación tan
+          lejos de su turno que no entra en ninguna jornada (por ejemplo a las 23:30 con un turno
+          que termina a las 17:00) no se cuenta, pero queda avisada en ese día para que alguien la
+          revise. Si era un error, anúlela. Si de verdad trabajó hasta esa hora, amplíe en
+          Configuración «La jornada deja de contar» y recalcule ese período.
+        </p>
+        <p>
           <strong className="text-ink-1">Tarjeta de tiempo.</strong> Elija un empleado en Jornadas y
           un período (por ejemplo «Este mes»): verá cada día con su entrada, almuerzo y salida, los
           totales del período y un botón para imprimirla y firmarla.

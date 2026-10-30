@@ -31,6 +31,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
 
   const { kept, ignored } = selectPunches(input);
   if (ignored.length > 0) anomalies.add('DUPLICATE_PUNCH');
+  if (input.strays?.length) anomalies.add('STRAY_PUNCH');
 
   if (kept.length === 0) {
     return {

@@ -8,7 +8,7 @@ import {
 } from './attendance-calculator';
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from './attendance-policy';
 import type { CalculationInput, LeaveInterval, Punch } from './types';
-import { type ShiftTemplate, assignWorkDate, buildWorkDay } from './work-day';
+import { type ShiftTemplate, assignWorkDate, buildWorkDay, isStrayPunch } from './work-day';
 
 const TZ = 'America/Guayaquil'; // UTC-5, no DST
 const DATE = '2026-09-21';
@@ -49,6 +49,7 @@ interface Scenario {
   template?: ShiftTemplate | null;
   policy?: Partial<AttendancePolicy>;
   leaves?: LeaveInterval[];
+  strays?: Punch[];
   isHoliday?: boolean;
   hasSchedule?: boolean;
   now?: Date;
@@ -69,6 +70,7 @@ function run(s: Scenario) {
   const input: CalculationInput = {
     day,
     punches: s.punches,
+    strays: s.strays,
     leaves: s.leaves ?? [],
     policy,
     // By default evaluate once the day is over.
@@ -403,6 +405,58 @@ describe('calculateAttendance', () => {
         hasSchedule: true,
       });
       expect(assignWorkDate(t('07:58'), previous, current)).toBe('2026-09-21');
+    });
+  });
+
+  describe('stray punches (outside every window)', () => {
+    const dayOf = (workDate: string, template: ShiftTemplate | null) =>
+      buildWorkDay({
+        workDate,
+        timezone: TZ,
+        policy: DEFAULT_ATTENDANCE_POLICY,
+        template,
+        isHoliday: false,
+        hasSchedule: true,
+      });
+    const PREVIOUS = '2026-09-20';
+    const NEXT = '2026-09-22';
+
+    it('finds the punches no work day takes', () => {
+      // Night shift 22:00 → 06:00: its window runs 18:00 → 12:00 the next morning.
+      const nightBefore = dayOf(PREVIOUS, NIGHT_SHIFT);
+      const night = dayOf(DATE, NIGHT_SHIFT);
+      expect(isStrayPunch(t('17:05'), nightBefore, night)).toBe(true);
+      expect(isStrayPunch(t('11:00'), nightBefore, night)).toBe(false); // last night's exit
+      expect(isStrayPunch(t('18:30'), nightBefore, night)).toBe(false); // early for tonight
+
+      // Day shift 08:00 → 17:00: its window runs 04:00 → 23:00.
+      const office = dayOf(DATE, DAY_SHIFT);
+      expect(isStrayPunch(t('23:30'), dayOf(PREVIOUS, DAY_SHIFT), office)).toBe(true);
+      expect(isStrayPunch(t('02:00', NEXT), office, dayOf(NEXT, DAY_SHIFT))).toBe(true);
+      expect(isStrayPunch(t('16:00'), dayOf(PREVIOUS, DAY_SHIFT), office)).toBe(false);
+    });
+
+    it('never strands a punch on a day without a shift: its window is the whole day', () => {
+      expect(isStrayPunch(t('23:30'), dayOf(PREVIOUS, DAY_SHIFT), dayOf(DATE, null))).toBe(false);
+    });
+
+    it('reports strays without counting them', () => {
+      const day = [punch('08:00'), punch('17:00')];
+      const plain = run({ punches: day, policy: STRICT });
+      const withStray = run({ punches: day, policy: STRICT, strays: [punch('23:30')] });
+      expect(withStray.anomalies).toContain('STRAY_PUNCH');
+      expect(plain.anomalies).not.toContain('STRAY_PUNCH');
+      expect(withStray).toMatchObject({
+        status: plain.status,
+        workedMinutes: plain.workedMinutes,
+        lastOut: plain.lastOut,
+      });
+    });
+
+    it('reports a stray on a day nobody punched in its window', () => {
+      const r = run({ punches: [], strays: [punch('23:30')] });
+      expect(r).toMatchObject({ status: 'ABSENT' });
+      expect(r.anomalies).toContain('STRAY_PUNCH');
     });
   });
 });

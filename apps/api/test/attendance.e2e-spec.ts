@@ -298,4 +298,43 @@ describe('Attendance corrections, leave and reports (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('punches outside every work day', () => {
+    // The fixture shift runs 08:00-17:00; with the default policy its window closes at 23:00.
+    const DAY = '2026-09-17';
+
+    it('reports a punch after the window without counting it', async () => {
+      await http()
+        .post('/api/attendance/events/batch')
+        .set(bearer(hr))
+        .send({
+          employeeId: fx.teammate.id,
+          punches: ['08:00', '17:00', '23:30'].map((t) => ({ occurredAt: at(t, DAY) })),
+          reason: 'Fuera de jornada (e2e)',
+        })
+        .expect(201);
+
+      const r = (
+        await http()
+          .get(`/api/attendance/records?from=${DAY}&to=${DAY}&employeeId=${fx.teammate.id}`)
+          .set(bearer(hr))
+          .expect(200)
+      ).body.data[0];
+      expect(r).toMatchObject({ status: 'PRESENT', workedMinutes: 480, lastOut: at('17:00', DAY) });
+      expect(r.anomalies).toContain('STRAY_PUNCH');
+    });
+
+    it('lists the stray in the preview of its day', async () => {
+      const res = await http()
+        .post('/api/attendance/events/preview')
+        .set(bearer(hr))
+        .send({ employeeId: fx.teammate.id, punches: [{ occurredAt: at('12:00', DAY) }] })
+        .expect(200);
+      expect(res.body.before.anomalies).toContain('STRAY_PUNCH');
+      const stray = res.body.punches.find(
+        (p: { occurredAt: string }) => p.occurredAt === at('23:30', DAY),
+      );
+      expect(stray).toMatchObject({ proposed: false, reading: 'OTHER_DAY' });
+    });
+  });
 });

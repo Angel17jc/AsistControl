@@ -44,6 +44,11 @@ export interface WorkDayContext {
 export interface CalculationInput {
   day: WorkDayContext;
   punches: Punch[];
+  /**
+   * Punches of this calendar day that no work day counts (see `isStrayPunch`). They do not
+   * enter the calculation; the day only reports them.
+   */
+  strays?: Punch[];
   leaves: LeaveInterval[];
   policy: AttendancePolicy;
   now: Date;
