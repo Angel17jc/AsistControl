@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../stores/auth';
-import { ApiError, api, buildUrl, login, logout, refreshSession } from './api';
+import { ApiError, NetworkError, api, buildUrl, login, logout, refreshSession } from './api';
 
 const session = {
   accessToken: 'new-token',
@@ -110,18 +110,38 @@ describe('api client', () => {
   });
 
   it('does not refresh when a login is rejected: the credentials are wrong', async () => {
-    fetchMock.mockResolvedValueOnce(json(401, { message: 'Invalid email or password' }));
-    await expect(login('a@b.c', 'nope')).rejects.toThrow('Invalid email or password');
+    fetchMock.mockResolvedValueOnce(
+      json(401, { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' }),
+    );
+    await expect(login('a@b.c', 'nope')).rejects.toThrow('Correo o contraseña incorrectos.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes validation messages from the error contract', async () => {
+  it('shows every error in words a person can read, never the English message', async () => {
     fetchMock.mockResolvedValueOnce(
-      json(400, { statusCode: 400, message: ['a is required', 'b is invalid'] }),
+      json(400, {
+        statusCode: 400,
+        code: 'VALIDATION_FAILED',
+        params: { violations: [{ field: 'email', rule: 'isEmail' }] },
+        message: ['email must be an email'],
+      }),
     );
     await expect(api('/x', { method: 'POST', body: {} })).rejects.toThrow(
-      'a is required. b is invalid',
+      'Correo: no es un correo válido.',
     );
+  });
+
+  it('explains a page from the proxy, which is not even JSON', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<html>Bad Gateway</html>', { status: 502 }));
+    await expect(api('/x')).rejects.toThrow('El servidor no está disponible');
+  });
+
+  it('explains a request that never got an answer', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const failure = api('/x');
+    await expect(failure).rejects.toBeInstanceOf(NetworkError);
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(api('/x')).rejects.toThrow('No se pudo conectar con el servidor');
   });
 
   it('omits empty query parameters', () => {

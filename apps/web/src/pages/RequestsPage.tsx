@@ -36,7 +36,9 @@ export function RequestsPage() {
         title="Solicitudes"
         description="Permisos, vacaciones y horas extra pendientes de aprobación"
         actions={
-          canRequest && (
+          // The form asks on behalf of one's own employee: an account without one cannot use it.
+          canRequest &&
+          ownEmployeeId && (
             <Button
               variant="primary"
               icon={<Plus className="size-4" />}

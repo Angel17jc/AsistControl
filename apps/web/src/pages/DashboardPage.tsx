@@ -39,7 +39,7 @@ export function DashboardPage() {
   }, [data?.timezone]);
 
   if (isLoading) return <Spinner />;
-  if (error || !data) return <ErrorState error={error} />;
+  if (!data) return <ErrorState error={error} />;
 
   const { attendance, devices } = data;
 
@@ -49,6 +49,8 @@ export function DashboardPage() {
         title="Dashboard"
         description={`Hoy, ${formatDate(data.date)} · ${data.employees.active} empleados activos`}
       />
+      {/* A refresh that failed: what was on screen stays, with the reason it may be old. */}
+      {error && <ErrorState error={error} />}
       <PageHelp>
         <p>
           <strong className="text-ink-1">Presentes</strong>: marcaron hoy, aunque ya se hayan ido.{' '}

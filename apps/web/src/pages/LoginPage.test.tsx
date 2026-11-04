@@ -36,15 +36,16 @@ describe('LoginPage', () => {
 
   it('shows the API error on invalid credentials', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ statusCode: 401, message: 'Invalid email or password' }), {
-        status: 401,
-      }),
+      Response.json(
+        { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
+        { status: 401 },
+      ),
     );
     renderPage();
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'admin@asistcontrol.local');
     await userEvent.type(screen.getByLabelText('Contraseña'), 'wrong');
     await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Correo o contraseña incorrectos.');
     expect(useAuth.getState().status).toBe('anonymous');
   });
 

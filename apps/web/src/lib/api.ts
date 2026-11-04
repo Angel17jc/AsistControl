@@ -1,13 +1,21 @@
 import type { ApiErrorResponse, AuthSession } from '@asistcontrol/shared';
 import { useAuth } from '../stores/auth';
+import { describeApiError } from './api-errors';
 
+/** The API answered no. Its `message` is what a person can read (see api-errors.ts). */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly body: ApiErrorResponse | null,
   ) {
-    const message = body?.message;
-    super(Array.isArray(message) ? message.join('. ') : (message ?? `Error ${status}`));
+    super(describeApiError(status, body));
+  }
+}
+
+/** The API did not answer: no network, or the server is out of reach. */
+export class NetworkError extends Error {
+  constructor() {
+    super('No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.');
   }
 }
 
@@ -67,15 +75,20 @@ export function buildUrl(path: string, query?: Query): string {
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const token = useAuth.getState().accessToken;
-  return fetch(buildUrl(path, options.query), {
-    method: options.method ?? 'GET',
-    credentials: 'same-origin',
-    headers: {
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  try {
+    return await fetch(buildUrl(path, options.query), {
+      method: options.method ?? 'GET',
+      credentials: 'same-origin',
+      headers: {
+        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    // The browser's own "Failed to fetch" means nothing to whoever is using the app.
+    throw new NetworkError();
+  }
 }
 
 /**

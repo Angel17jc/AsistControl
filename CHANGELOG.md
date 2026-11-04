@@ -19,6 +19,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - Tarjeta de tiempo por empleado con totales e impresión con firmas; almuerzo visible en las jornadas (#117).
 - Ayuda en cada pantalla y en cada campo; los obligatorios llevan un asterisco rojo (#118, #120).
 - Suite de navegador con Playwright en la CI (#35).
+- Errores en español: la API añade un código estable con sus datos y la web los redacta en un solo lugar, también sin red o con el servidor caído ([ADR 0014](docs/adr/0014-error-codes.md)).
 
 ### Changed
 

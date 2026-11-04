@@ -6,9 +6,18 @@ import { App } from './App';
 import { ApiError } from './lib/api';
 import './index.css';
 
+// By default a browser that believes it is offline pauses requests in silence: the button keeps
+// spinning and nobody is told. This app talks to its own server, often inside a LAN, so it tries
+// and says what happened; what was on screen comes back by itself when the network does.
+const networkMode = 'always';
+
 const queryClient = new QueryClient({
   defaultOptions: {
+    mutations: { networkMode },
     queries: {
+      networkMode,
+      // This mode turns it off by default, and it is what brings a screen back after a cut.
+      refetchOnReconnect: true,
       staleTime: 15_000,
       // Client errors (401/403/404/422) will not fix themselves on retry.
       retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,

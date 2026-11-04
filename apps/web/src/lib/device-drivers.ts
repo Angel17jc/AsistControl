@@ -98,9 +98,11 @@ export function explainDeviceError(error: string | null): string {
   const reason: Record<string, string> = {
     AUTHENTICATION_FAILED: 'El equipo rechazó las credenciales',
     CONNECTION_FAILED: 'Sin respuesta del equipo: revise la IP, el puerto y la red',
+    NOT_CONNECTED: 'Se perdió la conexión con el equipo',
     TIMEOUT: 'El equipo no respondió a tiempo',
     PROTOCOL_ERROR: 'El equipo respondió algo inesperado',
     UNSUPPORTED_DRIVER: 'El driver no está disponible en este servidor',
+    UNSUPPORTED_OPERATION: 'Este equipo no admite esa operación',
   };
   return reason[code] ? `${reason[code]} (${detail})` : error;
 }

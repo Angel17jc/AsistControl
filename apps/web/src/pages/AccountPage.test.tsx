@@ -85,7 +85,14 @@ describe('AccountPage', () => {
 
   it('explains a wrong current password without signing out', async () => {
     const { form, submit, fill } = renderPage(
-      Response.json({ statusCode: 403, message: 'Current password is incorrect' }, { status: 403 }),
+      Response.json(
+        {
+          statusCode: 403,
+          code: 'CURRENT_PASSWORD_INCORRECT',
+          message: 'Current password is incorrect',
+        },
+        { status: 403 },
+      ),
     );
     await fill('Clave-Errada-2026', NEXT);
     await userEvent.click(submit);
