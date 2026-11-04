@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.18"
   },
   "scripts": {
     "build:packages": "npm run build -w @asistcontrol/shared && npm run build -w @asistcontrol/biometric-core",

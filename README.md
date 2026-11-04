@@ -101,7 +101,7 @@ Se eligieron las últimas versiones **estables y maduras** de cada familia en lu
 
 ## Inicio rápido
 
-Requisitos: **Docker** (para todo el stack) o **Node.js ≥ 22.12** + Docker (para desarrollo).
+Requisitos: **Docker** (para todo el stack) o **Node.js ≥ 22.18** + Docker (para desarrollo).
 
 ```bash
 git clone https://github.com/Angel17jc/AsistControl.git
