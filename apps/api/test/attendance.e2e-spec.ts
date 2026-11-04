@@ -193,6 +193,25 @@ describe('Attendance corrections, leave and reports (e2e)', () => {
       .expect(400);
   });
 
+  // class-validator 0.15 lets the nil UUID through @IsUUID(): it must behave as any unknown id.
+  it('treats a nil id like any other unknown employee', async () => {
+    const nil = '00000000-0000-0000-0000-000000000000';
+    const records = `/api/attendance/records?from=${WORK_DATE}&to=${WORK_DATE}&employeeId=${nil}`;
+
+    const list = await http().get(records).set(bearer(hr)).expect(200);
+    expect(list.body.data).toEqual([]);
+    await manual(nil, '08:00').expect(404);
+    await http()
+      .post('/api/attendance/events/preview')
+      .set(bearer(hr))
+      .send({ employeeId: nil, punches: [{ occurredAt: at('08:00') }] })
+      .expect(404);
+
+    const employee = await login(app, fx.emails.employee);
+    const own = await http().get(records).set(bearer(employee)).expect(200);
+    expect(own.body.data).toEqual([]);
+  });
+
   describe('manual corrections with preview', () => {
     const DAY = '2026-09-15';
     const recordOn = async (employeeId: string, date: string) =>
