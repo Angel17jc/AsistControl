@@ -134,6 +134,12 @@ describe('presenceAt', () => {
     expect(at(t('09:00'), [punch('08:00')], { template: null }).state).toBe('IN');
   });
 
+  it('gives a holiday off to people without a schedule too, until they punch', () => {
+    const holiday = { template: null, hasSchedule: false, isHoliday: true };
+    expect(at(t('09:00'), [], holiday).state).toBe('DAY_OFF');
+    expect(at(t('09:00'), [punch('08:00')], holiday).state).toBe('IN');
+  });
+
   it('keeps a night shift in after midnight', () => {
     expect(at(t('02:00', NEXT), [punch('22:01')], { template: NIGHT }).state).toBe('IN');
     expect(
