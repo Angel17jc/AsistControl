@@ -25,7 +25,7 @@ const POLICY: AttendancePolicy = {
   punchWindowAfterShiftMinutes: 360,
 };
 
-function renderPage(role: 'ADMIN' | 'HR' = 'ADMIN') {
+function renderPage(role: 'ADMIN' | 'HR' = 'ADMIN', shifts?: { flexible: boolean }[]) {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
@@ -44,6 +44,7 @@ function renderPage(role: 'ADMIN' | 'HR' = 'ADMIN') {
       return Response.json({ ...POLICY, ...JSON.parse(String(init.body)) });
     }
     if (init?.method === 'POST') return Response.json({ recomputed: 42 });
+    if (url === '/api/work-shifts' && shifts) return Response.json(shifts);
     if (url === '/api/settings') {
       return Response.json({ timezone: 'America/Guayaquil', attendancePolicy: POLICY });
     }
@@ -128,6 +129,26 @@ describe('SettingsPage', () => {
     await userEvent.click(within(form).getByRole('button', { name: /Guardar/ }));
     await waitFor(() => expect(sent('PATCH')).toBeDefined());
     expect(sent('PATCH')!.body).toEqual({ overtimeEnabled: false });
+  });
+
+  it('leaves out the rules about fixed hours when no shift has them', async () => {
+    renderPage('ADMIN', [{ flexible: true }]);
+    const form = await policyForm();
+    await waitFor(() =>
+      expect(within(form).queryByLabelText('Tolerancia de atraso (min)')).toBeNull(),
+    );
+    expect(within(form).queryByText('Atrasos y salidas')).toBeNull();
+    expect(within(form).queryByLabelText('Margen fuera de horario (min)')).toBeNull();
+    expect(within(form).getByLabelText('Marcación repetida (segundos)')).toBeVisible();
+  });
+
+  it('keeps them as soon as one shift has fixed hours', async () => {
+    renderPage('ADMIN', [{ flexible: true }, { flexible: false }]);
+    const form = await policyForm();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith('/api/work-shifts', expect.anything()),
+    );
+    expect(await within(form).findByLabelText('Tolerancia de atraso (min)')).toBeVisible();
   });
 
   it('only counts early arrivals as overtime when overtime starts at the shift end', async () => {

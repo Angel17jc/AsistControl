@@ -19,6 +19,8 @@ interface EmployeeRef {
 
 const EMPLOYEE_REF = { id: true, supervisorId: true, hireDate: true, terminatedAt: true } as const;
 const FINALIZER_LOOKBACK_DAYS = 7;
+/** How far back punches that arrive late complete the days around them: a report's reach. */
+const MAX_FILLED_DAYS = 93;
 /**
  * Employees recomputed at once in a range. Each day takes up to two pool connections, and a
  * small server's pool has about five: more would starve the requests of everyone else.
@@ -50,11 +52,13 @@ export class AttendanceProcessingService {
     if (linked.length === 0) return 0;
 
     const timezone = await this.settings.getTimezone();
+    const today = localDateOf(new Date(), timezone);
     const dates = linked
       .map((e) => localDateOf(e.occurredAt, timezone))
       .sort((a, b) => a.localeCompare(b));
     const employeeIds = [...new Set(linked.map((e) => e.employeeId))];
-    const calendar = await this.loadCalendar(employeeIds, addDays(dates[0]!, -1), dates.at(-1)!);
+    const lastDate = dates.at(-1)! > today ? dates.at(-1)! : today;
+    const calendar = await this.loadCalendar(employeeIds, addDays(dates[0]!, -1), lastDate);
     const employees = await this.employeesById(employeeIds);
 
     const pairs = new Map<string, { employee: EmployeeRef; workDate: string }>();
@@ -67,6 +71,15 @@ export class AttendanceProcessingService {
     for (const { employee, workDate } of pairs.values()) {
       await this.recomputeWith(calendar, employee, workDate);
     }
+
+    const earliest = new Map<string, string>();
+    for (const { employee, workDate } of pairs.values()) {
+      const known = earliest.get(employee.id);
+      if (!known || workDate < known) earliest.set(employee.id, workDate);
+    }
+    await forEachLimit([...earliest], RANGE_CONCURRENCY, ([employeeId, from]) =>
+      this.completeDaysSince(calendar, employees.get(employeeId)!, from, today),
+    );
     return pairs.size;
   }
 
@@ -253,6 +266,36 @@ export class AttendanceProcessingService {
   }
 
   // ───────────────────────────────────────────────────────── internals
+
+  /**
+   * Punches from the past (the first download of a terminal's memory, a correction of last
+   * month) only compute their own days. The ones between them and now that nobody punched
+   * stay without a record, older than what the finalizer looks at: an absence or a day off that
+   * no report would show. Before a person's first punch there is no data, so nothing is assumed.
+   */
+  private async completeDaysSince(
+    calendar: WorkCalendar,
+    employee: EmployeeRef,
+    from: string,
+    today: string,
+  ) {
+    const yesterday = addDays(today, -1);
+    if (from >= yesterday) return;
+    const earliest = addDays(today, -MAX_FILLED_DAYS);
+    const start = from < earliest ? earliest : from;
+    const existing = await this.prisma.attendanceRecord.findMany({
+      where: {
+        employeeId: employee.id,
+        workDate: { gte: toDbDate(start), lte: toDbDate(yesterday) },
+      },
+      select: { workDate: true },
+    });
+    const known = new Set(existing.map((r) => fromDbDate(r.workDate)));
+    for (const date of eachDate(start, yesterday)) {
+      if (known.has(date) || !isEmployed(employee, date)) continue;
+      await this.recomputeWith(calendar, employee, date, { announce: false });
+    }
+  }
 
   private async recomputeWith(
     calendar: WorkCalendar,

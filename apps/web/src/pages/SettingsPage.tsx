@@ -15,7 +15,7 @@ import {
 } from '../components/ui';
 import { api } from '../lib/api';
 import { todayIso } from '../lib/format';
-import type { AttendancePolicy, SettingsResponse } from '../lib/types';
+import type { AttendancePolicy, SettingsResponse, WorkShiftRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
 type Keys<T> = {
@@ -36,6 +36,8 @@ type Rule = (
 ) & {
   /** The rule only means something under this other choice. */
   when?: Keys<boolean>;
+  /** It measures against a shift's hours: nothing to set if no shift has fixed ones. */
+  fixedHours?: boolean;
 };
 
 const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
@@ -61,6 +63,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         },
       },
       {
+        fixedHours: true,
         kind: 'number',
         key: 'punchWindowBeforeShiftMinutes',
         label: 'La jornada empieza a contar (min antes del turno)',
@@ -68,6 +71,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         max: 720,
       },
       {
+        fixedHours: true,
         kind: 'number',
         key: 'punchWindowAfterShiftMinutes',
         label: 'La jornada deja de contar (min después del turno)',
@@ -75,6 +79,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         max: 720,
       },
       {
+        fixedHours: true,
         kind: 'number',
         key: 'outOfScheduleMarginMinutes',
         label: 'Margen fuera de horario (min)',
@@ -88,6 +93,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
     subtitle: 'Cada turno puede tener sus propias tolerancias; si no, rigen estas',
     rules: [
       {
+        fixedHours: true,
         kind: 'number',
         key: 'lateToleranceMinutes',
         label: 'Tolerancia de atraso (min)',
@@ -95,6 +101,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         max: 240,
       },
       {
+        fixedHours: true,
         kind: 'number',
         key: 'earlyLeaveToleranceMinutes',
         label: 'Tolerancia de salida anticipada (min)',
@@ -178,7 +185,7 @@ export function SettingsPage() {
     <>
       <PageHeader
         title="Configuración"
-        description="Reglas de asistencia de la empresa. Son política interna: ajústelas a su reglamento."
+        description="Reglas de asistencia de la empresa. Los valores que traen sirven para empezar: no hace falta cambiar nada."
       />
       <PageHelp>
         <p>
@@ -239,6 +246,14 @@ function PolicyForm({ settings }: { settings: SettingsResponse }) {
   const queryClient = useQueryClient();
   const saved = settings.attendancePolicy;
   const [draft, setDraft] = useState<AttendancePolicy>(saved);
+  const shifts = useQuery({
+    queryKey: ['work-shifts'],
+    queryFn: () => api<WorkShiftRow[]>('/work-shifts'),
+  });
+  // Decided on what is known: while unknown, or with no shifts yet, every rule is shown.
+  const noFixedHours = (shifts.data?.length ?? 0) > 0 && shifts.data!.every((s) => s.flexible);
+  const applies = (rule: Rule) =>
+    (!rule.when || draft[rule.when]) && !(rule.fixedHours && noFixedHours);
 
   const changed = (Object.keys(draft) as (keyof AttendancePolicy)[]).filter(
     (key) => draft[key] !== saved[key],
@@ -279,23 +294,21 @@ function PolicyForm({ settings }: { settings: SettingsResponse }) {
         </p>
       )}
       <fieldset disabled={!canWrite} className="grid gap-6 lg:grid-cols-2">
-        {GROUPS.map((group) => (
+        {GROUPS.filter((group) => group.rules.some(applies)).map((group) => (
           <Card key={group.title}>
             <CardHeader title={group.title} subtitle={group.subtitle} />
             <div className="grid gap-4 px-5 py-4">
-              {group.rules
-                .filter((rule) => !rule.when || draft[rule.when])
-                .map((rule) => (
-                  <RuleField
-                    key={rule.key}
-                    rule={rule}
-                    draft={draft}
-                    onChange={(value) => (
-                      setDraft((d) => ({ ...d, [rule.key]: value })),
-                      save.reset()
-                    )}
-                  />
-                ))}
+              {group.rules.filter(applies).map((rule) => (
+                <RuleField
+                  key={rule.key}
+                  rule={rule}
+                  draft={draft}
+                  onChange={(value) => (
+                    setDraft((d) => ({ ...d, [rule.key]: value })),
+                    save.reset()
+                  )}
+                />
+              ))}
             </div>
           </Card>
         ))}

@@ -158,6 +158,103 @@ describe('Quick setup of the workday (e2e)', () => {
     expect(assignment?.effectiveFrom.toISOString().slice(0, 10)).toBe(NEAR_PAST);
   });
 
+  describe('punches that arrive late, like the first download of a terminal', () => {
+    const daysBefore = (date: string, days: number) =>
+      new Date(Date.parse(`${date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const statusOf = async (employeeId: string, date: string) =>
+      (
+        await prisma.attendanceRecord.findUnique({
+          where: {
+            employeeId_workDate: { employeeId, workDate: new Date(`${date}T00:00:00Z`) },
+          },
+        })
+      )?.status;
+    const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+    const hireWithPunch = async (code: string, date: string) => {
+      const { id: scheduleId } = await prisma.workSchedule.findUniqueOrThrow({
+        where: { name: 'Jornada de la empresa' },
+      });
+      const created = await http()
+        .post('/api/employees')
+        .set(bearer(hr))
+        .send({
+          employeeCode: code,
+          identification: `${code.replace('-', '')}01`,
+          firstName: 'Con',
+          lastName: 'Historia',
+          hireDate: '2026-01-01',
+          scheduleId,
+        })
+        .expect(201);
+      const { id } = created.body as { id: string };
+      await http()
+        .post('/api/attendance/events/batch')
+        .set(bearer(hr))
+        .send({
+          employeeId: id,
+          punches: ['08:00', '17:00'].map((t) => ({ occurredAt: at(t, date) })),
+          reason: 'Historia (e2e)',
+        })
+        .expect(201);
+      return id;
+    };
+
+    it('completes the days nobody punched, as absences or days off', async () => {
+      const first = daysBefore(today, 20);
+      const id = await hireWithPunch('WKS-HIS', first);
+      for (let back = 19; back >= 1; back--) {
+        const date = daysBefore(today, back);
+        const status = await statusOf(id, date);
+        if (isWeekend(date)) expect(status).toBe('REST_DAY');
+        else expect(['ABSENT', 'HOLIDAY']).toContain(status);
+      }
+    });
+
+    it('assumes nothing before the first punch', async () => {
+      const first = daysBefore(today, 15);
+      const id = await hireWithPunch('WKS-PRE', first);
+      expect(await statusOf(id, daysBefore(first, 1))).toBeUndefined();
+      expect(await statusOf(id, daysBefore(first, 10))).toBeUndefined();
+    });
+
+    it('leaves the finalizer the days of a punch from today', async () => {
+      const id = await hireWithPunch('WKS-NOW', today);
+      expect(await prisma.attendanceRecord.count({ where: { employeeId: id } })).toBe(1);
+    });
+
+    it('does not undo a day already calculated', async () => {
+      const first = daysBefore(today, 12);
+      const id = await hireWithPunch('WKS-KEP', first);
+      const worked = daysBefore(today, 5);
+      await http()
+        .post('/api/attendance/events/batch')
+        .set(bearer(hr))
+        .send({
+          employeeId: id,
+          punches: ['09:00', '18:00'].map((t) => ({ occurredAt: at(t, worked) })),
+          reason: 'Historia (e2e)',
+        })
+        .expect(201);
+      // A later correction further back walks over that day again.
+      await http()
+        .post('/api/attendance/events/batch')
+        .set(bearer(hr))
+        .send({
+          employeeId: id,
+          punches: ['09:00', '18:00'].map((t) => ({ occurredAt: at(t, daysBefore(today, 14)) })),
+          reason: 'Historia (e2e)',
+        })
+        .expect(201);
+      const record = await prisma.attendanceRecord.findUnique({
+        where: {
+          employeeId_workDate: { employeeId: id, workDate: new Date(`${worked}T00:00:00Z`) },
+        },
+      });
+      expect(record?.workedMinutes).toBeGreaterThan(0);
+    });
+  });
+
   it('refuses a schedule that does not exist, and creates nobody', async () => {
     const res = await http()
       .post('/api/employees')

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
+import { useFeatures } from '../../lib/features';
 import { formatDateWithYear, todayIso } from '../../lib/format';
 import type { HolidayRow } from '../../lib/types';
 import { Button, Card, CardHeader, ErrorState, Field, Input, Spinner, Table, Td } from '../ui';
@@ -102,6 +103,8 @@ function HolidayForm({ year, onAdded }: { year: number; onAdded: () => Promise<u
     add.mutate();
   }
 
+  const { overtimeEnabled } = useFeatures();
+
   return (
     <form
       onSubmit={submit}
@@ -110,7 +113,11 @@ function HolidayForm({ year, onAdded }: { year: number; onAdded: () => Promise<u
     >
       <Field
         label="Fecha"
-        hint="Nadie tiene que trabajar; lo trabajado se propone como horas extra"
+        hint={
+          overtimeEnabled
+            ? 'Nadie tiene que trabajar; lo trabajado se propone como horas extra'
+            : 'Nadie tiene que trabajar; quien no marca ese día no figura ausente'
+        }
       >
         <Input
           type="date"

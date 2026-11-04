@@ -9,8 +9,22 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../stores/auth';
 import { refreshSession } from './api';
+import { localDate, setDisplayTimezone } from './format';
 
 export type ConnectionState = 'connecting' | 'live' | 'offline';
+
+/**
+ * The summary with a punch that just arrived. It lists today's: a punch of another day (the
+ * download of a terminal's memory, a correction) is not news, and shows no date to tell it apart.
+ */
+export function withLatestEvent(
+  summary: DashboardSummary,
+  event: AttendanceEventCreatedPayload,
+): DashboardSummary {
+  setDisplayTimezone(summary.timezone);
+  if (localDate(event.occurredAt) !== summary.date) return summary;
+  return { ...summary, latestEvents: [event, ...summary.latestEvents].slice(0, 15) };
+}
 
 /**
  * Keeps the dashboard live. New punches are prepended to the cached summary immediately
@@ -32,8 +46,12 @@ export function useRealtime(): ConnectionState {
     socket.on('error', () => void refreshSession());
 
     socket.on(REALTIME_EVENTS.ATTENDANCE_EVENT_CREATED, (event: AttendanceEventCreatedPayload) => {
-      queryClient.setQueryData<DashboardSummary>(['dashboard'], (old) =>
-        old ? { ...old, latestEvents: [event, ...old.latestEvents].slice(0, 15) } : old,
+      // Keeps its age: one more punch does not make the totals any fresher, and treating them
+      // as fresh would stop this screen from asking for them again when it is reopened.
+      queryClient.setQueryData<DashboardSummary>(
+        ['dashboard'],
+        (old) => old && withLatestEvent(old, event),
+        { updatedAt: queryClient.getQueryState(['dashboard'])?.dataUpdatedAt },
       );
       void queryClient.invalidateQueries({ queryKey: ['attendance'] });
     });
