@@ -18,6 +18,7 @@ const OFFICE: WorkShiftRow = {
   lateToleranceMinutes: null,
   earlyLeaveToleranceMinutes: null,
   overtimeThresholdMinutes: null,
+  flexible: false,
 };
 const NIGHT: WorkShiftRow = {
   ...OFFICE,
@@ -89,6 +90,43 @@ afterEach(() => {
 });
 
 describe('SchedulesPage — shifts', () => {
+  it('creates a shift without fixed hours, asking only what it needs', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo turno' }));
+    const form = screen.getByRole('form', { name: 'Nuevo turno' });
+    await userEvent.type(within(form).getByLabelText('Nombre'), 'Jornada libre');
+    expect(within(form).getByLabelText('Tolerancia de atraso (min)')).toBeVisible();
+
+    await userEvent.click(within(form).getByLabelText(/Sin hora fija/));
+    expect(within(form).queryByLabelText('Tolerancia de atraso (min)')).not.toBeInTheDocument();
+    expect(within(form).getByLabelText('Entrada habitual')).toHaveValue('08:00');
+    expect(within(form).getByText('Se esperan 9h 00m al día, sin el almuerzo')).toBeVisible();
+
+    await userEvent.type(within(form).getByLabelText('Almuerzo desde'), '13:00');
+    await userEvent.type(within(form).getByLabelText('Almuerzo hasta'), '14:00');
+    expect(within(form).getByText('Se esperan 8h 00m al día, sin el almuerzo')).toBeVisible();
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Crear turno' }));
+    await waitFor(() => expect(sent('POST', '/api/work-shifts')).toBeDefined());
+    expect(sent('POST', '/api/work-shifts')!.body).toMatchObject({
+      name: 'Jornada libre',
+      flexible: true,
+      breakStart: '13:00',
+      breakEnd: '14:00',
+    });
+  });
+
+  it('will not save a reference day that ends the next day', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo turno' }));
+    const form = screen.getByRole('form', { name: 'Nuevo turno' });
+    await userEvent.click(within(form).getByLabelText(/Sin hora fija/));
+    await userEvent.clear(within(form).getByLabelText('Salida habitual'));
+    await userEvent.type(within(form).getByLabelText('Salida habitual'), '06:00');
+    expect(within(form).getByText('Debe ser posterior a la entrada habitual')).toBeVisible();
+    expect(within(form).getByRole('button', { name: 'Crear turno' })).toBeDisabled();
+  });
+
   it('lists shifts with their hours, lunch and tolerances in words', async () => {
     renderPage();
     const office = (await screen.findByText('Oficina')).closest('tr')!;
@@ -125,6 +163,7 @@ describe('SchedulesPage — shifts', () => {
         lateToleranceMinutes: null,
         earlyLeaveToleranceMinutes: null,
         overtimeThresholdMinutes: null,
+        flexible: false,
       }),
     );
   });

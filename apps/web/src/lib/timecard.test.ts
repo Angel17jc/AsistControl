@@ -10,6 +10,7 @@ const record = (rest: Partial<AttendanceRecordRow>): AttendanceRecordRow =>
     lateMinutes: 0,
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
+    shortMinutes: 0,
     anomalies: [],
     ...rest,
   }) as AttendanceRecordRow;
@@ -55,6 +56,7 @@ describe('timecardTotals', () => {
       lateMinutes: 12,
       earlyLeaveMinutes: 30,
       overtimeMinutes: 90,
+      shortMinutes: 0,
       absences: 1,
       incomplete: 1,
       strayDays: 1,

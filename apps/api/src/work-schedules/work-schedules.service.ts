@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { EmployeeSchedule } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
+import { crossesMidnight } from '../attendance/domain/work-day';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { apiError } from '../common/errors/api-error';
@@ -40,7 +41,7 @@ export class WorkSchedulesService {
   }
 
   async createShift(dto: CreateShiftDto, actor: AuthenticatedUser, ctx: RequestContext) {
-    validateBreak(dto);
+    validateShift(dto);
     return this.prisma.$transaction(async (tx) => {
       const shift = await tx.workShift.create({ data: dto });
       await this.audit.record(
@@ -66,7 +67,7 @@ export class WorkSchedulesService {
   ) {
     const before = await this.prisma.workShift.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException(apiError('SHIFT_NOT_FOUND', 'Shift not found'));
-    validateBreak({ ...before, ...dto });
+    validateShift({ ...before, ...dto });
     return this.prisma.$transaction(async (tx) => {
       const shift = await tx.workShift.update({ where: { id }, data: dto });
       await this.audit.record(
@@ -390,10 +391,22 @@ function toAssignmentResponse({ effectiveFrom, effectiveTo, ...rest }: Assignmen
   };
 }
 
-function validateBreak(shift: { breakStart?: string | null; breakEnd?: string | null }) {
+function validateShift(shift: {
+  startTime: string;
+  endTime: string;
+  breakStart?: string | null;
+  breakEnd?: string | null;
+  flexible?: boolean;
+}) {
   if (Boolean(shift.breakStart) !== Boolean(shift.breakEnd)) {
     throw new BadRequestException(
       apiError('BREAK_INCOMPLETE', 'breakStart and breakEnd must be provided together'),
+    );
+  }
+  // Its days are calendar days: a reference day crossing midnight could not be measured.
+  if (shift.flexible && crossesMidnight(shift.startTime, shift.endTime)) {
+    throw new BadRequestException(
+      apiError('FLEXIBLE_SHIFT_OVERNIGHT', 'A shift without fixed hours cannot cross midnight'),
     );
   }
 }

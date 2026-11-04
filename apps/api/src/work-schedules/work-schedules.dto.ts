@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -66,6 +67,13 @@ export class CreateShiftDto {
   @Min(0)
   @Max(480)
   overtimeThresholdMinutes?: number;
+
+  @ApiPropertyOptional({
+    description: 'No fixed hours: start, end and break only set the expected length of the day',
+  })
+  @IsOptional()
+  @IsBoolean()
+  flexible?: boolean;
 }
 
 export class UpdateShiftDto extends PartialType(CreateShiftDto) {}

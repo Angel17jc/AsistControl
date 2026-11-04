@@ -22,7 +22,7 @@ type Keys<T> = {
 }[keyof AttendancePolicy];
 
 /** How each rule is shown: label, a plain explanation and the API's limits. */
-type Rule =
+type Rule = (
   | { kind: 'number'; key: Keys<number>; label: string; hint: string; max: number }
   | { kind: 'toggle'; key: Keys<boolean>; label: string; hint: string }
   | {
@@ -31,7 +31,11 @@ type Rule =
       label: string;
       hint: string;
       options: Record<string, string>;
-    };
+    }
+) & {
+  /** The rule only means something under this other choice. */
+  when?: Keys<boolean>;
+};
 
 const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
   {
@@ -122,6 +126,13 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
     subtitle: 'Cada turno puede tener su propio mínimo; si no, rige este',
     rules: [
       {
+        kind: 'toggle',
+        key: 'overtimeEnabled',
+        label: 'La empresa paga horas extra',
+        hint: 'Si no las paga, no se calculan ni se proponen, y dejan de aparecer en las pantallas y los reportes.',
+      },
+      {
+        when: 'overtimeEnabled',
         kind: 'choice',
         key: 'overtimeBasis',
         label: 'Qué cuenta como hora extra',
@@ -132,6 +143,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         },
       },
       {
+        when: 'overtimeEnabled',
         kind: 'number',
         key: 'overtimeThresholdMinutes',
         label: 'Mínimo para reconocer horas extra (min)',
@@ -139,6 +151,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         max: 480,
       },
       {
+        when: 'overtimeEnabled',
         kind: 'toggle',
         key: 'countEarlyArrivalAsOvertime',
         label: 'Contar la llegada anticipada como hora extra',
@@ -216,6 +229,7 @@ function PolicyForm({ settings }: { settings: SettingsResponse }) {
         attendancePolicy: policy,
       });
       setDraft(policy);
+      return queryClient.invalidateQueries({ queryKey: ['settings', 'features'] });
     },
   });
 
@@ -236,17 +250,19 @@ function PolicyForm({ settings }: { settings: SettingsResponse }) {
           <Card key={group.title}>
             <CardHeader title={group.title} subtitle={group.subtitle} />
             <div className="grid gap-4 px-5 py-4">
-              {group.rules.map((rule) => (
-                <RuleField
-                  key={rule.key}
-                  rule={rule}
-                  draft={draft}
-                  onChange={(value) => (
-                    setDraft((d) => ({ ...d, [rule.key]: value })),
-                    save.reset()
-                  )}
-                />
-              ))}
+              {group.rules
+                .filter((rule) => !rule.when || draft[rule.when])
+                .map((rule) => (
+                  <RuleField
+                    key={rule.key}
+                    rule={rule}
+                    draft={draft}
+                    onChange={(value) => (
+                      setDraft((d) => ({ ...d, [rule.key]: value })),
+                      save.reset()
+                    )}
+                  />
+                ))}
             </div>
           </Card>
         ))}

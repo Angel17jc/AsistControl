@@ -25,6 +25,7 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
+import { useFeatures } from '../lib/features';
 import { LEAVE_LABEL, formatDate, formatDateTime, formatMinutes } from '../lib/format';
 import type { LeaveRow, OvertimeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
@@ -33,11 +34,16 @@ export function RequestsPage() {
   const canRequest = useAuth((s) => s.can('leave:request'));
   const ownEmployeeId = useAuth((s) => s.user?.employeeId);
   const [creating, setCreating] = useState(false);
+  const { overtimeEnabled } = useFeatures();
   return (
     <>
       <PageHeader
         title="Solicitudes"
-        description="Permisos, vacaciones y horas extra pendientes de aprobación"
+        description={
+          overtimeEnabled
+            ? 'Permisos, vacaciones y horas extra pendientes de aprobación'
+            : 'Permisos y vacaciones pendientes de aprobación'
+        }
         actions={
           // The form asks on behalf of one's own employee: an account without one cannot use it.
           canRequest &&
@@ -59,11 +65,13 @@ export function RequestsPage() {
           de vacaciones quedan reservados en el saldo. Al aprobarse, esos días no cuentan como
           ausencia ni atraso; un permiso de la mañana mueve la hora de entrada esperada.
         </p>
-        <p>
-          <strong className="text-ink-1">Horas extra.</strong> El sistema las propone solo al
-          calcular cada jornada. Otra persona las aprueba o rechaza (nadie aprueba las suyas), y las
-          aprobadas son las que valen para la nómina.
-        </p>
+        {overtimeEnabled && (
+          <p>
+            <strong className="text-ink-1">Horas extra.</strong> El sistema las propone solo al
+            calcular cada jornada. Otra persona las aprueba o rechaza (nadie aprueba las suyas), y
+            las aprobadas son las que valen para la nómina.
+          </p>
+        )}
       </PageHelp>
       {/* What is left, before asking for more. */}
       {ownEmployeeId && (
@@ -72,7 +80,7 @@ export function RequestsPage() {
       {creating && <LeaveForm onDone={() => setCreating(false)} />}
       <div className="grid gap-6">
         <LeaveTable />
-        <OvertimeTable />
+        {overtimeEnabled && <OvertimeTable />}
       </div>
     </>
   );

@@ -17,6 +17,12 @@ export class SettingsController {
     return this.settings.getAll();
   }
 
+  @Get('features')
+  @ApiOperation({ summary: "What any signed-in person's screens depend on" })
+  features() {
+    return this.settings.getFeatures();
+  }
+
   @Patch('attendance-policy')
   @RequirePermissions('settings:write')
   @ApiOperation({

@@ -39,6 +39,7 @@ const record = (workDate: string, rest: Partial<AttendanceRecordRow>): Attendanc
     lateMinutes: 0,
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
+    shortMinutes: 0,
     anomalies: [],
     isFinal: true,
     employee: { ...ANA, department: { name: 'Ventas' } },
@@ -93,7 +94,7 @@ const RECORDS: AttendanceRecordRow[] = [
   }),
 ];
 
-function renderTable(role: Role, employeeId: string | null = null) {
+function renderTable(role: Role, employeeId: string | null = null, records = RECORDS) {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
@@ -116,8 +117,8 @@ function renderTable(role: Role, employeeId: string | null = null) {
     }
     if (url.startsWith('/api/attendance/records')) {
       return Response.json({
-        data: RECORDS,
-        meta: { page: 1, pageSize: 25, total: RECORDS.length, totalPages: 1 },
+        data: records,
+        meta: { page: 1, pageSize: 25, total: records.length, totalPages: 1 },
       });
     }
     return new Response(null, { status: 404 });
@@ -169,6 +170,63 @@ describe('RecordsTable', () => {
     // Lunch not punched, deducted from the schedule.
     expect(screen.getByText('jue, 1 oct').closest('tr')).toHaveTextContent('1h 00m sin marcar');
     expect(screen.getByRole('columnheader', { name: 'Empleado' })).toBeInTheDocument();
+  });
+
+  describe('days without fixed hours', () => {
+    const FLEXIBLE: AttendanceRecordRow[] = [
+      record('2026-10-02', {
+        scheduledStart: null,
+        scheduledEnd: null,
+        segments: [
+          { in: '09:00', out: '13:00' },
+          { in: '14:00', out: '17:00' },
+        ],
+        workedMinutes: 420,
+        shortMinutes: 60,
+        anomalies: ['SHORT_HOURS'],
+      }),
+      record('2026-10-01', {
+        scheduledStart: null,
+        scheduledEnd: null,
+        segments: [
+          { in: '08:00', out: '13:00' },
+          { in: '14:00', out: '20:00' },
+        ],
+        workedMinutes: 660,
+      }),
+    ];
+    const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent);
+
+    it('show the hours and what is missing, not a schedule, lateness or overtime', async () => {
+      renderTable('HR', null, FLEXIBLE);
+      const short = (await screen.findByText('vie, 2 oct')).closest('tr')!;
+      expect(headers()).toEqual(
+        expect.arrayContaining(['Entrada', 'Almuerzo', 'Salida', 'Trabajado', 'Faltan']),
+      );
+      for (const absent of ['Horario', 'Atraso', 'Extra']) expect(headers()).not.toContain(absent);
+      expect(short).toHaveTextContent('13:00–14:00');
+      expect(short).toHaveTextContent('1h 00m');
+      expect(short).toHaveTextContent('Menos horas de las esperadas');
+    });
+
+    it('add up on the time card without lateness or overtime', async () => {
+      renderTable('EMPLOYEE', 'e1', FLEXIBLE);
+      const card = await screen.findByRole('region', { name: 'Tarjeta de tiempo' });
+      expect(card).toHaveTextContent('Horas faltantes');
+      expect(card).toHaveTextContent('18h 00m');
+      for (const absent of ['Atrasos', 'Salidas anticipadas', 'Horas extra']) {
+        expect(card).not.toHaveTextContent(absent);
+      }
+    });
+  });
+
+  it('keeps the schedule and lateness columns on days with fixed hours', async () => {
+    renderTable('HR');
+    await screen.findByText('vie, 2 oct');
+    expect(screen.getByRole('columnheader', { name: 'Horario' })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Atraso' })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Extra' })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: 'Faltan' })).toBeNull();
   });
 
   it("turns into an employee's time card with totals and a print button", async () => {

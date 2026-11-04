@@ -17,6 +17,7 @@ const shift = (id: string, startTime: string, endTime: string): ShiftTemplate =>
   lateToleranceMinutes: null,
   earlyLeaveToleranceMinutes: null,
   overtimeThresholdMinutes: null,
+  flexible: false,
 });
 
 const at = (date: string, hhmm: string) =>

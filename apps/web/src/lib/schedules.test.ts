@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { assignmentState, canUndo, describeWeek } from './schedules';
+import {
+  assignmentState,
+  canUndo,
+  describeShift,
+  describeWeek,
+  expectedMinutes,
+} from './schedules';
 import type { ScheduleAssignmentRow } from './types';
 
-const shift = (startTime: string, endTime: string) => ({ name: 's', startTime, endTime });
+const shift = (startTime: string, endTime: string) => ({
+  name: 's',
+  startTime,
+  endTime,
+  breakStart: null,
+  breakEnd: null,
+  flexible: false,
+});
 const office = shift('08:00', '17:00');
 
 const assignment = (effectiveFrom: string, effectiveTo: string | null): ScheduleAssignmentRow => ({
@@ -10,6 +23,27 @@ const assignment = (effectiveFrom: string, effectiveTo: string | null): Schedule
   effectiveFrom,
   effectiveTo,
   schedule: { id: 's', name: 'Oficina' },
+});
+
+describe('shifts without fixed hours', () => {
+  const flexible = {
+    ...shift('08:00', '17:00'),
+    breakStart: '13:00',
+    breakEnd: '14:00',
+    flexible: true,
+  };
+
+  it('expects the reference day without its lunch', () => {
+    expect(expectedMinutes(flexible)).toBe(8 * 60);
+    expect(expectedMinutes({ ...flexible, breakStart: null, breakEnd: null })).toBe(9 * 60);
+  });
+
+  it('are described by their hours a day, not by a schedule', () => {
+    expect(describeShift(flexible)).toBe('Sin hora fija · 8h 00m al día');
+    expect(describeShift({ ...flexible, flexible: false })).toBe('08:00–17:00');
+    const week = [1, 2, 3, 4, 5].map((weekday) => ({ weekday, shift: flexible }));
+    expect(describeWeek(week)).toBe('lun–vie sin hora fija (8h 00m al día)');
+  });
 });
 
 describe('describeWeek', () => {

@@ -21,6 +21,7 @@ export interface TimecardTotals {
   lateMinutes: number;
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
+  shortMinutes: number;
   absences: number;
   /** Days missing an entry or an exit: they need a correction. */
   incomplete: number;
@@ -37,6 +38,7 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
     lateMinutes: 0,
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
+    shortMinutes: 0,
     absences: 0,
     incomplete: 0,
     strayDays: 0,
@@ -48,6 +50,7 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
     totals.lateMinutes += r.lateMinutes;
     totals.earlyLeaveMinutes += r.earlyLeaveMinutes;
     totals.overtimeMinutes += r.overtimeMinutes;
+    totals.shortMinutes += r.shortMinutes;
     if (r.status === 'ABSENT') totals.absences++;
     if (r.status === 'INCOMPLETE') totals.incomplete++;
     if (r.anomalies.includes('STRAY_PUNCH')) totals.strayDays++;

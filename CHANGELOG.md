@@ -21,6 +21,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - Suite de navegador con Playwright en la CI (#35).
 - Reportes en español: estados, novedades, tipos y origen con su nombre, «Sí»/«No», y la hora de revisión de las horas extra en la hora de la empresa (antes, en UTC).
 - Errores en español: la API añade un código estable con sus datos y la web los redacta en un solo lugar, también sin red o con el servidor caído ([ADR 0014](docs/adr/0014-error-codes.md)).
+- Turnos sin hora fija: nadie se marca atrasado y se avisa si un día termina con menos horas de las esperadas. Las horas extra se pueden apagar para toda la empresa (ADR 0015).
 
 ### Changed
 

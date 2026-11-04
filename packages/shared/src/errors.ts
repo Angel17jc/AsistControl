@@ -71,6 +71,7 @@ export interface ApiErrorParams {
   SCHEDULE_NOT_FOUND: undefined;
   HOLIDAY_NOT_FOUND: undefined;
   BREAK_INCOMPLETE: undefined;
+  FLEXIBLE_SHIFT_OVERNIGHT: undefined;
   ASSIGNMENT_NOT_FOUND: undefined;
   ASSIGNMENT_DATE_CONFLICT: undefined;
   ASSIGNMENT_NOT_LATEST: undefined;

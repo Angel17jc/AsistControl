@@ -10,6 +10,8 @@ import type { AttendancePolicy } from './attendance-policy';
 /** A shift materialized on a concrete date: absolute instants, tolerances already resolved. */
 export interface ResolvedShift {
   shiftId: string;
+  /** No fixed hours: `start` and `end` only measure how long the day is expected to be. */
+  flexible: boolean;
   start: Date;
   end: Date;
   breakStart: Date | null;
@@ -72,6 +74,8 @@ export interface CalculationResult {
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
   overtimeKind: OvertimeKind | null;
+  /** Hours missing from a closed day of a flexible shift. */
+  shortMinutes: number;
   /** Punches ignored as double presses. */
   ignoredPunchIds: string[];
   /** False while the work day window is still open: results may still change. */

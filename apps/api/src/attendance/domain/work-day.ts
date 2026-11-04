@@ -13,6 +13,7 @@ export interface ShiftTemplate {
   lateToleranceMinutes: number | null;
   earlyLeaveToleranceMinutes: number | null;
   overtimeThresholdMinutes: number | null;
+  flexible: boolean;
 }
 
 export const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -49,6 +50,7 @@ export function resolveShift(
 
   return {
     shiftId: template.id,
+    flexible: template.flexible,
     start,
     end,
     breakStart: template.breakStart ? at(template.breakStart) : null,
@@ -62,7 +64,8 @@ export function resolveShift(
 
 /**
  * Builds the evaluation context of a work day: which shift applies and which punches belong
- * to it. Days without a shift use the local calendar day as window.
+ * to it. Days without a shift, or with one without fixed hours, use the local calendar day as
+ * window: an entry at 06:00 or an exit at 22:00 are simply that day's.
  */
 export function buildWorkDay(params: {
   workDate: string;
@@ -79,12 +82,13 @@ export function buildWorkDay(params: {
   if (isHoliday) dayType = 'HOLIDAY';
   else if (hasSchedule && !template) dayType = 'REST_DAY';
 
-  const window = shift
-    ? {
-        from: new Date(shift.start.getTime() - policy.punchWindowBeforeShiftMinutes * 60_000),
-        to: new Date(shift.end.getTime() + policy.punchWindowAfterShiftMinutes * 60_000),
-      }
-    : calendarDay(workDate, timezone);
+  const window =
+    shift && !shift.flexible
+      ? {
+          from: new Date(shift.start.getTime() - policy.punchWindowBeforeShiftMinutes * 60_000),
+          to: new Date(shift.end.getTime() + policy.punchWindowAfterShiftMinutes * 60_000),
+        }
+      : calendarDay(workDate, timezone);
 
   return { workDate, dayType, shift: dayType === 'HOLIDAY' ? null : shift, hasSchedule, window };
 }

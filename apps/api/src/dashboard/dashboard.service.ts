@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DashboardSummary } from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
 import { EVENT_WITH_RELATIONS, toEventPayload } from '../attendance/attendance-events.publisher';
+import { arrivalDeadline } from '../attendance/domain/attendance-calculator';
 import { WorkCalendarService } from '../attendance/work-calendar.service';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
@@ -103,8 +104,7 @@ export class DashboardService {
       if (!day.shift || day.dayType !== 'WORKDAY') continue;
       scheduledToday++;
       if (onLeave.has(id) || record?.status === 'ON_LEAVE') attendance.onLeave++;
-      else if (now.getTime() > day.shift.start.getTime() + day.shift.lateToleranceMinutes * 60_000)
-        attendance.absent++;
+      else if (now > arrivalDeadline(day.shift, day.shift.start)) attendance.absent++;
       else attendance.pendingArrival++;
     }
 

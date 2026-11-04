@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { SettingsService } from '../settings/settings.service';
 import { calculateAttendance, readPunches } from './domain/attendance-calculator';
-import type { CalculationResult, Punch } from './domain/types';
+import type { CalculationResult, Punch, ResolvedShift } from './domain/types';
 import { type WorkCalendar, WorkCalendarService } from './work-calendar.service';
 
 interface EmployeeRef {
@@ -408,20 +408,20 @@ function summarize(result: CalculationResult) {
     lateMinutes: result.lateMinutes,
     earlyLeaveMinutes: result.earlyLeaveMinutes,
     overtimeMinutes: result.overtimeMinutes,
+    shortMinutes: result.shortMinutes,
     anomalies: result.anomalies,
     isFinal: result.isFinal,
   };
 }
 
-function toRecordData(
-  result: CalculationResult,
-  shift: { shiftId: string; start: Date; end: Date } | null,
-) {
+function toRecordData(result: CalculationResult, shift: ResolvedShift | null) {
+  // Without fixed hours there is no schedule to show: the reference day only sets the length.
+  const scheduled = shift && !shift.flexible ? shift : null;
   return {
     status: result.status,
     shiftId: shift?.shiftId ?? null,
-    scheduledStart: shift?.start ?? null,
-    scheduledEnd: shift?.end ?? null,
+    scheduledStart: scheduled?.start ?? null,
+    scheduledEnd: scheduled?.end ?? null,
     firstIn: result.firstIn,
     lastOut: result.lastOut,
     workedMinutes: result.workedMinutes,
@@ -429,6 +429,7 @@ function toRecordData(
     lateMinutes: result.lateMinutes,
     earlyLeaveMinutes: result.earlyLeaveMinutes,
     overtimeMinutes: result.overtimeMinutes,
+    shortMinutes: result.shortMinutes,
     anomalies: result.anomalies,
     segments: result.segments.map((s) => ({
       in: s.in?.toISOString() ?? null,

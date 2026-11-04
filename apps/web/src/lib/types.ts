@@ -36,6 +36,8 @@ export interface AttendanceRecordRow {
   lateMinutes: number;
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
+  /** Hours missing from a closed day of a shift without fixed hours. */
+  shortMinutes: number;
   anomalies: AttendanceAnomaly[];
   isFinal: boolean;
   employee: {
@@ -263,6 +265,8 @@ export interface WorkShiftRow {
   lateToleranceMinutes: number | null;
   earlyLeaveToleranceMinutes: number | null;
   overtimeThresholdMinutes: number | null;
+  /** No fixed hours: start, end and lunch only say how long the day is expected to be. */
+  flexible: boolean;
 }
 
 export interface WorkScheduleRow {
@@ -273,7 +277,10 @@ export interface WorkScheduleRow {
   days: {
     weekday: number;
     shiftId?: string;
-    shift: { name: string; startTime: string; endTime: string };
+    shift: Pick<
+      WorkShiftRow,
+      'name' | 'startTime' | 'endTime' | 'breakStart' | 'breakEnd' | 'flexible'
+    >;
   }[];
 }
 
@@ -288,6 +295,7 @@ export interface AttendancePolicy {
   duplicatePunchWindowSeconds: number;
   lateToleranceMinutes: number;
   earlyLeaveToleranceMinutes: number;
+  overtimeEnabled: boolean;
   overtimeThresholdMinutes: number;
   overtimeBasis: 'AFTER_SHIFT_END' | 'EXCESS_WORKED_TIME';
   countEarlyArrivalAsOvertime: boolean;

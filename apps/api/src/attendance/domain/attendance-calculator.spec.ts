@@ -22,6 +22,7 @@ const DAY_SHIFT: ShiftTemplate = {
   lateToleranceMinutes: null,
   earlyLeaveToleranceMinutes: null,
   overtimeThresholdMinutes: null,
+  flexible: false,
 };
 
 const NIGHT_SHIFT: ShiftTemplate = {
@@ -210,6 +211,136 @@ describe('calculateAttendance', () => {
       });
       expect(r.breakMinutes).toBe(20);
       expect(r.anomalies).toContain('SHORT_BREAK');
+    });
+  });
+
+  describe('flexible shift (no fixed hours)', () => {
+    // Reference day 08:00-17:00 with lunch 13:00-14:00: 8 h are expected.
+    const FLEX: ShiftTemplate = {
+      ...DAY_SHIFT,
+      id: 'shift-flex',
+      breakStart: '13:00',
+      breakEnd: '14:00',
+      flexible: true,
+    };
+    const day = (...hours: string[]) => hours.map((h) => punch(h));
+
+    it.each([
+      ['entering at 08:00', ['08:00', '13:00', '14:00', '17:00'], 8 * 60],
+      ['entering at 09:00', ['09:00', '13:00', '14:00', '18:00'], 8 * 60],
+      ['leaving at 20:00', ['09:00', '13:00', '14:00', '20:00'], 10 * 60],
+      ['lunching at another hour', ['08:00', '12:00', '13:00', '17:00'], 8 * 60],
+    ])('is simply present %s', (_when, hours, worked) => {
+      const r = run({ punches: day(...hours), template: FLEX });
+      expect(r).toMatchObject({
+        status: 'PRESENT',
+        workedMinutes: worked,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        shortMinutes: 0,
+      });
+      expect(r.anomalies).not.toEqual(expect.arrayContaining(['LATE_ARRIVAL']));
+      expect(r.anomalies).not.toEqual(expect.arrayContaining(['EARLY_LEAVE']));
+    });
+
+    it('takes any hour of the calendar day, however far from the reference day', () => {
+      const r = run({ punches: day('05:30', '13:00', '14:00', '22:30'), template: FLEX });
+      expect(r.workedMinutes).toBe(16 * 60);
+      expect(r.anomalies).not.toContain('OUT_OF_SCHEDULE_PUNCH');
+      expect(r.anomalies).not.toContain('STRAY_PUNCH');
+    });
+
+    it('deducts the reference lunch when nobody punched it', () => {
+      const r = run({ punches: day('08:00', '18:00'), template: FLEX });
+      expect(r.workedMinutes).toBe(9 * 60);
+      expect(r.breakMinutes).toBe(60);
+    });
+
+    it('reports the hours missing from a closed day, without changing its status', () => {
+      const r = run({ punches: day('09:00', '13:00', '14:00', '17:00'), template: FLEX });
+      expect(r).toMatchObject({ status: 'PRESENT', workedMinutes: 7 * 60, shortMinutes: 60 });
+      expect(r.anomalies).toContain('SHORT_HOURS');
+    });
+
+    it('does not report missing hours while the day is open', () => {
+      const r = run({
+        punches: day('09:00', '13:00', '14:00', '17:00'),
+        template: FLEX,
+        now: t('17:05'),
+      });
+      expect(r.shortMinutes).toBe(0);
+      expect(r.isFinal).toBe(false);
+    });
+
+    it('does not report missing hours on an incomplete day: the exit is what is missing', () => {
+      const r = run({ punches: day('08:00', '13:00', '14:00'), template: FLEX });
+      expect(r).toMatchObject({ status: 'INCOMPLETE', shortMinutes: 0 });
+      expect(r.anomalies).not.toContain('SHORT_HOURS');
+    });
+
+    it('tolerates what the shift allows, and then reports all of it', () => {
+      const template = { ...FLEX, earlyLeaveToleranceMinutes: 5 };
+      const within = run({ punches: day('08:00', '13:00', '14:00', '16:55'), template });
+      expect(within.shortMinutes).toBe(0);
+      const beyond = run({ punches: day('08:00', '13:00', '14:00', '16:50'), template });
+      expect(beyond.shortMinutes).toBe(10);
+    });
+
+    it('expects less on a day with approved leave', () => {
+      const leave = { id: 'leave', start: t('08:00'), end: t('11:00') };
+      const r = run({
+        punches: day('11:00', '13:00', '14:00', '17:00'),
+        template: FLEX,
+        leaves: [leave],
+      });
+      expect(r.workedMinutes).toBe(5 * 60);
+      expect(r.shortMinutes).toBe(0);
+    });
+
+    it('does not count the reference lunch as leave taken from the expected hours', () => {
+      const leave = { id: 'leave', start: t('12:00'), end: t('15:00') };
+      const r = run({
+        punches: day('08:00', '12:00', '15:00', '17:00'),
+        template: FLEX,
+        leaves: [leave],
+      });
+      expect(r.workedMinutes).toBe(6 * 60);
+      expect(r.shortMinutes).toBe(0);
+    });
+
+    it('is absent without punches, and on leave when one covers the day', () => {
+      expect(run({ punches: [], template: FLEX }).status).toBe('ABSENT');
+      const leave = { id: 'leave', start: t('00:00'), end: t('23:59') };
+      expect(run({ punches: [], template: FLEX, leaves: [leave] }).status).toBe('ON_LEAVE');
+    });
+
+    it('measures overtime by what passes the expected hours, whatever the policy basis', () => {
+      const r = run({
+        punches: day('09:00', '13:00', '14:00', '20:00'),
+        template: FLEX,
+        policy: { overtimeBasis: 'AFTER_SHIFT_END' },
+      });
+      expect(r.overtimeMinutes).toBe(2 * 60);
+    });
+  });
+
+  describe('a company that does not pay overtime', () => {
+    const policy = { overtimeEnabled: false };
+
+    it('calculates none on a regular day', () => {
+      const r = run({
+        punches: [punch('08:00'), punch('12:00'), punch('13:00'), punch('20:00')],
+        policy,
+      });
+      expect(r).toMatchObject({ overtimeMinutes: 0, overtimeKind: null, workedMinutes: 11 * 60 });
+      expect(r.anomalies).not.toContain('OVERTIME');
+    });
+
+    it('calculates none on a holiday, which it still reports', () => {
+      const r = run({ punches: [punch('08:00'), punch('12:00')], isHoliday: true, policy });
+      expect(r).toMatchObject({ overtimeMinutes: 0, overtimeKind: null, status: 'HOLIDAY' });
+      expect(r.anomalies).toContain('WORKED_ON_HOLIDAY');
+      expect(r.anomalies).not.toContain('OVERTIME');
     });
   });
 

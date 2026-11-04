@@ -78,6 +78,8 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
   SHIFTS_NOT_FOUND: () => 'Uno de los turnos elegidos ya no existe.',
   SCHEDULE_NOT_FOUND: () => 'No se encontró ese horario: puede que ya no exista.',
   HOLIDAY_NOT_FOUND: () => 'No se encontró ese feriado: puede que ya no exista.',
+  FLEXIBLE_SHIFT_OVERNIGHT: () =>
+    'Un turno sin hora fija no puede terminar al día siguiente: revise sus horas de referencia.',
   BREAK_INCOMPLETE: () => 'Indique el inicio y el fin del almuerzo, o deje los dos vacíos.',
   ASSIGNMENT_NOT_FOUND: () => 'No se encontró esa asignación de horario.',
   ASSIGNMENT_DATE_CONFLICT: () => 'Ya hay una asignación que empieza en esa fecha o después.',

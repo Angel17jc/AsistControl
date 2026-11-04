@@ -66,6 +66,12 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
     ? (employees.data?.data.find((e) => e.id === cardOf) ?? data?.data[0]?.employee)
     : undefined;
 
+  // Only what these days have: without fixed hours there is no schedule, lateness to show.
+  const fixedHours = rows.some((r) => r.scheduledStart);
+  const showLate = fixedHours || rows.some((r) => r.lateMinutes > 0);
+  const showShort = rows.some((r) => r.shortMinutes > 0);
+  const showExtra = rows.some((r) => r.overtimeMinutes > 0);
+
   return (
     <Card>
       <div className="flex flex-wrap justify-end gap-2 border-b border-line px-4 py-3 print:hidden">
@@ -116,13 +122,14 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
               'Fecha',
               ...(cardOf ? [] : ['Empleado']),
               'Estado',
-              'Horario',
+              ...(fixedHours ? ['Horario'] : []),
               'Entrada',
               'Almuerzo',
               'Salida',
               'Trabajado',
-              'Atraso',
-              'Extra',
+              ...(showShort ? ['Faltan'] : []),
+              ...(showLate ? ['Atraso'] : []),
+              ...(showExtra ? ['Extra'] : []),
               'Novedades',
             ]}
             empty={rows.length === 0}
@@ -153,11 +160,13 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
                     </p>
                   )}
                 </Td>
-                <Td className="tabular whitespace-nowrap text-ink-2">
-                  {r.scheduledStart
-                    ? `${formatTime(r.scheduledStart)}–${formatTime(r.scheduledEnd)}`
-                    : '—'}
-                </Td>
+                {fixedHours && (
+                  <Td className="tabular whitespace-nowrap text-ink-2">
+                    {r.scheduledStart
+                      ? `${formatTime(r.scheduledStart)}–${formatTime(r.scheduledEnd)}`
+                      : '—'}
+                  </Td>
+                )}
                 <Td className="tabular">{formatTime(entryOf(r))}</Td>
                 <Td className="tabular whitespace-nowrap">
                   <Breaks record={r} />
@@ -169,10 +178,19 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
                   )}
                 </Td>
                 <Td className="tabular whitespace-nowrap">{formatMinutes(r.workedMinutes)}</Td>
-                <Td className="tabular">{r.lateMinutes > 0 ? `${r.lateMinutes} min` : '—'}</Td>
-                <Td className="tabular">
-                  {r.overtimeMinutes > 0 ? formatMinutes(r.overtimeMinutes) : '—'}
-                </Td>
+                {showShort && (
+                  <Td className="tabular whitespace-nowrap">
+                    {r.shortMinutes > 0 ? formatMinutes(r.shortMinutes) : '—'}
+                  </Td>
+                )}
+                {showLate && (
+                  <Td className="tabular">{r.lateMinutes > 0 ? `${r.lateMinutes} min` : '—'}</Td>
+                )}
+                {showExtra && (
+                  <Td className="tabular">
+                    {r.overtimeMinutes > 0 ? formatMinutes(r.overtimeMinutes) : '—'}
+                  </Td>
+                )}
                 <Td className="text-xs text-ink-2">
                   {r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · ') || '—'}
                 </Td>
@@ -245,6 +263,7 @@ function TimecardHeader({
   records: AttendanceRecordRow[];
 }) {
   const t = timecardTotals(records);
+  const fixedHours = records.some((r) => r.scheduledStart);
   return (
     <section aria-label="Tarjeta de tiempo" className="border-b border-line px-5 py-4">
       <h2 className="text-sm font-semibold text-ink-1">
@@ -258,20 +277,29 @@ function TimecardHeader({
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
         <Total label="Días trabajados">{t.daysWorked}</Total>
         <Total label="Trabajado">{formatMinutes(t.workedMinutes)}</Total>
-        <Total label="Atrasos">
-          {t.lateDays > 0 ? `${t.lateDays} · ${t.lateMinutes} min` : '—'}
-        </Total>
-        <Total label="Salidas anticipadas">
-          {t.earlyLeaveMinutes > 0 ? `${t.earlyLeaveMinutes} min` : '—'}
-        </Total>
-        <Total label="Horas extra">
-          {t.overtimeMinutes > 0 ? formatMinutes(t.overtimeMinutes) : '—'}
-        </Total>
+        {t.shortMinutes > 0 && (
+          <Total label="Horas faltantes">{formatMinutes(t.shortMinutes)}</Total>
+        )}
+        {(fixedHours || t.lateDays > 0) && (
+          <Total label="Atrasos">
+            {t.lateDays > 0 ? `${t.lateDays} · ${t.lateMinutes} min` : '—'}
+          </Total>
+        )}
+        {(fixedHours || t.earlyLeaveMinutes > 0) && (
+          <Total label="Salidas anticipadas">
+            {t.earlyLeaveMinutes > 0 ? `${t.earlyLeaveMinutes} min` : '—'}
+          </Total>
+        )}
+        {t.overtimeMinutes > 0 && (
+          <Total label="Horas extra">{formatMinutes(t.overtimeMinutes)}</Total>
+        )}
         <Total label="Ausencias">{t.absences}</Total>
       </dl>
-      <p className="mt-3 text-xs text-ink-3">
-        Las horas extra son las calculadas; se aprueban en Solicitudes.
-      </p>
+      {t.overtimeMinutes > 0 && (
+        <p className="mt-3 text-xs text-ink-3">
+          Las horas extra son las calculadas; se aprueban en Solicitudes.
+        </p>
+      )}
       {t.incomplete > 0 && (
         <p className="mt-2 flex items-start gap-2 text-xs text-ink-1">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
