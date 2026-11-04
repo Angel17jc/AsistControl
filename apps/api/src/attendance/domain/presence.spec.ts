@@ -154,10 +154,10 @@ describe('presenceAt', () => {
 describe('presenceAt without fixed hours', () => {
   const options = { template: FLEX };
 
-  it('is not yet in, not late, until the reference day ends', () => {
-    expect(at(t('10:30'), [], options).state).toBe('NOT_YET');
-    expect(at(t('16:59'), [], options).state).toBe('NOT_YET');
-    expect(at(t('17:01'), [], options).state).toBe('NOT_ARRIVED');
+  it('says whoever has not punched has not arrived, at any hour, without calling it late', () => {
+    for (const hour of ['08:30', '11:00', '16:30', '17:30']) {
+      expect(at(t(hour), [], options)).toMatchObject({ state: 'NOT_ARRIVED', lateMinutes: 0 });
+    }
   });
 
   it('shows no hour to be expected at', () => {

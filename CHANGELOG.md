@@ -34,6 +34,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Fixed
 
+- En un turno sin hora fija, quien no ha marcado sale como «No ha llegado» a cualquier hora, en vez de «Aún no es su hora».
 - Los días sin marcar de un período descargado tarde (el historial de un marcador, una corrección de un mes pasado) ahora cuentan: figuraban sin registro y la tarjeta de tiempo decía «Ausencias: 0». Antes de la primera marcación de una persona no se da nada por supuesto.
 - El panel ya no muestra como de hoy las marcaciones de otros días que llegan en vivo, ni se queda con datos viejos al volver a él.
 - La tarjeta de tiempo de un empleado muestra su cabecera también en un período sin jornadas.

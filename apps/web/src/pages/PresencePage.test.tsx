@@ -142,8 +142,14 @@ describe('PresencePage', () => {
             state: 'ON_BREAK',
             lastPunch: { at: lunchAt, reading: 'BREAK_OUT', deviceName: 'Puerta' },
           }),
-          entry('2', 'Beto', null, { ...noHours, state: 'NOT_YET' }),
-          entry('3', 'Carla', null, { ...noHours, state: 'NOT_ARRIVED' }),
+          // The reference day of these entries is still running at the board's moment...
+          entry('2', 'Beto', null, { ...noHours, state: 'NOT_ARRIVED' }),
+          // ...and over for this one.
+          entry('3', 'Carla', null, {
+            ...noHours,
+            shift: { ...flexible, end: '2026-09-18T17:00:00.000Z' },
+            state: 'NOT_ARRIVED',
+          }),
         ],
       }),
     );
@@ -158,6 +164,7 @@ describe('PresencePage', () => {
     expect(rowOf('Ana')).toHaveTextContent('Sin hora fija');
     expect(rowOf('Ana')).toHaveTextContent('desde 12:30');
     expect(rowOf('Ana')).not.toHaveTextContent('vuelve');
+    expect(rowOf('Beto')).toHaveTextContent('aún no marca hoy');
     expect(rowOf('Beto')).not.toHaveTextContent('entra ');
     expect(rowOf('Carla')).toHaveTextContent('no marcó en todo el día');
   });
