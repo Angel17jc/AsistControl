@@ -106,7 +106,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
         kind: 'toggle',
         key: 'autoDeductUnpunchedBreak',
         label: 'Descontar el almuerzo programado si no se marcó',
-        hint: 'Si nadie marcó la salida y el regreso del almuerzo, se descuenta el tiempo programado.',
+        hint: 'Si no se marcó el almuerzo, se descuenta el tiempo programado. Si se marcó menos, solo lo que falte.',
       },
       {
         kind: 'number',

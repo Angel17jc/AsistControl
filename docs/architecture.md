@@ -118,7 +118,7 @@ Todas viven en `SystemSetting["attendance.policy"]` (editable vía `PATCH /api/s
 | `overtimeBasis`                       | `AFTER_SHIFT_END` | O `EXCESS_WORKED_TIME` (compensa atrasos primero)       |
 | `countEarlyArrivalAsOvertime`         | `false`           | Llegar antes cuenta como extra                          |
 | `punchPairing`                        | `SEQUENTIAL`      | O `DEVICE_TYPE`                                         |
-| `autoDeductUnpunchedBreak`            | `true`            | Descontar almuerzo si no se marcó                       |
+| `autoDeductUnpunchedBreak`            | `true`            | Descontar del almuerzo lo que no se marcó               |
 | `minBreakMinutes`                     | 0                 | Almuerzo mínimo (0 = no se controla)                    |
 | `duplicatePunchWindowSeconds`         | 60                | Ventana de doble marcación                              |
 | `outOfScheduleMarginMinutes`          | 180               | Margen para marcar "fuera de horario"                   |

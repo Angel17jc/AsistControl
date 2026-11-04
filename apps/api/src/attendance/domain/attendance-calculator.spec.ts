@@ -174,6 +174,27 @@ describe('calculateAttendance', () => {
       expect(r.breakMinutes).toBe(60);
     });
 
+    it.each([
+      ['before the scheduled hour', ['08:00', '11:00', '12:00', '17:00']],
+      ['after the scheduled hour', ['08:00', '14:00', '15:00', '17:00']],
+    ])('does not deduct a punched lunch again when it was taken %s', (_when, hours) => {
+      const r = run({ punches: hours.map((h) => punch(h)) });
+      expect(r.workedMinutes).toBe(8 * 60);
+      expect(r.breakMinutes).toBe(60);
+    });
+
+    it('deducts only what is missing of the break after a shorter punched pause', () => {
+      const r = run({ punches: [punch('08:00'), punch('10:00'), punch('10:20'), punch('17:00')] });
+      expect(r.workedMinutes).toBe(8 * 60);
+      expect(r.breakMinutes).toBe(60);
+    });
+
+    it('deducts nothing after a punched pause longer than the break', () => {
+      const r = run({ punches: [punch('08:00'), punch('10:00'), punch('11:30'), punch('17:00')] });
+      expect(r.workedMinutes).toBe(7 * 60 + 30);
+      expect(r.breakMinutes).toBe(90);
+    });
+
     it('keeps the full span when auto-deduction is disabled', () => {
       const r = run({
         punches: [punch('08:00'), punch('17:00')],

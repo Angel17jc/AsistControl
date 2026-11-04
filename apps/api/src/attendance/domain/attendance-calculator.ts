@@ -58,9 +58,10 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
     const { breakStart, breakEnd } = shift;
     const workedThroughBreak = complete.some((s) => s.in <= breakStart && s.out >= breakEnd);
     if (workedThroughBreak) {
-      const scheduledBreak = breakEnd.getTime() - breakStart.getTime();
-      workedMs -= scheduledBreak;
-      breakMs += scheduledBreak;
+      // A lunch punched at another hour already is the lunch: only what is missing of it goes.
+      const unpunched = Math.max(0, breakEnd.getTime() - breakStart.getTime() - breakMs);
+      workedMs -= unpunched;
+      breakMs += unpunched;
     }
   }
 
