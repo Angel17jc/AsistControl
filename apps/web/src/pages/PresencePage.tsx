@@ -250,7 +250,11 @@ function detail(e: PresenceEntry, at: string): string | null {
       return `a las ${timeOf(e.lastPunch.at, today)}${early}`;
     }
     case 'NOT_ARRIVED': {
-      if (e.shift?.flexible) return 'no marcó en todo el día';
+      if (e.shift?.flexible) {
+        return Date.parse(at) >= Date.parse(e.shift.end)
+          ? 'no marcó en todo el día'
+          : 'aún no marca hoy';
+      }
       if (!e.expectedStart) return null;
       const over = e.expectedEnd !== null && Date.parse(at) >= Date.parse(e.expectedEnd);
       return over ? 'no marcó en todo su turno' : `debía entrar ${formatTime(e.expectedStart)}`;

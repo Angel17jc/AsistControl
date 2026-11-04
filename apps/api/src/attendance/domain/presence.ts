@@ -70,6 +70,8 @@ function stateOf(
   if (leaves.some((l) => l.start <= now && l.end > now)) return 'ON_LEAVE';
   if (day.dayType !== 'WORKDAY') return 'DAY_OFF';
   if (!day.shift || !expectedStart) return 'NO_SCHEDULE';
+  // Without fixed hours there is no hour to wait for: whoever has not punched is just not here.
+  if (day.shift.flexible) return 'NOT_ARRIVED';
   return now > arrivalDeadline(day.shift, expectedStart) ? 'NOT_ARRIVED' : 'NOT_YET';
 }
 
