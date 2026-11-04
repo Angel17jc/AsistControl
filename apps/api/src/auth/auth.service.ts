@@ -12,6 +12,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import type { AccessTokenPayload, RefreshTokenPayload } from '../common/auth/token-payloads';
+import { apiError } from '../common/errors/api-error';
 import { AppConfigService } from '../config/app-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordService } from './password.service';
@@ -53,7 +54,7 @@ export class AuthService {
         context: ctx,
         metadata: { email, reason: !user ? 'unknown_user' : !valid ? 'bad_password' : 'inactive' },
       });
-      throw new UnauthorizedException(INVALID_CREDENTIALS);
+      throw new UnauthorizedException(apiError('INVALID_CREDENTIALS', INVALID_CREDENTIALS));
     }
 
     const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS');
@@ -93,7 +94,8 @@ export class AuthService {
    * already-rotated token means it was stolen or replayed, so the whole session is revoked.
    */
   async refresh(refreshToken: string | undefined, ctx: RequestContext): Promise<IssuedSession> {
-    if (!refreshToken) throw new UnauthorizedException('Missing refresh token');
+    if (!refreshToken)
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Missing refresh token'));
 
     let payload: RefreshTokenPayload;
     try {
@@ -102,7 +104,7 @@ export class AuthService {
       });
       if (payload.typ !== 'refresh') throw new Error('wrong type');
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Invalid refresh token'));
     }
 
     const session = await this.prisma.session.findUnique({
@@ -110,7 +112,7 @@ export class AuthService {
       include: { user: { include: { employee: { select: { firstName: true, lastName: true } } } } },
     });
     if (!session || session.revokedAt || session.expiresAt < new Date() || !session.user.isActive) {
-      throw new UnauthorizedException('Session expired');
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Session expired'));
     }
 
     const issued = await this.issue(session.user, session.id, displayName(session.user));
@@ -132,7 +134,7 @@ export class AuthService {
         entityId: session.id,
         context: ctx,
       });
-      throw new UnauthorizedException('Session revoked');
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Session revoked'));
     }
     return issued;
   }
@@ -163,7 +165,8 @@ export class AuthService {
     ctx: RequestContext,
   ): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: actor.id } });
-    if (!user?.isActive) throw new UnauthorizedException('Session expired');
+    if (!user?.isActive)
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Session expired'));
 
     if (!(await this.passwords.verify(user.passwordHash, currentPassword))) {
       this.audit.recordAsync({
@@ -173,10 +176,14 @@ export class AuthService {
         entityId: user.id,
         context: ctx,
       });
-      throw new ForbiddenException('Current password is incorrect');
+      throw new ForbiddenException(
+        apiError('CURRENT_PASSWORD_INCORRECT', 'Current password is incorrect'),
+      );
     }
     if (await this.passwords.verify(user.passwordHash, newPassword)) {
-      throw new BadRequestException('The new password must be different from the current one');
+      throw new BadRequestException(
+        apiError('PASSWORD_UNCHANGED', 'The new password must be different from the current one'),
+      );
     }
 
     const passwordHash = await this.passwords.hash(newPassword);
@@ -187,7 +194,12 @@ export class AuthService {
         data: { passwordHash, mustChangePassword: false },
       });
       if (changed.count === 0) {
-        throw new ConflictException('The password was changed meanwhile; sign in again');
+        throw new ConflictException(
+          apiError(
+            'PASSWORD_CHANGED_MEANWHILE',
+            'The password was changed meanwhile; sign in again',
+          ),
+        );
       }
       const revoked = await tx.session.updateMany({
         where: { userId: user.id, id: { not: actor.sessionId }, revokedAt: null },

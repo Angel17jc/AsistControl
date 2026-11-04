@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateDepartmentDto, UpdateDepartmentDto } from './departments.dto';
 
@@ -21,7 +22,8 @@ export class DepartmentsService {
 
   async get(id: string) {
     const department = await this.prisma.department.findFirst({ where: { id, deletedAt: null } });
-    if (!department) throw new NotFoundException('Department not found');
+    if (!department)
+      throw new NotFoundException(apiError('DEPARTMENT_NOT_FOUND', 'Department not found'));
     return department;
   }
 
@@ -74,7 +76,13 @@ export class DepartmentsService {
       where: { departmentId: id, deletedAt: null },
     });
     if (employees > 0) {
-      throw new ConflictException(`Department has ${employees} employee(s); reassign them first`);
+      throw new ConflictException(
+        apiError(
+          'DEPARTMENT_IN_USE',
+          `Department has ${employees} employee(s); reassign them first`,
+          { employees },
+        ),
+      );
     }
     await this.prisma.$transaction(async (tx) => {
       // Free the unique code/name so they can be reused by a new department.

@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { ApiErrorParams } from '@asistcontrol/shared';
 import type { Prisma } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
 import { AuditService, diff } from '../audit/audit.service';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
+import { apiError } from '../common/errors/api-error';
 import { fromDbDate, toDbDate } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateEmployeeDto, EmployeeQueryDto, UpdateEmployeeDto } from './employees.dto';
@@ -63,7 +65,8 @@ export class EmployeesService {
       where: { id, deletedAt: null },
       include: EMPLOYEE_INCLUDE,
     });
-    if (!employee) throw new NotFoundException('Employee not found');
+    if (!employee)
+      throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
     return serialize(employee);
   }
 
@@ -93,9 +96,11 @@ export class EmployeesService {
 
   async update(id: string, dto: UpdateEmployeeDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const before = await this.prisma.employee.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException('Employee not found');
+    if (!before) throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
     if (dto.supervisorId === id)
-      throw new BadRequestException('An employee cannot supervise themselves');
+      throw new BadRequestException(
+        apiError('SUPERVISOR_IS_SELF', 'An employee cannot supervise themselves'),
+      );
     await this.assertReferences(dto, id);
 
     const employee = await this.prisma.$transaction(async (tx) => {
@@ -140,7 +145,8 @@ export class EmployeesService {
    */
   async remove(id: string, actor: AuthenticatedUser, ctx: RequestContext): Promise<void> {
     const employee = await this.prisma.employee.findFirst({ where: { id, deletedAt: null } });
-    if (!employee) throw new NotFoundException('Employee not found');
+    if (!employee)
+      throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
     await this.prisma.$transaction(async (tx) => {
       await tx.employee.update({
         where: { id },
@@ -188,7 +194,7 @@ export class EmployeesService {
       checks.push(
         this.exists(
           this.prisma.department.count({ where: { id: dto.departmentId, deletedAt: null } }),
-          'Department',
+          'department',
         ),
       );
     }
@@ -196,7 +202,7 @@ export class EmployeesService {
       checks.push(
         this.exists(
           this.prisma.contractType.count({ where: { id: dto.contractTypeId } }),
-          'Contract type',
+          'contractType',
         ),
       );
     }
@@ -204,7 +210,7 @@ export class EmployeesService {
       checks.push(
         this.exists(
           this.prisma.position.count({ where: { id: dto.positionId, deletedAt: null } }),
-          'Position',
+          'position',
         ),
       );
     }
@@ -218,15 +224,21 @@ export class EmployeesService {
               NOT: selfId ? { id: selfId } : undefined,
             },
           }),
-          'Supervisor',
+          'supervisor',
         ),
       );
     }
     await Promise.all(checks);
   }
 
-  private async exists(count: Promise<number>, label: string): Promise<void> {
-    if ((await count) === 0) throw new BadRequestException(`${label} does not exist`);
+  private async exists(
+    count: Promise<number>,
+    record: ApiErrorParams['RELATED_RECORD_NOT_FOUND']['record'],
+  ): Promise<void> {
+    if ((await count) === 0)
+      throw new BadRequestException(
+        apiError('RELATED_RECORD_NOT_FOUND', `Related ${record} does not exist`, { record }),
+      );
   }
 }
 

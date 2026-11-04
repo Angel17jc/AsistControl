@@ -39,6 +39,21 @@ export default tseslint.config(
     rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
   {
+    // Clients word errors from their code (ADR 0014): one without it can only show raw English.
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['**/*.spec.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'NewExpression[callee.name=/^(BadRequest|Unauthorized|Forbidden|NotFound|Conflict|Gone|UnprocessableEntity|ServiceUnavailable)Exception$/]:not([arguments.0.callee.name=/^(apiError|invalidPolicy)$/])',
+          message: 'Give the error a code: new XException(apiError(code, message, params)).',
+        },
+      ],
+    },
+  },
+  {
     files: ['apps/api/prisma/seed.ts'],
     rules: { 'no-console': 'off' },
   },

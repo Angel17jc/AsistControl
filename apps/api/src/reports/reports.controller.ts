@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiProduces, ApiTags } from '@ne
 import type { Response } from 'express';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { apiError } from '../common/errors/api-error';
 import { REPORT_KINDS, type ReportKind, ReportQueryDto } from './reports.dto';
 import { ReportsService } from './reports.service';
 
@@ -27,7 +28,9 @@ export class ReportsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!(REPORT_KINDS as readonly string[]).includes(kind)) {
-      throw new BadRequestException(`Unknown report. Available: ${REPORT_KINDS.join(', ')}`);
+      throw new BadRequestException(
+        apiError('REPORT_UNKNOWN', `Unknown report. Available: ${REPORT_KINDS.join(', ')}`),
+      );
     }
     const report = await this.reports.build(kind as ReportKind, query, user);
     if (query.format === 'csv') {

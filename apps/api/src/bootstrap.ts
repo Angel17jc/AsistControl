@@ -1,8 +1,9 @@
-import { type INestApplication, ValidationPipe } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { CodedValidationPipe } from './common/errors/coded-validation.pipe';
 import { AppConfigService } from './config/app-config.service';
 
 /**
@@ -19,7 +20,7 @@ export function configureApp(app: NestExpressApplication): void {
   app.use(cookieParser());
   app.enableCors({ origin: config.get('CORS_ORIGINS'), credentials: true });
   app.useGlobalPipes(
-    new ValidationPipe({
+    new CodedValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,

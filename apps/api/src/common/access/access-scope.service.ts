@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
+import { apiError } from '../errors/api-error';
 
 /**
  * Row-level data scoping. RBAC answers "can this role read attendance?";
@@ -42,7 +43,10 @@ export class AccessScopeService {
     const visible = await this.prisma.employee.count({
       where: { AND: [where, { id: employeeId }] },
     });
-    if (visible === 0) throw new ForbiddenException('You cannot access this employee');
+    if (visible === 0)
+      throw new ForbiddenException(
+        apiError('EMPLOYEE_OUT_OF_SCOPE', 'You cannot access this employee'),
+      );
   }
 
   isUnrestricted(user: AuthenticatedUser): boolean {

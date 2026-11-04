@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePositionDto, UpdatePositionDto } from './positions.dto';
 
@@ -22,7 +23,8 @@ export class PositionsService {
 
   async get(id: string) {
     const position = await this.prisma.position.findFirst({ where: { id, deletedAt: null } });
-    if (!position) throw new NotFoundException('Position not found');
+    if (!position)
+      throw new NotFoundException(apiError('POSITION_NOT_FOUND', 'Position not found'));
     return position;
   }
 
@@ -69,7 +71,11 @@ export class PositionsService {
       where: { positionId: id, deletedAt: null },
     });
     if (employees > 0) {
-      throw new ConflictException(`Position has ${employees} employee(s); reassign them first`);
+      throw new ConflictException(
+        apiError('POSITION_IN_USE', `Position has ${employees} employee(s); reassign them first`, {
+          employees,
+        }),
+      );
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.position.update({

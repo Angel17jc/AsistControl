@@ -1,4 +1,5 @@
 import type { LeaveType, PresenceState, PunchReading } from './domain';
+import type { ApiErrorCode, ApiErrorParams } from './errors';
 import type { AttendanceEventCreatedPayload } from './realtime';
 import type { Role } from './rbac';
 
@@ -10,6 +11,11 @@ export interface PaginatedResponse<T> {
 export interface ApiErrorResponse {
   statusCode: number;
   error: string;
+  /** What happened, for clients to word (ADR 0014). */
+  code: ApiErrorCode;
+  /** The values of that code, see `ApiErrorParams`. */
+  params?: ApiErrorParams[ApiErrorCode];
+  /** In English: for logs and for whoever calls the API by hand. */
   message: string | string[];
   path: string;
   timestamp: string;

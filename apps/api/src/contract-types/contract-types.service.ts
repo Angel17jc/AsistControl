@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { ContractType, Prisma } from '@prisma/client';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import type { VacationRule } from '../vacations/domain/vacation-entitlement';
 import type { CreateContractTypeDto, UpdateContractTypeDto } from './contract-types.dto';
@@ -118,7 +119,11 @@ export class ContractTypesService {
     });
     if (employees > 0) {
       throw new ConflictException(
-        `Contract type "${row.name}" is used by ${employees} employee(s); reassign them first`,
+        apiError(
+          'CONTRACT_TYPE_IN_USE',
+          `Contract type "${row.name}" is used by ${employees} employee(s); reassign them first`,
+          { name: row.name, employees },
+        ),
       );
     }
     await this.prisma.$transaction(async (tx) => {
@@ -139,7 +144,8 @@ export class ContractTypesService {
 
   private async entity(id: string): Promise<ContractType> {
     const row = await this.prisma.contractType.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException('Contract type not found');
+    if (!row)
+      throw new NotFoundException(apiError('CONTRACT_TYPE_NOT_FOUND', 'Contract type not found'));
     return row;
   }
 }

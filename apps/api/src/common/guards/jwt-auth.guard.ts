@@ -12,6 +12,7 @@ import { AppConfigService } from '../../config/app-config.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ALLOW_PENDING_PASSWORD_KEY, IS_PUBLIC_KEY } from '../decorators';
 import type { AccessTokenPayload } from '../auth/token-payloads';
+import { apiError } from '../errors/api-error';
 
 /**
  * Global guard: every route requires a valid access token unless marked @Public().
@@ -34,7 +35,8 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
     const token = extractBearer(request.headers.authorization);
-    if (!token) throw new UnauthorizedException('Missing access token');
+    if (!token)
+      throw new UnauthorizedException(apiError('SESSION_EXPIRED', 'Missing access token'));
 
     request.user = await this.verify(token);
 
@@ -44,7 +46,10 @@ export class JwtAuthGuard implements CanActivate {
         context.getHandler(),
         context.getClass(),
       ]);
-      if (!allowed) throw new ForbiddenException(PASSWORD_CHANGE_REQUIRED);
+      if (!allowed)
+        throw new ForbiddenException(
+          apiError('PASSWORD_CHANGE_REQUIRED', PASSWORD_CHANGE_REQUIRED),
+        );
     }
     return true;
   }
@@ -64,7 +69,9 @@ export class JwtAuthGuard implements CanActivate {
         mustChangePassword: payload.pwc === true,
       };
     } catch {
-      throw new UnauthorizedException('Invalid or expired access token');
+      throw new UnauthorizedException(
+        apiError('SESSION_EXPIRED', 'Invalid or expired access token'),
+      );
     }
   }
 }

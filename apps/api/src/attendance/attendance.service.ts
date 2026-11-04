@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
+import { apiError } from '../common/errors/api-error';
 import { eachDate, fromDbDate, localDayBounds, toDbDate } from '../common/utils/date-only';
 import { buildDedupKey } from '../common/utils/dedup-key';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,7 +88,9 @@ export class AttendanceService {
     const timezone = await this.settings.getTimezone();
     const restricted = !this.scope.isUnrestricted(user);
     if (query.unmatched && restricted)
-      throw new BadRequestException('Not allowed to list unmatched punches');
+      throw new BadRequestException(
+        apiError('UNMATCHED_PUNCHES_FORBIDDEN', 'Not allowed to list unmatched punches'),
+      );
 
     const employeeFilters: Prisma.EmployeeWhereInput[] = [];
     const scoped = this.scope.employeeWhere(user);
@@ -148,7 +151,8 @@ export class AttendanceService {
     const employee = await this.prisma.employee.findFirst({
       where: { id: dto.employeeId, deletedAt: null },
     });
-    if (!employee) throw new NotFoundException('Employee not found');
+    if (!employee)
+      throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
 
     const punches = dto.punches.map((p) => {
       const occurredAt = new Date(p.occurredAt);
@@ -161,14 +165,21 @@ export class AttendanceService {
       return { occurredAt, punchType: p.punchType ?? 'UNKNOWN', dedupKey };
     });
     if (punches.some((p) => p.occurredAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS)) {
-      throw new BadRequestException('A punch cannot be registered in the future');
+      throw new BadRequestException(
+        apiError('PUNCH_IN_FUTURE', 'A punch cannot be registered in the future'),
+      );
     }
     const keys = punches.map((p) => p.dedupKey);
     if (new Set(keys).size !== keys.length) {
-      throw new BadRequestException('Two of the punches are at the same time');
+      throw new BadRequestException(
+        apiError('PUNCHES_AT_SAME_TIME', 'Two of the punches are at the same time'),
+      );
     }
     const existing = await this.prisma.attendanceEvent.count({ where: { dedupKey: { in: keys } } });
-    if (existing > 0) throw new ConflictException('A manual punch already exists at that time');
+    if (existing > 0)
+      throw new ConflictException(
+        apiError('MANUAL_PUNCH_EXISTS', 'A manual punch already exists at that time'),
+      );
 
     const events = await this.prisma.$transaction(async (tx) => {
       const created = [];
@@ -221,16 +232,17 @@ export class AttendanceService {
         punchType: p.punchType ?? 'UNKNOWN',
       })),
     );
-    if (!preview) throw new NotFoundException('Employee not found');
+    if (!preview) throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
     return preview;
   }
 
   /** Voiding keeps the original row (and why it was discarded) for the audit trail. */
   async voidEvent(id: string, dto: VoidEventDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const event = await this.prisma.attendanceEvent.findUnique({ where: { id } });
-    if (!event) throw new NotFoundException('Event not found');
+    if (!event) throw new NotFoundException(apiError('EVENT_NOT_FOUND', 'Event not found'));
     if (event.employeeId) await this.scope.assertCanAccessEmployee(actor, event.employeeId);
-    if (event.voidedAt) throw new ConflictException('Event is already voided');
+    if (event.voidedAt)
+      throw new ConflictException(apiError('EVENT_ALREADY_VOIDED', 'Event is already voided'));
 
     const voided = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.attendanceEvent.update({
@@ -274,8 +286,13 @@ export class AttendanceService {
 }
 
 function assertRange(from: string, to: string, maxDays: number): void {
-  if (from > to) throw new BadRequestException('"from" must be before or equal to "to"');
+  if (from > to)
+    throw new BadRequestException(
+      apiError('DATE_RANGE_INVERTED', '"from" must be before or equal to "to"'),
+    );
   if (eachDate(from, to).length > maxDays) {
-    throw new BadRequestException(`Date range cannot exceed ${maxDays} days`);
+    throw new BadRequestException(
+      apiError('DATE_RANGE_TOO_LONG', `Date range cannot exceed ${maxDays} days`, { maxDays }),
+    );
   }
 }

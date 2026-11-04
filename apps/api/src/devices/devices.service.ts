@@ -9,6 +9,7 @@ import {
 import type { Device, DeviceStatus, Prisma } from '@prisma/client';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -60,7 +61,7 @@ export class DevicesService implements OnApplicationBootstrap {
 
   async getEntity(id: string): Promise<Device> {
     const device = await this.prisma.device.findFirst({ where: { id, deletedAt: null } });
-    if (!device) throw new NotFoundException('Device not found');
+    if (!device) throw new NotFoundException(apiError('DEVICE_NOT_FOUND', 'Device not found'));
     return device;
   }
 
@@ -212,7 +213,8 @@ export class DevicesService implements OnApplicationBootstrap {
    */
   async testConnection(id: string) {
     const device = await this.getEntity(id);
-    if (device.status === 'DISABLED') throw new BadRequestException('Device is disabled');
+    if (device.status === 'DISABLED')
+      throw new BadRequestException(apiError('DEVICE_DISABLED', 'Device is disabled'));
     this.assertDriver(device.driver);
 
     const adapter = this.connections.adapterFor(device);
@@ -281,7 +283,11 @@ export class DevicesService implements OnApplicationBootstrap {
   private assertDriver(driver: string): void {
     if (!this.connections.isSupported(driver)) {
       throw new BadRequestException(
-        `Driver "${driver}" is not available. Supported: ${this.connections.supportedDrivers().join(', ') || 'none'}`,
+        apiError(
+          'DRIVER_NOT_AVAILABLE',
+          `Driver "${driver}" is not available. Supported: ${this.connections.supportedDrivers().join(', ') || 'none'}`,
+          { driver },
+        ),
       );
     }
   }
@@ -290,6 +296,13 @@ export class DevicesService implements OnApplicationBootstrap {
     const clash = await this.prisma.device.findFirst({
       where: { host, port, deletedAt: null, NOT: exceptId ? { id: exceptId } : undefined },
     });
-    if (clash) throw new ConflictException(`Device "${clash.name}" already uses ${host}:${port}`);
+    if (clash)
+      throw new ConflictException(
+        apiError('DEVICE_ADDRESS_IN_USE', `Device "${clash.name}" already uses ${host}:${port}`, {
+          name: clash.name,
+          host,
+          port,
+        }),
+      );
   }
 }

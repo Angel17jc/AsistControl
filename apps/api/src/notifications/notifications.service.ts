@@ -12,6 +12,7 @@ import {
   rolesWith,
 } from '@asistcontrol/shared';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail-transport';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -86,7 +87,8 @@ export class NotificationsService {
     if (count > 0) return;
     // Someone else's notification is reported exactly like one that does not exist.
     const own = await this.prisma.notification.count({ where: { id, userId: user.id } });
-    if (own === 0) throw new NotFoundException('Notification not found');
+    if (own === 0)
+      throw new NotFoundException(apiError('NOTIFICATION_NOT_FOUND', 'Notification not found'));
   }
 
   async markAllRead(user: AuthenticatedUser): Promise<{ updated: number }> {

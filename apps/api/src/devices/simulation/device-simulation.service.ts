@@ -7,6 +7,7 @@ import {
 } from '@asistcontrol/biometric-core';
 import { DateTime } from 'luxon';
 import { WorkCalendarService } from '../../attendance/work-calendar.service';
+import { apiError } from '../../common/errors/api-error';
 import { todayIn } from '../../common/utils/date-only';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -63,14 +64,20 @@ export class DeviceSimulationService {
       const employee = await this.prisma.employee.findFirst({
         where: { id: dto.employeeId, deletedAt: null },
       });
-      if (!employee?.biometricId) throw new BadRequestException('Employee has no biometricId');
+      if (!employee?.biometricId)
+        throw new BadRequestException(
+          apiError('SIMULATION_NO_BIOMETRIC_ID', 'Employee has no biometricId'),
+        );
       deviceUserId = employee.biometricId;
       sim.enrollUser({
         deviceUserId,
         name: `${employee.firstName} ${employee.lastName}`.toUpperCase(),
       });
     }
-    if (!deviceUserId) throw new BadRequestException('Provide employeeId or deviceUserId');
+    if (!deviceUserId)
+      throw new BadRequestException(
+        apiError('SIMULATION_TARGET_REQUIRED', 'Provide employeeId or deviceUserId'),
+      );
     const log = sim.punch(deviceUserId, { punchType: dto.punchType });
     return { ...log, deviceOnline: sim.isOnline() };
   }
@@ -181,10 +188,13 @@ export class DeviceSimulationService {
   }
 
   private async simulator(deviceId: string): Promise<MockDeviceSimulator> {
-    if (!this.config.mockDevicesEnabled) throw new NotFoundException('Mock devices are disabled');
+    if (!this.config.mockDevicesEnabled)
+      throw new NotFoundException(apiError('MOCK_DEVICES_DISABLED', 'Mock devices are disabled'));
     const device = await this.devices.getEntity(deviceId);
     if (device.driver !== 'MOCK')
-      throw new BadRequestException('Simulation is only available for MOCK devices');
+      throw new BadRequestException(
+        apiError('SIMULATION_MOCK_ONLY', 'Simulation is only available for MOCK devices'),
+      );
     return this.network.attach(device.host, device.port);
   }
 }
