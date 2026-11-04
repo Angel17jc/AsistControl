@@ -34,6 +34,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Fixed
 
+- Los días sin marcar de un período descargado tarde (el historial de un marcador, una corrección de un mes pasado) ahora cuentan: figuraban sin registro y la tarjeta de tiempo decía «Ausencias: 0». Antes de la primera marcación de una persona no se da nada por supuesto.
+- El panel ya no muestra como de hoy las marcaciones de otros días que llegan en vivo, ni se queda con datos viejos al volver a él.
 - La tarjeta de tiempo de un empleado muestra su cabecera también en un período sin jornadas.
 - El CSV usa coma, y Excel en Ecuador espera punto y coma: al abrirlo salía todo en una columna. Excel ahora tiene su propia descarga, y el CSV queda para cargar datos en otros sistemas.
 - El resumen mensual cuenta como asistido cualquier día con entrada, también sin horario asignado.

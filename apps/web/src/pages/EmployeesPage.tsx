@@ -29,6 +29,30 @@ const STATUS_TONE: Record<EmployeeStatus, Tone> = {
   SUSPENDED: 'warning',
 };
 
+/** Only shown when someone on the page has them: a small company may use none of these. */
+const OPTIONAL_COLUMNS: {
+  head: string;
+  has: (e: EmployeeRow) => boolean;
+  text: (e: EmployeeRow) => string;
+}[] = [
+  {
+    head: 'Departamento',
+    has: (e) => e.department !== null,
+    text: (e) => e.department?.name ?? '—',
+  },
+  { head: 'Cargo', has: (e) => e.position !== null, text: (e) => e.position?.name ?? '—' },
+  {
+    head: 'Supervisor',
+    has: (e) => e.supervisor !== null,
+    text: (e) => (e.supervisor ? `${e.supervisor.firstName} ${e.supervisor.lastName}` : '—'),
+  },
+  {
+    head: 'Contrato',
+    has: (e) => e.contractType !== null,
+    text: (e) => e.contractType?.name ?? '—',
+  },
+];
+
 export function EmployeesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -140,10 +164,7 @@ export function EmployeesPage() {
               head={[
                 'Código',
                 'Empleado',
-                'Departamento',
-                'Cargo',
-                'Supervisor',
-                'Contrato',
+                ...OPTIONAL_COLUMNS.filter((c) => data.data.some(c.has)).map((c) => c.head),
                 'ID biométrico',
                 'Estado',
                 '',
@@ -159,12 +180,11 @@ export function EmployeesPage() {
                     </p>
                     <p className="text-xs text-ink-3">{e.email ?? e.identification}</p>
                   </Td>
-                  <Td className="text-ink-2">{e.department?.name ?? '—'}</Td>
-                  <Td className="text-ink-2">{e.position?.name ?? '—'}</Td>
-                  <Td className="text-ink-2">
-                    {e.supervisor ? `${e.supervisor.firstName} ${e.supervisor.lastName}` : '—'}
-                  </Td>
-                  <Td className="text-ink-2">{e.contractType?.name ?? '—'}</Td>
+                  {OPTIONAL_COLUMNS.filter((c) => data.data.some(c.has)).map((c) => (
+                    <Td key={c.head} className="text-ink-2">
+                      {c.text(e)}
+                    </Td>
+                  ))}
                   <Td className="tabular">
                     {e.biometricId ?? <span className="text-ink-3">sin enrolar</span>}
                   </Td>

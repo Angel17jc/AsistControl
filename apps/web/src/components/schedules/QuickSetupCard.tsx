@@ -223,6 +223,13 @@ function SetupForm({
 
 function SetupOutcome({ result }: { result: SetupResult }) {
   const people = (n: number) => (n === 1 ? '1 empleado' : `${n} empleados`);
+  if (result.onSchedule === 0 && result.kept === 0) {
+    return (
+      <p role="status" className="text-sm text-ink-1">
+        Listo: la jornada quedó guardada. Los empleados que registre la tendrán desde su ingreso.
+      </p>
+    );
+  }
   return (
     <p role="status" className="text-sm text-ink-1">
       Listo: {people(result.onSchedule)} con esta jornada.

@@ -130,6 +130,7 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         queryClient.invalidateQueries({ queryKey: ['positions'] }),
         queryClient.invalidateQueries({ queryKey: ['contract-types'] }),
         queryClient.invalidateQueries({ queryKey: ['employee-schedules'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
       onDone();
     },

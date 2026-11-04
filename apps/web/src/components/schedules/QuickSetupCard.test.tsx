@@ -117,6 +117,15 @@ describe('QuickSetupCard', () => {
     expect(status).toHaveTextContent('2 empleados conservan el horario');
   });
 
+  it('says what happens next when there are no employees yet', async () => {
+    renderCard({ result: { assigned: 0, onSchedule: 0, kept: 0 } });
+    const form = await screen.findByRole('form', { name: 'Jornada de la empresa' });
+    await userEvent.click(within(form).getByRole('button', { name: /Aplicar a todos/ }));
+    expect(await within(form).findByRole('status')).toHaveTextContent(
+      'la jornada quedó guardada. Los empleados que registre la tendrán desde su ingreso.',
+    );
+  });
+
   it('shows what the API refuses', async () => {
     renderCard();
     const form = await screen.findByRole('form', { name: 'Jornada de la empresa' });

@@ -129,7 +129,7 @@ export function ReportsPage() {
           salida no se le cuentan horas trabajadas.
         </p>
       </PageHelp>
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-start gap-3">
         <Field label="Reporte" hint={meta[2]}>
           <Select value={kind} onChange={(e) => setKind(e.target.value as Kind)} className="w-56">
             {REPORTS.filter(([k]) => overtimeEnabled || k !== 'overtime').map(([k, label]) => (
