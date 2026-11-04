@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { EMPLOYEE_STATUSES, type EmployeeStatus } from '@asistcontrol/shared';
 import { Transform } from 'class-transformer';
 import {
@@ -87,9 +87,17 @@ export class CreateEmployeeDto {
   @Transform(trim)
   @Matches(/^[A-Za-z0-9]{1,24}$/, { message: 'biometricId must be 1-24 letters or digits' })
   biometricId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Weekly schedule from the hire date. Changing it later has its own endpoint',
+  })
+  @IsOptional()
+  @IsUUID()
+  scheduleId?: string;
 }
 
-export class UpdateEmployeeDto extends PartialType(CreateEmployeeDto) {
+export class UpdateEmployeeDto extends PartialType(OmitType(CreateEmployeeDto, ['scheduleId'])) {
   @ApiPropertyOptional({ enum: EMPLOYEE_STATUSES })
   @IsOptional()
   @IsIn(EMPLOYEE_STATUSES)

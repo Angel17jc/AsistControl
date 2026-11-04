@@ -85,6 +85,9 @@ export const ATTENDANCE_ANOMALIES = values(
 );
 export type AttendanceAnomaly = (typeof ATTENDANCE_ANOMALIES)[number];
 
+/** The schedule the quick setup keeps: how the company's screen recognizes it. */
+export const COMPANY_SCHEDULE_NAME = 'Jornada de la empresa';
+
 export const SYNC_STATUSES = values('RUNNING', 'SUCCESS', 'PARTIAL', 'FAILED');
 export type SyncStatus = (typeof SYNC_STATUSES)[number];
 

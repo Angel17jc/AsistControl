@@ -26,6 +26,8 @@ Se adopta la opción 3.
 - **`attendance.policy.overtimeEnabled`.** Las horas extra sí son decisión de toda la empresa. Apagadas, no se calculan ni se proponen, y las propuestas pendientes desaparecen al recalcular; las ya revisadas se conservan, como cualquier decisión de una persona. Encendidas, en un turno sin hora fija cuentan lo que pase de las horas esperadas, porque no hay hora de salida con la que medirlas.
 - **`GET /settings/features`** dice esto a cualquier sesión: un empleado no puede leer la configuración, y sus pantallas también dependen de ella. Las columnas de la tabla de jornadas se deciden por los datos, de modo que siguen mostrando lo que ya esté guardado.
 
+- **Una configuración rápida para el caso común.** `POST /work-schedules/setup` deja a toda la empresa en una jornada con las horas, el almuerzo y los días indicados, y se puede repetir para cambiarlos. No toca a quien ya tenga un horario que empieza en esa fecha o después, porque alguien lo eligió a propósito. Exige los permisos de horarios y de configuración, ya que también decide las horas extra. Los turnos y horarios semanales siguen disponibles, plegados mientras no haya turnos con hora fija.
+
 ## Consecuencias
 
 - Las reglas de un turno fijo no cambian, ni tampoco los datos existentes: `flexible` empieza en falso y `overtimeEnabled` en verdadero.

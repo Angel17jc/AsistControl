@@ -6,7 +6,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
-import type { ContractTypeRow, EmployeeRow, NamedRef } from '../../lib/types';
+import type { ContractTypeRow, EmployeeRow, NamedRef, WorkScheduleRow } from '../../lib/types';
+import { useAuth } from '../../stores/auth';
 import { Button, Card, Field, Input, Select } from '../ui';
 
 export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatus, string> = {
@@ -56,6 +57,17 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
       }),
   });
 
+  const canReadSchedules = useAuth((s) => s.can('schedules:read'));
+  const schedules = useQuery({
+    queryKey: ['work-schedules'],
+    queryFn: () => api<WorkScheduleRow[]>('/work-schedules'),
+    enabled: !editing && canReadSchedules,
+  });
+  // Null until touched: with a single schedule there is nothing to choose.
+  const [scheduleChoice, setScheduleChoice] = useState<string | null>(null);
+  const onlySchedule = schedules.data?.length === 1 ? schedules.data[0]!.id : '';
+  const scheduleId = scheduleChoice ?? onlySchedule;
+
   const [form, setForm] = useState({
     employeeCode: employee?.employeeCode ?? '',
     identification: employee?.identification ?? '',
@@ -75,6 +87,19 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  // Unfolded when there is something to see in it: data of this person, or a company that uses it.
+  const showMore =
+    Boolean(
+      employee?.email ||
+      employee?.phone ||
+      employee?.department ||
+      employee?.position ||
+      employee?.contractType ||
+      employee?.supervisor,
+    ) ||
+    (departments.data?.length ?? 0) > 0 ||
+    (positions.data?.length ?? 0) > 0;
+
   function changeStatus(status: EmployeeStatus) {
     // Back to active: the termination no longer applies.
     setForm((f) => ({ ...f, status, terminatedAt: status === 'ACTIVE' ? '' : f.terminatedAt }));
@@ -87,7 +112,9 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         const { status: _status, terminatedAt: _terminatedAt, ...fields } = form;
         return api('/employees', {
           method: 'POST',
-          body: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== '')),
+          body: Object.fromEntries(
+            Object.entries({ ...fields, scheduleId }).filter(([, v]) => v !== ''),
+          ),
         });
       }
       const body: Record<string, string | null> = { ...form };
@@ -102,6 +129,7 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         queryClient.invalidateQueries({ queryKey: ['departments'] }),
         queryClient.invalidateQueries({ queryKey: ['positions'] }),
         queryClient.invalidateQueries({ queryKey: ['contract-types'] }),
+        queryClient.invalidateQueries({ queryKey: ['employee-schedules'] }),
       ]);
       onDone();
     },
@@ -136,66 +164,8 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         <Field label="Apellidos" hint="Los listados se ordenan por apellido">
           <Input required value={form.lastName} onChange={set('lastName')} />
         </Field>
-        <Field
-          label="Correo"
-          hint="Solo de contacto. Los avisos van al correo de su cuenta de usuario"
-        >
-          <Input type="email" value={form.email} onChange={set('email')} />
-        </Field>
-        <Field label="Teléfono" hint="Solo de contacto">
-          <Input type="tel" value={form.phone} onChange={set('phone')} />
-        </Field>
         <Field label="Fecha de ingreso" hint="Desde este día cuentan sus jornadas y sus vacaciones">
           <Input type="date" required value={form.hireDate} onChange={set('hireDate')} />
-        </Field>
-        <Field
-          label="Departamento"
-          hint="Agrupa a las personas en listados y reportes. Se crean en Organización"
-        >
-          <Select value={form.departmentId} onChange={set('departmentId')}>
-            <option value="">—</option>
-            {departments.data?.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Cargo" hint="Se crean en Organización">
-          <Select value={form.positionId} onChange={set('positionId')}>
-            <option value="">—</option>
-            {positions.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Supervisor" hint="Verá su asistencia y aprobará sus permisos">
-          <Select value={form.supervisorId} onChange={set('supervisorId')}>
-            <option value="">—</option>
-            {supervisors.data?.data
-              // Nobody supervises themselves (the API refuses it too).
-              .filter((s) => s.id !== employee?.id)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.lastName} {s.firstName}
-                </option>
-              ))}
-          </Select>
-        </Field>
-        <Field
-          label="Tipo de contrato"
-          hint="Decide sus vacaciones. Sin contrato no tiene saldo de vacaciones"
-        >
-          <Select value={form.contractTypeId} onChange={set('contractTypeId')}>
-            <option value="">—</option>
-            {contractTypes.data?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
         </Field>
         <Field
           label="ID biométrico"
@@ -207,6 +177,25 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
         >
           <Input value={form.biometricId} onChange={set('biometricId')} />
         </Field>
+        {!editing && canReadSchedules && (
+          <Field
+            label="Horario"
+            hint={
+              schedules.data?.length === 0
+                ? 'Aún no hay ninguno: configure la jornada en Horarios'
+                : 'Desde su fecha de ingreso. Sin horario no se le marcan ausencias'
+            }
+          >
+            <Select value={scheduleId} onChange={(e) => setScheduleChoice(e.target.value)}>
+              <option value="">—</option>
+              {schedules.data?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         {editing && (
           <>
             <Field
@@ -242,6 +231,71 @@ export function EmployeeForm({ employee, onDone }: { employee?: EmployeeRow; onD
             </Field>
           </>
         )}
+        <details open={showMore} className="sm:col-span-2 lg:col-span-4">
+          <summary className="cursor-pointer text-sm font-medium text-ink-1">
+            Más datos (opcional): contacto, departamento, cargo, supervisor y contrato
+          </summary>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label="Correo"
+              hint="Solo de contacto. Los avisos van al correo de su cuenta de usuario"
+            >
+              <Input type="email" value={form.email} onChange={set('email')} />
+            </Field>
+            <Field label="Teléfono" hint="Solo de contacto">
+              <Input type="tel" value={form.phone} onChange={set('phone')} />
+            </Field>
+            <Field
+              label="Departamento"
+              hint="Agrupa a las personas en listados y reportes. Se crean en Configuración → Más opciones → Organización"
+            >
+              <Select value={form.departmentId} onChange={set('departmentId')}>
+                <option value="">—</option>
+                {departments.data?.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Cargo" hint="Se crean en Configuración → Más opciones → Organización">
+              <Select value={form.positionId} onChange={set('positionId')}>
+                <option value="">—</option>
+                {positions.data?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Supervisor" hint="Verá su asistencia y aprobará sus permisos">
+              <Select value={form.supervisorId} onChange={set('supervisorId')}>
+                <option value="">—</option>
+                {supervisors.data?.data
+                  // Nobody supervises themselves (the API refuses it too).
+                  .filter((s) => s.id !== employee?.id)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.lastName} {s.firstName}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+            <Field
+              label="Tipo de contrato"
+              hint="Decide sus vacaciones. Sin contrato no tiene saldo de vacaciones"
+            >
+              <Select value={form.contractTypeId} onChange={set('contractTypeId')}>
+                <option value="">—</option>
+                {contractTypes.data?.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </details>
         <p className="text-xs text-ink-3 sm:col-span-2 lg:col-span-4">
           <span className="text-critical">*</span> Obligatorio. Lo demás se puede completar después.
         </p>

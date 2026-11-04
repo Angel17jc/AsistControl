@@ -71,12 +71,28 @@ export class EmployeesService {
   }
 
   async create(dto: CreateEmployeeDto, actor: AuthenticatedUser, ctx: RequestContext) {
+    const { scheduleId, ...fields } = dto;
     await this.assertReferences(dto);
+    if (scheduleId) {
+      await this.exists(
+        this.prisma.workSchedule.count({ where: { id: scheduleId, deletedAt: null } }),
+        'schedule',
+      );
+    }
     const employee = await this.prisma.$transaction(async (tx) => {
       const created = await tx.employee.create({
-        data: { ...dto, hireDate: toDbDate(dto.hireDate) },
+        data: { ...fields, hireDate: toDbDate(fields.hireDate) },
         include: EMPLOYEE_INCLUDE,
       });
+      if (scheduleId) {
+        await tx.employeeSchedule.create({
+          data: {
+            employeeId: created.id,
+            scheduleId,
+            effectiveFrom: toDbDate(fields.hireDate),
+          },
+        });
+      }
       await this.audit.record(
         {
           actorId: actor.id,

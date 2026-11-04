@@ -17,6 +17,7 @@ import type { AuthenticatedUser, RequestContext } from '../common/auth/authentic
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
 import {
   AssignScheduleDto,
+  SetupWorkdayDto,
   CreateHolidayDto,
   CreateScheduleDto,
   CreateShiftDto,
@@ -93,6 +94,22 @@ export class WorkSchedulesController {
     @ReqContext() ctx: RequestContext,
   ) {
     return this.schedules.updateSchedule(id, dto, actor, ctx);
+  }
+
+  @Post('work-schedules/setup')
+  @RequirePermissions('schedules:write', 'settings:write')
+  @ApiOperation({
+    summary: 'Set up a workday without fixed hours for everyone, at once',
+    description:
+      'Creates or updates the company schedule, assigns it to every active employee and ' +
+      'recomputes the days since `effectiveFrom`. Safe to run again with other values.',
+  })
+  setup(
+    @Body() dto: SetupWorkdayDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ) {
+    return this.schedules.setupWorkday(dto, actor, ctx);
   }
 
   @Post('work-schedules/assignments')

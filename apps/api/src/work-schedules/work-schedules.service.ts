@@ -1,3 +1,4 @@
+import { COMPANY_SCHEDULE_NAME } from '@asistcontrol/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { EmployeeSchedule } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
@@ -13,12 +14,17 @@ import type {
   CreateHolidayDto,
   CreateScheduleDto,
   CreateShiftDto,
+  SetupWorkdayDto,
   UpdateScheduleDto,
   UpdateShiftDto,
 } from './work-schedules.dto';
 
 /** Retroactive schedule changes recompute at most this many past days. */
 const MAX_RETROACTIVE_DAYS = 62;
+
+const COMPANY_SHIFT_NAME = 'Jornada sin hora fija';
+/** A few minutes short of the day is not worth a warning, on every day of every person. */
+const SHORT_DAY_TOLERANCE_MINUTES = 10;
 
 @Injectable()
 export class WorkSchedulesService {
@@ -185,6 +191,93 @@ export class WorkSchedulesService {
    * Assigns a schedule from a date onwards, closing the previous assignment the day before.
    * History is preserved: past days keep being evaluated with the schedule in force back then.
    */
+  /**
+   * What a company without fixed hours needs, in one step: its workday, the days it works and
+   * everyone on it. Running it again changes those values for everyone. An employee who already
+   * has a schedule starting on or after that date keeps it: someone chose it on purpose.
+   */
+  async setupWorkday(dto: SetupWorkdayDto, actor: AuthenticatedUser, ctx: RequestContext) {
+    const today = todayIn(await this.settings.getTimezone());
+    if (dto.effectiveFrom < addDays(today, -MAX_RETROACTIVE_DAYS)) {
+      throw new BadRequestException(
+        apiError('ASSIGNMENT_TOO_OLD', `Limited to the last ${MAX_RETROACTIVE_DAYS} days`, {
+          maxDays: MAX_RETROACTIVE_DAYS,
+        }),
+      );
+    }
+
+    const hours = referenceDay(dto.dailyMinutes, dto.lunchMinutes);
+    const { schedule, employees } = await this.prisma.$transaction(async (tx) => {
+      const shift = await tx.workShift.upsert({
+        where: { name: COMPANY_SHIFT_NAME },
+        create: { name: COMPANY_SHIFT_NAME, ...hours },
+        update: { ...hours, deletedAt: null },
+      });
+      const saved = await tx.workSchedule.upsert({
+        where: { name: COMPANY_SCHEDULE_NAME },
+        create: { name: COMPANY_SCHEDULE_NAME },
+        update: { deletedAt: null },
+      });
+      await tx.workScheduleDay.deleteMany({ where: { scheduleId: saved.id } });
+      await tx.workScheduleDay.createMany({
+        data: dto.weekdays.map((weekday) => ({ weekday, scheduleId: saved.id, shiftId: shift.id })),
+      });
+      await this.audit.record(
+        {
+          actorId: actor.id,
+          action: 'schedule.setup',
+          entity: 'WorkSchedule',
+          entityId: saved.id,
+          context: ctx,
+          metadata: { ...dto },
+        },
+        tx,
+      );
+      const active = await tx.employee.findMany({
+        where: { deletedAt: null, status: 'ACTIVE' },
+        select: {
+          id: true,
+          scheduleAssignments: { orderBy: { effectiveFrom: 'desc' }, take: 1 },
+        },
+      });
+      return { schedule: saved, employees: active };
+    });
+    await this.settings.updateAttendancePolicy(
+      { overtimeEnabled: dto.overtimeEnabled },
+      actor,
+      ctx,
+    );
+
+    const from = toDbDate(dto.effectiveFrom);
+    let assigned = 0;
+    let kept = 0;
+    const onSchedule: string[] = [];
+    for (const employee of employees) {
+      const latest = employee.scheduleAssignments[0];
+      if (latest?.scheduleId === schedule.id) {
+        onSchedule.push(employee.id);
+      } else if (latest && latest.effectiveFrom >= from) {
+        kept++;
+      } else {
+        await this.createAssignment(
+          { employeeId: employee.id, scheduleId: schedule.id, effectiveFrom: dto.effectiveFrom },
+          actor,
+          ctx,
+        );
+        onSchedule.push(employee.id);
+        assigned++;
+      }
+    }
+    if (onSchedule.length > 0) {
+      await this.processing.recomputeRange({
+        from: dto.effectiveFrom,
+        to: today,
+        employeeIds: onSchedule,
+      });
+    }
+    return { scheduleId: schedule.id, assigned, onSchedule: onSchedule.length, kept };
+  }
+
   async assign(dto: AssignScheduleDto, actor: AuthenticatedUser, ctx: RequestContext) {
     await this.assertEmployeeExists(dto.employeeId);
     await this.getSchedule(dto.scheduleId);
@@ -199,7 +292,15 @@ export class WorkSchedulesService {
       );
     }
 
-    const assignment = await this.prisma.$transaction(async (tx) => {
+    const assignment = await this.createAssignment(dto, actor, ctx);
+    await this.recomputeRetroactively(dto.employeeId, dto.effectiveFrom);
+    return toAssignmentResponse(assignment);
+  }
+
+  /** Closes the assignment in force the day before and opens the new one, audited. */
+  private createAssignment(dto: AssignScheduleDto, actor: AuthenticatedUser, ctx: RequestContext) {
+    const from = toDbDate(dto.effectiveFrom);
+    return this.prisma.$transaction(async (tx) => {
       await tx.employeeSchedule.updateMany({
         where: {
           employeeId: dto.employeeId,
@@ -224,9 +325,6 @@ export class WorkSchedulesService {
       );
       return created;
     });
-
-    await this.recomputeRetroactively(dto.employeeId, dto.effectiveFrom);
-    return toAssignmentResponse(assignment);
   }
 
   /**
@@ -388,6 +486,25 @@ function toAssignmentResponse({ effectiveFrom, effectiveTo, ...rest }: Assignmen
     ...rest,
     effectiveFrom: fromDbDate(effectiveFrom),
     effectiveTo: effectiveTo ? fromDbDate(effectiveTo) : null,
+  };
+}
+
+/**
+ * A day without fixed hours as the shift stores it: a reference from 08:00, with the lunch at
+ * 13:00, ending when the expected hours are done. Only its length and its lunch matter.
+ */
+function referenceDay(dailyMinutes: number, lunchMinutes: number) {
+  const clock = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  const start = 8 * 60;
+  const lunch = 13 * 60;
+  return {
+    startTime: clock(start),
+    endTime: clock(start + dailyMinutes + lunchMinutes),
+    breakStart: lunchMinutes > 0 ? clock(lunch) : null,
+    breakEnd: lunchMinutes > 0 ? clock(lunch + lunchMinutes) : null,
+    flexible: true,
+    earlyLeaveToleranceMinutes: SHORT_DAY_TOLERANCE_MINUTES,
   };
 }
 

@@ -54,6 +54,7 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
       position: 'El cargo elegido ya no existe.',
       contractType: 'El tipo de contrato elegido ya no existe.',
       supervisor: 'El supervisor elegido ya no existe o no es válido.',
+      schedule: 'El horario elegido ya no existe.',
     })[record],
   DEPARTMENT_NOT_FOUND: () => 'No se encontró ese departamento: puede que ya no exista.',
   DEPARTMENT_IN_USE: ({ employees }) =>

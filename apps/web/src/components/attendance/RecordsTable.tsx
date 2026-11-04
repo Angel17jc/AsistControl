@@ -37,6 +37,7 @@ type Person = Pick<EmployeeRow, 'firstName' | 'lastName' | 'employeeCode'> & {
 export function RecordsTable({ from, to }: { from: string; to: string }) {
   const canListEmployees = useAuth((s) => s.can('employees:read'));
   const ownEmployeeId = useAuth((s) => s.user?.employeeId ?? null);
+  const displayName = useAuth((s) => s.user?.displayName ?? '');
   const [status, setStatus] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [page, setPage] = useState(1);
@@ -63,7 +64,12 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
   });
   const rows = cardOf ? [...(data?.data ?? [])].reverse() : (data?.data ?? []);
   const person: Person | undefined = cardOf
-    ? (employees.data?.data.find((e) => e.id === cardOf) ?? data?.data[0]?.employee)
+    ? (employees.data?.data.find((e) => e.id === cardOf) ??
+      data?.data[0]?.employee ??
+      // Their own card, on a period without days: the account's name is what there is.
+      (canListEmployees
+        ? undefined
+        : { firstName: displayName, lastName: '', employeeCode: '', department: null }))
     : undefined;
 
   // Only what these days have: without fixed hours there is no schedule, lateness to show.
@@ -267,12 +273,16 @@ function TimecardHeader({
   return (
     <section aria-label="Tarjeta de tiempo" className="border-b border-line px-5 py-4">
       <h2 className="text-sm font-semibold text-ink-1">
-        Tarjeta de tiempo · {person.lastName} {person.firstName}
+        Tarjeta de tiempo · {`${person.lastName} ${person.firstName}`.trim()}
       </h2>
       <p className="mt-0.5 text-xs text-ink-3">
-        {person.employeeCode}
-        {person.department ? ` · ${person.department.name}` : ''} · del {formatDateWithYear(from)}{' '}
-        al {formatDateWithYear(to)}
+        {[
+          person.employeeCode,
+          person.department?.name,
+          `del ${formatDateWithYear(from)} al ${formatDateWithYear(to)}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
         <Total label="Días trabajados">{t.daysWorked}</Total>

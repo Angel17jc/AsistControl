@@ -117,11 +117,19 @@ sesiones.
 
 ### 2.5 Configuración inicial (desde la web)
 
-Producción arranca vacía. En este orden: **Organización** (departamentos y cargos) → **Contratos**
-(reglas de vacaciones) → **Horarios** (turnos, horarios semanales y **feriados del año**, incluidos los
-locales) → **Configuración** (tolerancias, horas extra, almuerzo) → **Empleados** (con su **ID
-biométrico** = número de usuario en el marcador) → **Dispositivos** (§4) → **Usuarios** (cuentas para
-RR. HH., supervisores y empleados).
+Producción arranca vacía. En este orden:
+
+1. **Horarios → Jornada de la empresa:** horas al día, almuerzo y días laborables, si no hay hora fija
+   de entrada ni de salida. Queda aplicada a todos, también a quien se registre después. Si hay horas
+   fijas, se arman abajo, en **Horarios a medida** (turnos y horarios semanales).
+2. **Horarios → Feriados** del año, incluidos los locales. Sin ellos, ese día las personas figuran
+   ausentes.
+3. **Empleados**, con su **ID biométrico** = número de usuario en el marcador.
+4. **Dispositivos** (§4).
+5. **Usuarios:** cuentas para RR. HH. y para los empleados que vayan a ver sus propias marcaciones.
+
+Es opcional, en **Configuración → Más opciones**: **Organización** (departamentos y cargos) y
+**Contratos** (saldos de vacaciones). Las reglas finas están en **Configuración**.
 
 Las marcaciones de personas que todavía no están cargadas no se pierden: se guardan y se vinculan solas al
 crear el empleado con ese ID biométrico.
