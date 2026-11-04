@@ -95,35 +95,36 @@ export function calendarDay(workDate: string, timezone: string): { from: Date; t
 }
 
 /**
- * A punch at 02:00 may belong to yesterday's night shift. Given the contexts of the previous
- * and current local day, returns the work date the punch belongs to.
+ * The work date a punch belongs to, given the days around its local date. A punch at 02:00 may
+ * belong to yesterday's night shift, and one at 23:50 to a shift starting after midnight. In
+ * the window of two shifts (a night shift's morning, the next day's office hours) it belongs
+ * to the nearer one, so it counts once; on a tie to the earlier, whose exit it most likely is.
+ * With no shift to claim it, it stays on its calendar day.
  */
 export function assignWorkDate(
   punchAt: Date,
   previousDay: WorkDayContext,
   currentDay: WorkDayContext,
+  nextDay?: WorkDayContext,
 ): string {
-  return claimedByPrevious(punchAt, previousDay) ? previousDay.workDate : currentDay.workDate;
+  let owner = currentDay;
+  let nearest = Infinity;
+  for (const day of [previousDay, currentDay, nextDay]) {
+    if (!day?.shift || !inWindow(punchAt, day)) continue;
+    const distance = distanceToShift(punchAt, day.shift);
+    if (distance < nearest) {
+      owner = day;
+      nearest = distance;
+    }
+  }
+  return owner.workDate;
+}
+
+function distanceToShift(punchAt: Date, shift: ResolvedShift): number {
+  const at = punchAt.getTime();
+  return Math.max(shift.start.getTime() - at, at - shift.end.getTime(), 0);
 }
 
 export function inWindow(punchAt: Date, day: WorkDayContext): boolean {
   return punchAt >= day.window.from && punchAt < day.window.to;
-}
-
-/**
- * A punch no work day counts: on its calendar day but outside that day's window, and not
- * taken by the night shift of the day before. A 17:05 punch for a 22:00 night shift, or one
- * at 23:30 after a shift ending at 17:00 with a 6 h window. The calculation leaves it out;
- * its work date (the calendar day) reports it so a person can look at it.
- */
-export function isStrayPunch(
-  punchAt: Date,
-  previousDay: WorkDayContext,
-  currentDay: WorkDayContext,
-): boolean {
-  return !claimedByPrevious(punchAt, previousDay) && !inWindow(punchAt, currentDay);
-}
-
-function claimedByPrevious(punchAt: Date, previousDay: WorkDayContext): boolean {
-  return previousDay.shift !== null && inWindow(punchAt, previousDay);
 }

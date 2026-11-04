@@ -9,7 +9,6 @@ import {
   buildWorkDay,
   calendarDay,
   inWindow,
-  isStrayPunch,
 } from './domain/work-day';
 
 interface Assignment {
@@ -26,6 +25,9 @@ interface Assignment {
  * stays cheap.
  */
 export class WorkCalendar {
+  /** A day is looked up several times per punch, and this is a snapshot: it does not change. */
+  private readonly days = new Map<string, WorkDayContext>();
+
   constructor(
     private readonly assignments: Map<string, Assignment[]>,
     private readonly holidays: Set<string>,
@@ -34,6 +36,16 @@ export class WorkCalendar {
   ) {}
 
   dayFor(employeeId: string, workDate: string): WorkDayContext {
+    const key = `${employeeId}|${workDate}`;
+    let day = this.days.get(key);
+    if (!day) {
+      day = this.evaluateDay(employeeId, workDate);
+      this.days.set(key, day);
+    }
+    return day;
+  }
+
+  private evaluateDay(employeeId: string, workDate: string): WorkDayContext {
     const assignment = (this.assignments.get(employeeId) ?? []).find(
       (a) => a.effectiveFrom <= workDate && (a.effectiveTo === null || a.effectiveTo >= workDate),
     );
@@ -48,13 +60,14 @@ export class WorkCalendar {
     });
   }
 
-  /** Work date a punch belongs to (handles night shifts crossing midnight). */
+  /** Work date a punch belongs to (handles shifts crossing midnight and overlapping windows). */
   workDateOf(employeeId: string, at: Date): string {
     const local = localDateOf(at, this.timezone);
     return assignWorkDate(
       at,
       this.dayFor(employeeId, addDays(local, -1)),
       this.dayFor(employeeId, local),
+      this.dayFor(employeeId, addDays(local, 1)),
     );
   }
 
@@ -69,23 +82,19 @@ export class WorkCalendar {
 
   /**
    * Splits punches loaded with `reachOf` into the ones the day counts (its window) and the
-   * strays of its calendar day, which it only reports. The rest belong to another day.
+   * strays of its calendar day, which it only reports. The rest belong to another day: every
+   * punch has one work date, so it never counts twice.
    */
   split<T extends { occurredAt: Date }>(
     employeeId: string,
     day: WorkDayContext,
     punches: T[],
   ): { counted: T[]; strays: T[] } {
-    const previous = this.dayFor(employeeId, addDays(day.workDate, -1));
     const counted: T[] = [];
     const strays: T[] = [];
     for (const p of punches) {
-      if (inWindow(p.occurredAt, day)) counted.push(p);
-      else if (
-        localDateOf(p.occurredAt, this.timezone) === day.workDate &&
-        isStrayPunch(p.occurredAt, previous, day)
-      )
-        strays.push(p);
+      if (this.workDateOf(employeeId, p.occurredAt) !== day.workDate) continue;
+      (inWindow(p.occurredAt, day) ? counted : strays).push(p);
     }
     return { counted, strays };
   }
@@ -102,9 +111,10 @@ export class WorkCalendarService {
     timezone: string;
     policy: AttendancePolicy;
   }): Promise<WorkCalendar> {
-    // One day of margin on each side: night shifts and punch → work date assignment look at neighbours.
-    const from = toDbDate(addDays(params.from, -1));
-    const to = toDbDate(addDays(params.to, 1));
+    // Two days of margin on each side: a window can spill into the next or previous day, and
+    // deciding which work date owns a punch there looks at the days around that punch.
+    const from = toDbDate(addDays(params.from, -2));
+    const to = toDbDate(addDays(params.to, 2));
 
     const [rows, holidays] = await Promise.all([
       this.prisma.employeeSchedule.findMany({
