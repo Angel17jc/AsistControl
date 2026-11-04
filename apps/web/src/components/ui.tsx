@@ -23,7 +23,9 @@ import {
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <section className={clsx('rounded-xl border border-line bg-surface-1 shadow-sm', className)}>
+    <section
+      className={clsx('min-w-0 rounded-xl border border-line bg-surface-1 shadow-sm', className)}
+    >
       {children}
     </section>
   );

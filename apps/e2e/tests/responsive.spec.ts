@@ -36,4 +36,13 @@ test('el panel es usable en un teléfono', async ({ page }) => {
 
   await nav.getByRole('link', { name: 'Asistencia' }).click();
   await expect(page.getByRole('heading', { name: 'Asistencia', level: 1 })).toBeVisible();
+
+  // Every screen: a wide table must scroll inside its card, wherever that card is placed.
+  const labels = await nav.getByRole('link').allTextContents();
+  for (const label of labels) {
+    await nav.getByRole('link', { name: label, exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(await overflow(), `${label} se sale de la pantalla`).toBeLessThanOrEqual(1);
+  }
 });
