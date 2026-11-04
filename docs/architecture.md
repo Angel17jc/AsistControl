@@ -171,3 +171,4 @@ Los hechos que alguien debe atender (un marcador caído o recuperado, una solici
 | [0011](adr/0011-email-notifications.md)     | Notificaciones por correo: un canal más, con outbox                |
 | [0012](adr/0012-calendar-year-vacations.md) | Vacaciones por año calendario                                      |
 | [0013](adr/0013-migrations-as-a-job.md)     | Migraciones como tarea aparte, no al arrancar la API               |
+| [0014](adr/0014-error-codes.md)             | Errores con código: la API dice qué pasó y cada cliente lo redacta |
