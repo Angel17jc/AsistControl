@@ -10,3 +10,5 @@
 docs
 **/playwright-report
 **/test-results
+backups
+**/*.dump
