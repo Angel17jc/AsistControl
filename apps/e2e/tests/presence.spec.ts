@@ -4,6 +4,8 @@ import { ApiClient, USERS, signIn } from '../support/app';
 /**
  * The presence board follows punches as they happen. The employee is new and has no schedule,
  * so their day is the calendar day and the result does not depend on the hour the test runs.
+ * The date does matter: on one of the seeded holidays nobody has to work, so before punching
+ * they read as "Día libre" instead of "Sin horario".
  */
 test('la presencia cambia en vivo cuando alguien marca', async ({ page, request }) => {
   const api = await ApiClient.signIn(request, USERS.admin.email);
@@ -18,7 +20,7 @@ test('la presencia cambia en vivo cuando alguien marca', async ({ page, request 
     .click();
   await page.getByLabel('Buscar').fill(suffix);
   const row = page.getByRole('row').filter({ hasText: suffix });
-  await expect(row).toContainText('Sin horario');
+  await expect(row).toContainText(/Sin horario|Día libre/);
 
   await api.manualPunch(employee.id);
   // The WebSocket refreshes it at once; on its own the board only polls once a minute.
