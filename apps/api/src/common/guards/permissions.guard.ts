@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { type Permission, hasPermission } from '@asistcontrol/shared';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { IS_PUBLIC_KEY, PERMISSIONS_KEY } from '../decorators';
+import { apiError } from '../errors/api-error';
 
 /** Enforces @RequirePermissions() against the role → permission matrix. */
 @Injectable()
@@ -22,10 +23,11 @@ export class PermissionsGuard implements CanActivate {
     if (!required || required.length === 0) return true;
 
     const user = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>().user;
-    if (!user) throw new ForbiddenException();
+    if (!user) throw new ForbiddenException(apiError('FORBIDDEN', 'Forbidden'));
 
     const missing = required.filter((p) => !hasPermission(user.role, p));
-    if (missing.length > 0) throw new ForbiddenException('Insufficient permissions');
+    if (missing.length > 0)
+      throw new ForbiddenException(apiError('FORBIDDEN', 'Insufficient permissions'));
     return true;
   }
 }

@@ -42,12 +42,18 @@ Todas las respuestas de error tienen la misma forma:
 {
   "statusCode": 400,
   "error": "BAD_REQUEST",
+  "code": "VALIDATION_FAILED",
+  "params": { "violations": [{ "field": "isAdmin", "rule": "whitelistValidation" }] },
   "message": ["property isAdmin should not exist"],
   "path": "/api/employees",
   "timestamp": "2026-09-21T13:00:00.000Z",
   "requestId": "0b6e…"
 }
 ```
+
+- **`code`** dice qué pasó y no cambia de significado. Es lo que debe usar un cliente para decidir o redactar ([ADR 0014](adr/0014-error-codes.md)). El catálogo, con los datos de cada código, es `ApiErrorParams` en [`packages/shared/src/errors.ts`](../packages/shared/src/errors.ts).
+- **`params`** trae los valores que vale la pena mencionar, por ejemplo `{ "maxDays": 93 }`. En `VALIDATION_FAILED`, `violations` lista cada regla incumplida: `field` es la ruta de la propiedad (`punches.0.occurredAt`) y `rule` el nombre del validador.
+- **`message`** va en inglés, para logs y para quien llama a la API a mano. Puede cambiar: no se debe comparar.
 
 | Código | Cuándo                                                                                          |
 | ------ | ----------------------------------------------------------------------------------------------- |

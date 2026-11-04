@@ -12,6 +12,7 @@ import { AttendanceProcessingService } from '../attendance/attendance-processing
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake, type PaginationQueryDto } from '../common/dto/pagination.dto';
+import { apiError } from '../common/errors/api-error';
 import { DeviceConnectionManager } from '../devices/device-connection.manager';
 import { describeDeviceError, statusAfterFailure } from '../devices/device-errors';
 import { DevicesService } from '../devices/devices.service';
@@ -67,9 +68,12 @@ export class DeviceSyncService implements OnModuleInit {
     ctx?: RequestContext,
   ) {
     const device = await this.devices.getEntity(deviceId);
-    if (device.status === 'DISABLED') throw new BadRequestException('Device is disabled');
+    if (device.status === 'DISABLED')
+      throw new BadRequestException(apiError('DEVICE_DISABLED', 'Device is disabled'));
     if (!(await this.acquireLock(deviceId)))
-      throw new ConflictException('A sync is already running for this device');
+      throw new ConflictException(
+        apiError('SYNC_ALREADY_RUNNING', 'A sync is already running for this device'),
+      );
 
     const syncLog = await this.prisma.deviceSyncLog.create({ data: { deviceId, trigger } });
     await this.devices.setStatus(deviceId, 'SYNCING', null);

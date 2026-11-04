@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/password.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
+import { apiError } from '../common/errors/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateUserDto, UpdateUserDto, UserQueryDto } from './dto/user.dto';
 
@@ -54,7 +55,7 @@ export class UsersService {
 
   async get(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id }, select: PUBLIC_USER });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException(apiError('USER_NOT_FOUND', 'User not found'));
     return user;
   }
 
@@ -92,7 +93,9 @@ export class UsersService {
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const current = await this.get(id);
     if (id === actor.id && (dto.role || dto.isActive === false)) {
-      throw new BadRequestException('You cannot change your own role or deactivate yourself');
+      throw new BadRequestException(
+        apiError('SELF_ACCOUNT_CHANGE', 'You cannot change your own role or deactivate yourself'),
+      );
     }
     // Touching a privileged account or granting a privileged role requires SUPER_ADMIN.
     assertCanGrant(actor, current.role);
@@ -176,12 +179,18 @@ export class UsersService {
  */
 function assertScopedRoleHasEmployee(role: Role, employeeId: string | null): void {
   if (SCOPED_ROLES.includes(role) && !employeeId) {
-    throw new BadRequestException(`A ${role} account must be linked to an employee`);
+    throw new BadRequestException(
+      apiError('ACCOUNT_NEEDS_EMPLOYEE', `A ${role} account must be linked to an employee`, {
+        role,
+      }),
+    );
   }
 }
 
 function assertCanGrant(actor: AuthenticatedUser, role: Role): void {
   if (PRIVILEGED_ROLES.includes(role) && actor.role !== 'SUPER_ADMIN') {
-    throw new ForbiddenException('Only a SUPER_ADMIN can manage administrator accounts');
+    throw new ForbiddenException(
+      apiError('ADMIN_ACCOUNTS_RESTRICTED', 'Only a SUPER_ADMIN can manage administrator accounts'),
+    );
   }
 }

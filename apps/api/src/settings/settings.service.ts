@@ -8,6 +8,7 @@ import {
 } from '../attendance/domain/attendance-policy';
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { AppConfigService } from '../config/app-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -49,10 +50,10 @@ export class SettingsService {
   ): Promise<AttendancePolicy> {
     // Strict: a misspelled rule must fail, not answer 200 while changing nothing.
     const checked = attendancePolicySchema.partial().strict().safeParse(patch);
-    if (!checked.success) throw new BadRequestException(issues(checked.error));
+    if (!checked.success) throw new BadRequestException(invalidPolicy(checked.error));
     const current = await this.getAttendancePolicy();
     const parsed = attendancePolicySchema.safeParse({ ...current, ...checked.data });
-    if (!parsed.success) throw new BadRequestException(issues(parsed.error));
+    if (!parsed.success) throw new BadRequestException(invalidPolicy(parsed.error));
     await this.prisma.$transaction(async (tx) => {
       await this.upsert(tx, POLICY_KEY, parsed.data, actor.id);
       await this.audit.record(
@@ -102,10 +103,16 @@ export class SettingsService {
   }
 }
 
-function issues(error: z.ZodError): string[] {
-  return error.issues.map((i) =>
+function invalidPolicy(error: z.ZodError) {
+  const messages = error.issues.map((i) =>
     i.code === 'unrecognized_keys'
       ? `unknown setting(s): ${i.keys.join(', ')}`
       : `${i.path.join('.')}: ${i.message}`,
   );
+  const violations = error.issues.flatMap((i) =>
+    i.code === 'unrecognized_keys'
+      ? i.keys.map((field) => ({ field, rule: i.code as string }))
+      : [{ field: i.path.join('.'), rule: i.code as string }],
+  );
+  return apiError('VALIDATION_FAILED', messages, { violations });
 }

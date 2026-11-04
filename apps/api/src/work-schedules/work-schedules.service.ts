@@ -3,6 +3,7 @@ import type { EmployeeSchedule } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { addDays, fromDbDate, toDbDate, todayIn } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -64,7 +65,7 @@ export class WorkSchedulesService {
     ctx: RequestContext,
   ) {
     const before = await this.prisma.workShift.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException('Shift not found');
+    if (!before) throw new NotFoundException(apiError('SHIFT_NOT_FOUND', 'Shift not found'));
     validateBreak({ ...before, ...dto });
     return this.prisma.$transaction(async (tx) => {
       const shift = await tx.workShift.update({ where: { id }, data: dto });
@@ -98,7 +99,8 @@ export class WorkSchedulesService {
       where: { id, deletedAt: null },
       include: { days: { include: { shift: true }, orderBy: { weekday: 'asc' } } },
     });
-    if (!schedule) throw new NotFoundException('Schedule not found');
+    if (!schedule)
+      throw new NotFoundException(apiError('SCHEDULE_NOT_FOUND', 'Schedule not found'));
     return schedule;
   }
 
@@ -191,7 +193,9 @@ export class WorkSchedulesService {
       where: { employeeId: dto.employeeId, effectiveFrom: { gte: from } },
     });
     if (later > 0) {
-      throw new BadRequestException('An assignment already starts on or after that date');
+      throw new BadRequestException(
+        apiError('ASSIGNMENT_DATE_CONFLICT', 'An assignment already starts on or after that date'),
+      );
     }
 
     const assignment = await this.prisma.$transaction(async (tx) => {
@@ -231,19 +235,27 @@ export class WorkSchedulesService {
    */
   async unassign(id: string, actor: AuthenticatedUser, ctx: RequestContext) {
     const assignment = await this.prisma.employeeSchedule.findUnique({ where: { id } });
-    if (!assignment) throw new NotFoundException('Assignment not found');
+    if (!assignment)
+      throw new NotFoundException(apiError('ASSIGNMENT_NOT_FOUND', 'Assignment not found'));
     const { employeeId, effectiveFrom } = assignment;
 
     const later = await this.prisma.employeeSchedule.count({
       where: { employeeId, effectiveFrom: { gt: effectiveFrom } },
     });
-    if (later > 0) throw new BadRequestException('Only the latest assignment can be undone');
+    if (later > 0)
+      throw new BadRequestException(
+        apiError('ASSIGNMENT_NOT_LATEST', 'Only the latest assignment can be undone'),
+      );
 
     const from = fromDbDate(effectiveFrom);
     const today = todayIn(await this.settings.getTimezone());
     if (from < addDays(today, -MAX_RETROACTIVE_DAYS)) {
       throw new BadRequestException(
-        `Assignments that started more than ${MAX_RETROACTIVE_DAYS} days ago cannot be undone`,
+        apiError(
+          'ASSIGNMENT_TOO_OLD',
+          `Assignments that started more than ${MAX_RETROACTIVE_DAYS} days ago cannot be undone`,
+          { maxDays: MAX_RETROACTIVE_DAYS },
+        ),
       );
     }
 
@@ -313,7 +325,7 @@ export class WorkSchedulesService {
 
   async removeHoliday(id: string, actor: AuthenticatedUser, ctx: RequestContext) {
     const holiday = await this.prisma.holiday.findUnique({ where: { id } });
-    if (!holiday) throw new NotFoundException('Holiday not found');
+    if (!holiday) throw new NotFoundException(apiError('HOLIDAY_NOT_FOUND', 'Holiday not found'));
     await this.prisma.$transaction(async (tx) => {
       await tx.holiday.delete({ where: { id } });
       await this.audit.record(
@@ -335,7 +347,8 @@ export class WorkSchedulesService {
 
   private async assertEmployeeExists(id: string) {
     const found = await this.prisma.employee.count({ where: { id, deletedAt: null } });
-    if (found === 0) throw new NotFoundException('Employee not found');
+    if (found === 0)
+      throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
   }
 
   private async assertShiftsExist(ids: string[]) {
@@ -343,7 +356,10 @@ export class WorkSchedulesService {
     const found = await this.prisma.workShift.count({
       where: { id: { in: unique }, deletedAt: null },
     });
-    if (found !== unique.length) throw new BadRequestException('One or more shifts do not exist');
+    if (found !== unique.length)
+      throw new BadRequestException(
+        apiError('SHIFTS_NOT_FOUND', 'One or more shifts do not exist'),
+      );
   }
 
   private async recomputeRetroactively(employeeId: string, from: string) {
@@ -376,6 +392,8 @@ function toAssignmentResponse({ effectiveFrom, effectiveTo, ...rest }: Assignmen
 
 function validateBreak(shift: { breakStart?: string | null; breakEnd?: string | null }) {
   if (Boolean(shift.breakStart) !== Boolean(shift.breakEnd)) {
-    throw new BadRequestException('breakStart and breakEnd must be provided together');
+    throw new BadRequestException(
+      apiError('BREAK_INCOMPLETE', 'breakStart and breakEnd must be provided together'),
+    );
   }
 }

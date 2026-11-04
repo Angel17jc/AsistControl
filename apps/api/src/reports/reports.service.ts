@@ -4,6 +4,7 @@ import { formatMinutes } from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { eachDate, fromDbDate, localDayBounds, toDbDate } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -43,9 +44,14 @@ export class ReportsService {
       from = month.startOf('month').toISODate()!;
       to = month.endOf('month').toISODate()!;
     }
-    if (from > to) throw new BadRequestException('"from" must be before "to"');
+    if (from > to)
+      throw new BadRequestException(apiError('DATE_RANGE_INVERTED', '"from" must be before "to"'));
     if (eachDate(from, to).length > MAX_REPORT_DAYS)
-      throw new BadRequestException(`Reports are limited to ${MAX_REPORT_DAYS} days`);
+      throw new BadRequestException(
+        apiError('DATE_RANGE_TOO_LONG', `Reports are limited to ${MAX_REPORT_DAYS} days`, {
+          maxDays: MAX_REPORT_DAYS,
+        }),
+      );
 
     const employeeWhere: Prisma.EmployeeWhereInput = {
       AND: [

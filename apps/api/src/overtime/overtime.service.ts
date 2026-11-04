@@ -10,6 +10,7 @@ import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
 import type { ReviewDto } from '../common/dto/review.dto';
+import { apiError } from '../common/errors/api-error';
 import { fromDbDate, toDbDate } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import type { OvertimeQueryDto } from './overtime.dto';
@@ -60,12 +61,19 @@ export class OvertimeService {
 
   async review(id: string, dto: ReviewDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const record = await this.prisma.overtimeRecord.findUnique({ where: { id } });
-    if (!record) throw new NotFoundException('Overtime record not found');
+    if (!record)
+      throw new NotFoundException(apiError('OVERTIME_NOT_FOUND', 'Overtime record not found'));
     await this.scope.assertCanAccessEmployee(actor, record.employeeId);
     if (record.employeeId === actor.employeeId)
-      throw new ForbiddenException('You cannot approve your own overtime');
+      throw new ForbiddenException(
+        apiError('OVERTIME_SELF_REVIEW', 'You cannot approve your own overtime'),
+      );
     if (record.status !== 'PENDING')
-      throw new ConflictException(`Overtime is already ${record.status}`);
+      throw new ConflictException(
+        apiError('OVERTIME_ALREADY_DECIDED', `Overtime is already ${record.status}`, {
+          status: record.status,
+        }),
+      );
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.overtimeRecord.update({

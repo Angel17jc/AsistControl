@@ -3,6 +3,7 @@ import { WorkCalendarService } from '../attendance/work-calendar.service';
 import { AuditService } from '../audit/audit.service';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
+import { apiError } from '../common/errors/api-error';
 import { fromDbDate, localDateOf, localDayBounds, todayIn } from '../common/utils/date-only';
 import { toContractTypeResponse, vacationRuleOf } from '../contract-types/contract-types.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -82,15 +83,28 @@ export class VacationsService {
       timezone,
     );
     if (requested.total === 0) {
-      throw new ConflictException('The vacation covers no day that counts against the balance');
+      throw new ConflictException(
+        apiError(
+          'VACATION_NO_COUNTABLE_DAYS',
+          'The vacation covers no day that counts against the balance',
+        ),
+      );
     }
     if (
       !balance.contractType.allowNegativeVacationBalance &&
       requested.total > balance.availableDays
     ) {
       throw new ConflictException(
-        `Insufficient vacation balance: ${balance.availableDays} day(s) available on ` +
-          `${startDate}, the request uses ${requested.total}`,
+        apiError(
+          'VACATION_INSUFFICIENT_BALANCE',
+          `Insufficient vacation balance: ${balance.availableDays} day(s) available on ` +
+            `${startDate}, the request uses ${requested.total}`,
+          {
+            availableDays: balance.availableDays,
+            requestedDays: requested.total,
+            startDate,
+          },
+        ),
       );
     }
   }
@@ -313,7 +327,8 @@ export class VacationsService {
       where: { id, deletedAt: null },
       include: { contractType: true },
     });
-    if (!employee) throw new NotFoundException('Employee not found');
+    if (!employee)
+      throw new NotFoundException(apiError('EMPLOYEE_NOT_FOUND', 'Employee not found'));
     return employee;
   }
 }

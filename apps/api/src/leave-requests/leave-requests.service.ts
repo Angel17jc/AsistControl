@@ -12,6 +12,7 @@ import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
 import type { ReviewDto } from '../common/dto/review.dto';
+import { apiError } from '../common/errors/api-error';
 import { addDays, localDateOf, todayIn } from '../common/utils/date-only';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -62,14 +63,26 @@ export class LeaveRequestsService {
   async create(dto: CreateLeaveRequestDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const employeeId = dto.employeeId ?? actor.employeeId;
     if (!employeeId)
-      throw new BadRequestException('employeeId is required for accounts without an employee');
+      throw new BadRequestException(
+        apiError(
+          'LEAVE_EMPLOYEE_REQUIRED',
+          'employeeId is required for accounts without an employee',
+        ),
+      );
     await this.scope.assertCanAccessEmployee(actor, employeeId);
 
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
-    if (endsAt <= startsAt) throw new BadRequestException('endsAt must be after startsAt');
+    if (endsAt <= startsAt)
+      throw new BadRequestException(
+        apiError('LEAVE_ENDS_BEFORE_START', 'endsAt must be after startsAt'),
+      );
     if (endsAt.getTime() - startsAt.getTime() > MAX_LEAVE_DAYS * 86_400_000) {
-      throw new BadRequestException(`A single request cannot exceed ${MAX_LEAVE_DAYS} days`);
+      throw new BadRequestException(
+        apiError('LEAVE_TOO_LONG', `A single request cannot exceed ${MAX_LEAVE_DAYS} days`, {
+          maxDays: MAX_LEAVE_DAYS,
+        }),
+      );
     }
 
     const overlapping = await this.prisma.leaveRequest.count({
@@ -81,7 +94,9 @@ export class LeaveRequestsService {
       },
     });
     if (overlapping > 0)
-      throw new ConflictException('The employee already has a request overlapping these dates');
+      throw new ConflictException(
+        apiError('LEAVE_OVERLAP', 'The employee already has a request overlapping these dates'),
+      );
     if (dto.type === 'VACATION') {
       await this.vacations.assertAffordable({ employeeId, startsAt, endsAt });
     }
@@ -117,9 +132,15 @@ export class LeaveRequestsService {
   async review(id: string, dto: ReviewDto, actor: AuthenticatedUser, ctx: RequestContext) {
     const request = await this.getScoped(id, actor);
     if (request.status !== 'PENDING')
-      throw new ConflictException(`Request is already ${request.status}`);
+      throw new ConflictException(
+        apiError('LEAVE_ALREADY_DECIDED', `Request is already ${request.status}`, {
+          status: request.status,
+        }),
+      );
     if (request.employeeId === actor.employeeId)
-      throw new ForbiddenException('You cannot review your own request');
+      throw new ForbiddenException(
+        apiError('LEAVE_SELF_REVIEW', 'You cannot review your own request'),
+      );
     // The balance may have changed since the request was filed (another approval, an
     // adjustment, a new contract type): it must still fit when it is approved.
     if (dto.decision === 'APPROVED' && request.type === 'VACATION') {
@@ -157,12 +178,18 @@ export class LeaveRequestsService {
   async cancel(id: string, actor: AuthenticatedUser, ctx: RequestContext) {
     const request = await this.getScoped(id, actor);
     if (request.status === 'CANCELLED' || request.status === 'REJECTED') {
-      throw new ConflictException(`Request is already ${request.status}`);
+      throw new ConflictException(
+        apiError('LEAVE_ALREADY_DECIDED', `Request is already ${request.status}`, {
+          status: request.status,
+        }),
+      );
     }
     const wasApproved = request.status === 'APPROVED';
     const isRequester = request.requestedById === actor.id;
     if (!isRequester && !this.scope.isUnrestricted(actor)) {
-      throw new ForbiddenException('Only the requester or HR can cancel this request');
+      throw new ForbiddenException(
+        apiError('LEAVE_CANCEL_FORBIDDEN', 'Only the requester or HR can cancel this request'),
+      );
     }
 
     const cancelled = await this.prisma.$transaction(async (tx) => {
@@ -189,7 +216,8 @@ export class LeaveRequestsService {
 
   private async getScoped(id: string, actor: AuthenticatedUser): Promise<LeaveRequest> {
     const request = await this.prisma.leaveRequest.findUnique({ where: { id } });
-    if (!request) throw new NotFoundException('Leave request not found');
+    if (!request)
+      throw new NotFoundException(apiError('LEAVE_NOT_FOUND', 'Leave request not found'));
     await this.scope.assertCanAccessEmployee(actor, request.employeeId);
     return request;
   }
