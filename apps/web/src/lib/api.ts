@@ -30,20 +30,30 @@ export function refreshSession(): Promise<boolean> {
   refreshInFlight ??= (async () => {
     try {
       const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' });
-      if (!res.ok) {
-        useAuth.getState().clear();
-        return false;
+      if (res.ok) {
+        useAuth.getState().setSession((await res.json()) as AuthSession);
+        return true;
       }
-      useAuth.getState().setSession((await res.json()) as AuthSession);
-      return true;
+      if (res.status === 429 || res.status >= 500) keepSessionForNow();
+      else useAuth.getState().clear();
+      return false;
     } catch {
-      useAuth.getState().clear();
+      keepSessionForNow();
       return false;
     } finally {
       refreshInFlight = null;
     }
   })();
   return refreshInFlight;
+}
+
+/**
+ * The refresh did not get an answer about the session (API restarting, network down, rate
+ * limit), so the session stands and the next request tries again. A page still loading has
+ * nothing to show yet: it goes to the login, and reloading restores the session.
+ */
+function keepSessionForNow(): void {
+  if (useAuth.getState().status === 'unknown') useAuth.getState().clear();
 }
 
 export function buildUrl(path: string, query?: Query): string {

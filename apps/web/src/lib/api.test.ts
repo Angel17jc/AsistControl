@@ -62,6 +62,35 @@ describe('api client', () => {
     expect(useAuth.getState().status).toBe('anonymous');
   });
 
+  it.each([
+    ['the rate limit', () => json(429, {})],
+    ['an API restarting behind nginx', () => json(502, {})],
+  ])('keeps the session through %s and recovers on the next request', async (_, failure) => {
+    fetchMock.mockResolvedValueOnce(json(401, {})).mockResolvedValueOnce(failure());
+    await expect(api('/employees')).rejects.toMatchObject({ status: 401 });
+    expect(useAuth.getState().status).toBe('authenticated');
+
+    fetchMock
+      .mockResolvedValueOnce(json(401, {}))
+      .mockResolvedValueOnce(json(200, session))
+      .mockResolvedValueOnce(json(200, { data: [] }));
+    await expect(api('/employees')).resolves.toEqual({ data: [] });
+    expect(useAuth.getState().accessToken).toBe('new-token');
+  });
+
+  it('keeps the session when the network is down', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(refreshSession()).resolves.toBe(false);
+    expect(useAuth.getState().status).toBe('authenticated');
+  });
+
+  it('does not leave a loading page waiting when it cannot restore the session', async () => {
+    useAuth.setState({ status: 'unknown', accessToken: null, user: null });
+    fetchMock.mockResolvedValueOnce(json(503, {}));
+    await refreshSession();
+    expect(useAuth.getState().status).toBe('anonymous');
+  });
+
   it('signs out on the server even after the access token expired', async () => {
     // Otherwise the refresh cookie survives and reloading the page signs the user back in.
     fetchMock
