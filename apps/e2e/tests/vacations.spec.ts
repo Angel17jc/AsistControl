@@ -25,7 +25,7 @@ test.describe('Vacaciones', () => {
     const workingDays = Math.ceil(await available(mine)) + 10;
     const start = daysFromToday(40);
     await requestVacation(page, start, addDays(start, Math.ceil((workingDays * 7) / 5) + 7));
-    await expect(page.getByRole('alert')).toContainText('Insufficient vacation balance');
+    await expect(page.getByRole('alert')).toContainText('Saldo de vacaciones insuficiente');
 
     // Three weekdays well ahead do fit, and are held in reserve at once.
     const monday = nextMonday(45);
@@ -52,6 +52,12 @@ test.describe('Vacaciones', () => {
     await adjust.getByRole('button', { name: 'Ajustar' }).click();
     await expect.poll(() => available(panel)).toBe(before + 2);
     await expect(panel).toContainText('Ajuste de prueba automatizada');
+
+    // Undone: a local test database outlives the run, and this balance must not grow with each.
+    await adjust.getByLabel('Días').fill('-2');
+    await adjust.getByLabel('Motivo del ajuste').fill('Se deshace el ajuste de prueba');
+    await adjust.getByRole('button', { name: 'Ajustar' }).click();
+    await expect.poll(() => available(panel)).toBe(before);
 
     // Contract types: create one, then remove it (nobody uses it yet).
     await page.getByRole('link', { name: 'Contratos' }).click();

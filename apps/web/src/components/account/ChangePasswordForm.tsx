@@ -1,7 +1,7 @@
 import { isStrongPassword } from '@asistcontrol/shared';
 import { useMutation } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
-import { ApiError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import { Button, Field, Input } from '../ui';
 import { PASSWORD_HINT } from '../users/AccountForm';
 
@@ -91,7 +91,7 @@ export function ChangePasswordForm({
       )}
       {change.error && (
         <p role="alert" className="text-sm text-critical">
-          {errorText(change.error)}
+          {change.error.message}
         </p>
       )}
       {change.isSuccess && (
@@ -106,14 +106,4 @@ export function ChangePasswordForm({
       </div>
     </form>
   );
-}
-
-function errorText(error: Error): string {
-  if (error instanceof ApiError && error.status === 403) {
-    return 'La contraseña actual no es correcta.';
-  }
-  if (error instanceof ApiError && error.status === 429) {
-    return 'Demasiados intentos. Espere un minuto y vuelva a intentarlo.';
-  }
-  return error.message;
 }

@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import clsx from 'clsx';
 import { AlertTriangle } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
-import { ApiError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import {
   ANOMALY_LABEL,
   PUNCH_LABEL,
@@ -228,7 +228,7 @@ export function ManualPunchForm({ onDone }: { onDone: () => void }) {
         </div>
         {create.error && (
           <p role="alert" className="text-sm text-critical">
-            {createErrorMessage(create.error)}
+            {create.error.message}
           </p>
         )}
       </form>
@@ -412,11 +412,4 @@ function origin(p: DayPreview['punches'][number]): string {
 
 function anomalies(summary: DaySummary): string {
   return summary.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · ') || '—';
-}
-
-function createErrorMessage(error: Error): string {
-  if (error instanceof ApiError && error.status === 409) {
-    return 'Ya hay una marcación manual de esta persona a esa hora.';
-  }
-  return error.message;
 }

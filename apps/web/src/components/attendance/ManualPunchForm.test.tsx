@@ -250,6 +250,7 @@ describe('ManualPunchForm', () => {
           {
             statusCode: 409,
             error: 'Conflict',
+            code: 'MANUAL_PUNCH_EXISTS',
             message: 'A manual punch already exists at that time',
           },
           { status: 409 },
