@@ -1,11 +1,11 @@
-import {
-  type LeaveType,
-  type PunchReading,
-  type VacationAccrual,
+import type { PunchReading, VacationAccrual } from '@asistcontrol/shared';
+
+export {
+  ANOMALY_LABEL,
+  LEAVE_TYPE_LABEL as LEAVE_LABEL,
+  PUNCH_TYPE_LABEL as PUNCH_LABEL,
   formatMinutes,
 } from '@asistcontrol/shared';
-
-export { formatMinutes };
 
 const TZ = 'America/Guayaquil';
 
@@ -103,21 +103,6 @@ export function describeExpiry(months: number | null, accrual: VacationAccrual):
   return `${months} ${months === 1 ? 'mes' : 'meses'} después ${from}`;
 }
 
-export const LEAVE_LABEL: Record<LeaveType, string> = {
-  PERSONAL: 'Permiso personal',
-  MEDICAL: 'Médico',
-  VACATION: 'Vacaciones',
-  OTHER: 'Otro',
-};
-
-export const PUNCH_LABEL: Record<string, string> = {
-  CHECK_IN: 'Entrada',
-  CHECK_OUT: 'Salida',
-  BREAK_OUT: 'Salida almuerzo',
-  BREAK_IN: 'Regreso',
-  UNKNOWN: 'Marcación',
-};
-
 /** How the attendance calculation read a punch of the day. */
 export const READING_LABEL: Record<PunchReading, string> = {
   CHECK_IN: 'Entrada',
@@ -126,18 +111,4 @@ export const READING_LABEL: Record<PunchReading, string> = {
   CHECK_OUT: 'Salida',
   DUPLICATE: 'Repetida: no cuenta',
   OTHER_DAY: 'Fuera de esta jornada',
-};
-
-export const ANOMALY_LABEL: Record<string, string> = {
-  LATE_ARRIVAL: 'Atraso',
-  EARLY_LEAVE: 'Salida anticipada',
-  OVERTIME: 'Horas extra',
-  MISSING_CHECK_IN: 'Sin entrada',
-  MISSING_CHECK_OUT: 'Sin salida',
-  DUPLICATE_PUNCH: 'Marcación duplicada',
-  OUT_OF_SCHEDULE_PUNCH: 'Fuera de horario',
-  SHORT_BREAK: 'Almuerzo corto',
-  WORKED_ON_REST_DAY: 'Trabajó en día libre',
-  WORKED_ON_HOLIDAY: 'Trabajó en feriado',
-  STRAY_PUNCH: 'Marcación fuera de jornada',
 };

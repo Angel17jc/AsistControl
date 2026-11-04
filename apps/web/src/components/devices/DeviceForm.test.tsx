@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { explainDeviceError } from '../../lib/device-drivers';
 import type { DeviceRow } from '../../lib/types';
 import { useAuth } from '../../stores/auth';
 import { DeviceForm } from './DeviceForm';
@@ -149,23 +148,6 @@ describe('DeviceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Registrar' }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(JSON.stringify(sentDevice())).not.toContain('no-debe-viajar');
-  });
-});
-
-describe('explainDeviceError', () => {
-  it.each([
-    [
-      'AUTHENTICATION_FAILED: Device rejected the username or password',
-      'El equipo rechazó las credenciales (Device rejected the username or password)',
-    ],
-    [
-      'CONNECTION_FAILED: ECONNREFUSED',
-      'Sin respuesta del equipo: revise la IP, el puerto y la red (ECONNREFUSED)',
-    ],
-    ['Algo raro', 'Algo raro'],
-    [null, 'Error desconocido'],
-  ])('%s', (error, expected) => {
-    expect(explainDeviceError(error)).toBe(expected);
   });
 });
 

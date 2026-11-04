@@ -1,4 +1,9 @@
-import { LEAVE_TYPES, type LeaveType, type PaginatedResponse } from '@asistcontrol/shared';
+import {
+  LEAVE_TYPES,
+  type LeaveType,
+  OVERTIME_KIND_LABEL,
+  type PaginatedResponse,
+} from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus, X } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
@@ -23,8 +28,6 @@ import { api } from '../lib/api';
 import { LEAVE_LABEL, formatDate, formatDateTime, formatMinutes } from '../lib/format';
 import type { LeaveRow, OvertimeRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
-
-const OVERTIME_LABEL = { REGULAR: 'Ordinaria', REST_DAY: 'Día libre', HOLIDAY: 'Feriado' } as const;
 
 export function RequestsPage() {
   const canRequest = useAuth((s) => s.can('leave:request'));
@@ -201,7 +204,7 @@ function OvertimeTable() {
               <Td className="font-medium">
                 {o.employee.lastName} {o.employee.firstName}
               </Td>
-              <Td className="text-ink-2">{OVERTIME_LABEL[o.kind]}</Td>
+              <Td className="text-ink-2">{OVERTIME_KIND_LABEL[o.kind]}</Td>
               <Td className="tabular">{formatMinutes(o.minutes)}</Td>
               <Td>
                 <StatusBadge tone={REQUEST_STATUS[o.status].tone}>

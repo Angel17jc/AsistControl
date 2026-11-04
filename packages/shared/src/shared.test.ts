@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, hasPermission, rolesWith } from './rbac';
 import { NOTIFICATION_TYPES } from './domain';
+import { explainDeviceError } from './labels';
 import { notificationTypesFor } from './notifications';
 import { isStrongPassword } from './passwords';
 import { formatMinutes } from './time';
@@ -61,4 +62,27 @@ describe('formatMinutes', () => {
     [-5, '0h 00m'],
     [61, '1h 01m'],
   ])('%i -> %s', (input, expected) => expect(formatMinutes(input)).toBe(expected));
+});
+
+describe('explainDeviceError', () => {
+  it.each([
+    [
+      'AUTHENTICATION_FAILED: Device rejected the username or password',
+      'El equipo rechazó las credenciales (Device rejected the username or password)',
+    ],
+    [
+      'CONNECTION_FAILED: ECONNREFUSED',
+      'Sin respuesta del equipo: revise la IP, el puerto y la red (ECONNREFUSED)',
+    ],
+    ['NOT_CONNECTED: socket closed', 'Se perdió la conexión con el equipo (socket closed)'],
+    ['TIMEOUT: a: b', 'El equipo no respondió a tiempo (a: b)'],
+    ['PROTOCOL_ERROR: bad frame', 'El equipo respondió algo inesperado (bad frame)'],
+    ['UNSUPPORTED_DRIVER: X', 'El driver no está disponible en este servidor (X)'],
+    ['UNSUPPORTED_OPERATION: push', 'Este equipo no admite esa operación (push)'],
+    ['TIMEOUT', 'El equipo no respondió a tiempo'],
+    ['Algo raro', 'Algo raro'],
+    [null, 'Error desconocido'],
+  ])('%s', (error, expected) => {
+    expect(explainDeviceError(error)).toBe(expected);
+  });
 });

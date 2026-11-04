@@ -1,22 +1,34 @@
-import type {
-  AttendanceStatus,
-  DeviceStatus,
-  PresenceState,
-  RequestStatus,
-  SyncStatus,
+import {
+  ATTENDANCE_STATUS_LABEL,
+  type AttendanceStatus,
+  type DeviceStatus,
+  type PresenceState,
+  REQUEST_STATUS_LABEL,
+  type RequestStatus,
+  SYNC_STATUS_LABEL,
+  type SyncStatus,
 } from '@asistcontrol/shared';
 import type { Tone } from './ui';
 
-export const ATTENDANCE_STATUS: Record<AttendanceStatus, { label: string; tone: Tone }> = {
-  PRESENT: { label: 'Presente', tone: 'good' },
-  LATE: { label: 'Atrasado', tone: 'warning' },
-  INCOMPLETE: { label: 'Incompleta', tone: 'serious' },
-  ABSENT: { label: 'Ausente', tone: 'critical' },
-  ON_LEAVE: { label: 'Permiso', tone: 'info' },
-  REST_DAY: { label: 'Día libre', tone: 'neutral' },
-  HOLIDAY: { label: 'Feriado', tone: 'neutral' },
-  NO_SCHEDULE: { label: 'Sin horario', tone: 'neutral' },
-};
+/** The shared names of a domain's values, with the tone each one is shown in. */
+function toned<K extends string>(
+  labels: Record<K, string>,
+  tones: Record<K, Tone>,
+): Record<K, { label: string; tone: Tone }> {
+  const entries = (Object.keys(tones) as K[]).map((k) => [k, { label: labels[k], tone: tones[k] }]);
+  return Object.fromEntries(entries) as Record<K, { label: string; tone: Tone }>;
+}
+
+export const ATTENDANCE_STATUS = toned<AttendanceStatus>(ATTENDANCE_STATUS_LABEL, {
+  PRESENT: 'good',
+  LATE: 'warning',
+  INCOMPLETE: 'serious',
+  ABSENT: 'critical',
+  ON_LEAVE: 'info',
+  REST_DAY: 'neutral',
+  HOLIDAY: 'neutral',
+  NO_SCHEDULE: 'neutral',
+});
 
 /** Presence board: where a person is right now. */
 export const PRESENCE_STATE: Record<PresenceState, { label: string; tone: Tone }> = {
@@ -38,16 +50,16 @@ export const DEVICE_STATUS: Record<DeviceStatus, { label: string; tone: Tone }> 
   DISABLED: { label: 'Deshabilitado', tone: 'neutral' },
 };
 
-export const SYNC_STATUS: Record<SyncStatus, { label: string; tone: Tone }> = {
-  RUNNING: { label: 'En curso', tone: 'info' },
-  SUCCESS: { label: 'Exitosa', tone: 'good' },
-  PARTIAL: { label: 'Parcial', tone: 'warning' },
-  FAILED: { label: 'Fallida', tone: 'critical' },
-};
+export const SYNC_STATUS = toned<SyncStatus>(SYNC_STATUS_LABEL, {
+  RUNNING: 'info',
+  SUCCESS: 'good',
+  PARTIAL: 'warning',
+  FAILED: 'critical',
+});
 
-export const REQUEST_STATUS: Record<RequestStatus, { label: string; tone: Tone }> = {
-  PENDING: { label: 'Pendiente', tone: 'warning' },
-  APPROVED: { label: 'Aprobada', tone: 'good' },
-  REJECTED: { label: 'Rechazada', tone: 'critical' },
-  CANCELLED: { label: 'Cancelada', tone: 'neutral' },
-};
+export const REQUEST_STATUS = toned<RequestStatus>(REQUEST_STATUS_LABEL, {
+  PENDING: 'warning',
+  APPROVED: 'good',
+  REJECTED: 'critical',
+  CANCELLED: 'neutral',
+});

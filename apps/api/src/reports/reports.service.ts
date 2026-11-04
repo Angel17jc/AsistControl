@@ -1,6 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { AttendanceStatus, Prisma } from '@prisma/client';
-import { formatMinutes } from '@asistcontrol/shared';
+import {
+  ANOMALY_LABEL,
+  ATTENDANCE_STATUS_LABEL,
+  EVENT_SOURCE_LABEL,
+  OVERTIME_KIND_LABEL,
+  PUNCH_TYPE_LABEL,
+  REQUEST_STATUS_LABEL,
+  SYNC_STATUS_LABEL,
+  SYNC_TRIGGER_LABEL,
+  explainDeviceError,
+  formatMinutes,
+} from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
@@ -26,7 +37,8 @@ type Row = Record<string, string | number | boolean | null>;
 
 /**
  * Read models for HR and payroll. Every report returns flat rows, so the same data feeds
- * the JSON API, the UI tables and the CSV export.
+ * the JSON API, the UI tables and the CSV export. A report is a finished document for people,
+ * in Spanish like its columns: values and dates come worded, in the company's time zone.
  */
 @Injectable()
 export class ReportsService {
@@ -124,7 +136,7 @@ export class ReportsService {
       codigo: r.employee.employeeCode,
       empleado: `${r.employee.lastName} ${r.employee.firstName}`,
       departamento: r.employee.department?.name ?? null,
-      estado: r.status,
+      estado: ATTENDANCE_STATUS_LABEL[r.status],
       horario: r.scheduledStart ? `${time(r.scheduledStart)}-${time(r.scheduledEnd)}` : null,
       entrada: time(r.firstIn),
       salida: time(r.lastOut),
@@ -133,8 +145,8 @@ export class ReportsService {
       minutos_atraso: r.lateMinutes,
       minutos_salida_anticipada: r.earlyLeaveMinutes,
       minutos_extra: r.overtimeMinutes,
-      novedades: r.anomalies.join(' '),
-      cerrado: r.isFinal,
+      novedades: r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · '),
+      cerrado: yesNo(r.isFinal),
     }));
   }
 
@@ -206,6 +218,7 @@ export class ReportsService {
     range: { from: string; to: string },
     employee: Prisma.EmployeeWhereInput,
   ): Promise<Row[]> {
+    const timezone = await this.settings.getTimezone();
     const rows = await this.prisma.overtimeRecord.findMany({
       where: { workDate: { gte: toDbDate(range.from), lte: toDbDate(range.to) }, employee },
       include: { employee: { select: { employeeCode: true, firstName: true, lastName: true } } },
@@ -216,11 +229,13 @@ export class ReportsService {
       fecha: fromDbDate(o.workDate),
       codigo: o.employee.employeeCode,
       empleado: `${o.employee.lastName} ${o.employee.firstName}`,
-      tipo: o.kind,
+      tipo: OVERTIME_KIND_LABEL[o.kind],
       minutos: o.minutes,
       horas: formatMinutes(o.minutes),
-      estado: o.status,
-      revisado: o.reviewedAt?.toISOString() ?? null,
+      estado: REQUEST_STATUS_LABEL[o.status],
+      revisado: o.reviewedAt
+        ? DateTime.fromJSDate(o.reviewedAt, { zone: timezone }).toFormat('yyyy-MM-dd HH:mm')
+        : null,
       nota: o.reviewNote,
     }));
   }
@@ -252,10 +267,10 @@ export class ReportsService {
       codigo: e.employee?.employeeCode ?? null,
       empleado: e.employee ? `${e.employee.lastName} ${e.employee.firstName}` : null,
       id_biometrico: e.deviceUserId,
-      tipo: e.punchType,
-      origen: e.source,
+      tipo: PUNCH_TYPE_LABEL[e.punchType],
+      origen: EVENT_SOURCE_LABEL[e.source],
       dispositivo: e.device?.name ?? null,
-      anulada: e.voidedAt !== null,
+      anulada: yesNo(e.voidedAt !== null),
       nota: e.note ?? e.voidReason,
     }));
   }
@@ -276,18 +291,20 @@ export class ReportsService {
     return logs.map((l) => ({
       inicio: DateTime.fromJSDate(l.startedAt, { zone: timezone }).toFormat('yyyy-MM-dd HH:mm:ss'),
       dispositivo: l.device.name,
-      origen: l.trigger,
-      estado: l.status,
+      origen: SYNC_TRIGGER_LABEL[l.trigger],
+      estado: SYNC_STATUS_LABEL[l.status],
       recibidos: l.recordsReceived,
       procesados: l.recordsProcessed,
       duplicados: l.recordsDuplicated,
       rechazados: l.recordsRejected,
       sin_empleado: l.recordsUnmatched,
       duracion_ms: l.finishedAt ? l.finishedAt.getTime() - l.startedAt.getTime() : null,
-      error: l.errorMessage,
+      error: l.errorMessage && explainDeviceError(l.errorMessage),
     }));
   }
 }
+
+const yesNo = (value: boolean) => (value ? 'Sí' : 'No');
 
 function columnsOf(rows: Row[]): CsvColumn<Record<string, unknown>>[] {
   const first = rows[0];

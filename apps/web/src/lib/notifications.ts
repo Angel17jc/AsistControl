@@ -1,6 +1,9 @@
-import type { AppNotification, NotificationType } from '@asistcontrol/shared';
+import {
+  type AppNotification,
+  type NotificationType,
+  explainDeviceError,
+} from '@asistcontrol/shared';
 import type { Tone } from '../components/ui';
-import { explainDeviceError } from './device-drivers';
 import { LEAVE_LABEL, formatDateTime, formatDateWithYear, formatDays } from './format';
 
 /** What each kind of notification is about, for the email preferences. Exhaustive. */
