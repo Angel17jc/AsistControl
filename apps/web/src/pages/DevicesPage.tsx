@@ -1,4 +1,8 @@
-import type { PaginatedResponse } from '@asistcontrol/shared';
+import {
+  type PaginatedResponse,
+  SYNC_TRIGGER_LABEL,
+  explainDeviceError,
+} from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlaskConical, Pencil, Plug, Plus, RefreshCw, Unplug, Zap } from 'lucide-react';
 import { useState } from 'react';
@@ -21,7 +25,6 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
-import { explainDeviceError } from '../lib/device-drivers';
 import { formatDateTime, relativeTime, todayIso } from '../lib/format';
 import type { DeviceRow, SimulatorState, SyncLogRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
@@ -136,20 +139,17 @@ export function DevicesPage() {
               <tr key={l.id}>
                 <Td className="tabular whitespace-nowrap">{formatDateTime(l.startedAt)}</Td>
                 <Td>{l.device.name}</Td>
-                <Td className="text-ink-2">
-                  {
-                    { MANUAL: 'Manual', SCHEDULED: 'Programada', REALTIME: 'Tiempo real' }[
-                      l.trigger
-                    ]
-                  }
-                </Td>
+                <Td className="text-ink-2">{SYNC_TRIGGER_LABEL[l.trigger]}</Td>
                 <Td>
                   <StatusBadge tone={SYNC_STATUS[l.status].tone}>
                     {SYNC_STATUS[l.status].label}
                   </StatusBadge>
                   {l.errorMessage && (
-                    <p className="mt-1 max-w-56 truncate text-xs text-ink-3" title={l.errorMessage}>
-                      {l.errorMessage}
+                    <p
+                      className="mt-1 max-w-56 truncate text-xs text-ink-3"
+                      title={explainDeviceError(l.errorMessage)}
+                    >
+                      {explainDeviceError(l.errorMessage)}
                     </p>
                   )}
                 </Td>

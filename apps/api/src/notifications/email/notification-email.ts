@@ -1,4 +1,9 @@
-import type { AppNotification, LeaveType } from '@asistcontrol/shared';
+import {
+  type AppNotification,
+  LEAVE_TYPE_LABEL,
+  type LeaveType,
+  explainDeviceError,
+} from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
 
 /**
@@ -20,21 +25,6 @@ export interface RenderedEmail {
   html: string;
 }
 
-const LEAVE_LABEL: Record<LeaveType, string> = {
-  PERSONAL: 'Permiso personal',
-  MEDICAL: 'Médico',
-  VACATION: 'Vacaciones',
-  OTHER: 'Otro',
-};
-
-const DEVICE_ERROR = new Map<string, string>([
-  ['AUTHENTICATION_FAILED', 'El equipo rechazó las credenciales'],
-  ['CONNECTION_FAILED', 'Sin respuesta del equipo: revise la IP, el puerto y la red'],
-  ['TIMEOUT', 'El equipo no respondió a tiempo'],
-  ['PROTOCOL_ERROR', 'El equipo respondió algo inesperado'],
-  ['UNSUPPORTED_DRIVER', 'El driver no está disponible en este servidor'],
-]);
-
 export function renderNotificationEmail(
   notification: AppNotification,
   context: EmailContext,
@@ -44,7 +34,7 @@ export function renderNotificationEmail(
   const day = (isoDate: string) =>
     DateTime.fromISO(isoDate, { zone: 'utc' }).setLocale('es').toFormat('d LLL yyyy');
   const leave = (d: { leaveType: LeaveType; startsAt: string; endsAt: string }) =>
-    `${LEAVE_LABEL[d.leaveType]}, del ${when(d.startsAt)} al ${when(d.endsAt)}`;
+    `${LEAVE_TYPE_LABEL[d.leaveType]}, del ${when(d.startsAt)} al ${when(d.endsAt)}`;
 
   switch (notification.type) {
     case 'DEVICE_DOWN': {
@@ -53,7 +43,7 @@ export function renderNotificationEmail(
         `${status === 'ERROR' ? 'Dispositivo con error' : 'Dispositivo sin conexión'}: ${deviceName}`,
         [
           `El marcador "${deviceName}" dejó de responder a la sincronización.`,
-          `Motivo: ${explainDeviceError(error)}.`,
+          `Motivo: ${error ? explainDeviceError(error) : 'error desconocido'}.`,
           'Las marcaciones no se pierden: quedan en el equipo y se descargan cuando vuelva.',
         ],
         '/dispositivos',
@@ -82,7 +72,7 @@ export function renderNotificationEmail(
       const data = notification.data;
       const approved = data.decision === 'APPROVED';
       return compose(
-        `Solicitud ${approved ? 'aprobada' : 'rechazada'}: ${LEAVE_LABEL[data.leaveType]}`,
+        `Solicitud ${approved ? 'aprobada' : 'rechazada'}: ${LEAVE_TYPE_LABEL[data.leaveType]}`,
         [
           `La solicitud de ${data.employeeName} (${leave(data)}) fue ${approved ? 'aprobada' : 'rechazada'}.`,
           ...(data.note ? [`Nota de quien la revisó: «${data.note}»`] : []),
@@ -168,14 +158,6 @@ const HTML_ESCAPES = new Map([
 
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES.get(c)!);
-}
-
-function explainDeviceError(error: string | null): string {
-  if (!error) return 'error desconocido';
-  const separator = error.indexOf(': ');
-  const code = separator === -1 ? error : error.slice(0, separator);
-  const reason = DEVICE_ERROR.get(code);
-  return reason ? `${reason} (${error.slice(separator + 2)})` : error;
 }
 
 function formatDays(days: number): string {

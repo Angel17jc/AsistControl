@@ -107,6 +107,8 @@ curl -X POST localhost:3000/api/devices/<id>/sync -H "authorization: Bearer $TOK
 curl -OJ "localhost:3000/api/reports/monthly?from=2026-09-01&format=csv" -H "authorization: Bearer $TOKEN"
 ```
 
+Los reportes son documentos terminados para personas, también en JSON: los valores van en español (`estado: "Atrasado"`, `cerrado: "Sí"`) y las fechas en la zona horaria de la empresa. Para automatizar, use los endpoints de cada recurso, que devuelven los códigos.
+
 ## Tiempo real (Socket.IO)
 
 ```ts

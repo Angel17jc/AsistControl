@@ -86,23 +86,3 @@ export function driverPreset(driver: string): DriverPreset {
     }
   );
 }
-
-/**
- * A device failure in words an operator can act on. The API sends `CODE: detail`; the code
- * decides where to look (network, credentials, configuration).
- */
-export function explainDeviceError(error: string | null): string {
-  if (!error) return 'Error desconocido';
-  const [code = '', ...rest] = error.split(': ');
-  const detail = rest.join(': ');
-  const reason: Record<string, string> = {
-    AUTHENTICATION_FAILED: 'El equipo rechazó las credenciales',
-    CONNECTION_FAILED: 'Sin respuesta del equipo: revise la IP, el puerto y la red',
-    NOT_CONNECTED: 'Se perdió la conexión con el equipo',
-    TIMEOUT: 'El equipo no respondió a tiempo',
-    PROTOCOL_ERROR: 'El equipo respondió algo inesperado',
-    UNSUPPORTED_DRIVER: 'El driver no está disponible en este servidor',
-    UNSUPPORTED_OPERATION: 'Este equipo no admite esa operación',
-  };
-  return reason[code] ? `${reason[code]} (${detail})` : error;
-}

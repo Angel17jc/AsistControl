@@ -4,5 +4,6 @@ export * from './realtime';
 export * from './notifications';
 export * from './api';
 export * from './errors';
+export * from './labels';
 export * from './time';
 export * from './passwords';
