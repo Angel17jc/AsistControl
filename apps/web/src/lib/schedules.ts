@@ -1,4 +1,5 @@
-import type { ScheduleAssignmentRow, WorkScheduleRow } from './types';
+import { formatMinutes } from './format';
+import type { ScheduleAssignmentRow, WorkScheduleRow, WorkShiftRow } from './types';
 
 const WEEKDAY = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'] as const;
 
@@ -17,6 +18,29 @@ export const WEEKDAYS = [
 export function describeHours(startTime: string, endTime: string): string {
   return `${startTime}–${endTime}${endTime <= startTime ? ' (+1 día)' : ''}`;
 }
+const minutesOf = (hhmm: string) => {
+  const [hours = 0, minutes = 0] = hhmm.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+type ShiftHours = Pick<WorkShiftRow, 'startTime' | 'endTime' | 'breakStart' | 'breakEnd'>;
+
+/** How long the shift's day is expected to be: from start to end, without the lunch. */
+export function expectedMinutes(shift: ShiftHours): number {
+  const lunch =
+    shift.breakStart && shift.breakEnd
+      ? minutesOf(shift.breakEnd) - minutesOf(shift.breakStart)
+      : 0;
+  return minutesOf(shift.endTime) - minutesOf(shift.startTime) - lunch;
+}
+
+/** "08:00–17:00", or "Sin hora fija · 8h 00m al día". */
+export function describeShift(shift: ShiftHours & Pick<WorkShiftRow, 'flexible'>): string {
+  return shift.flexible
+    ? `Sin hora fija · ${formatMinutes(expectedMinutes(shift))} al día`
+    : describeHours(shift.startTime, shift.endTime);
+}
+
 const dayName = (weekday: number) => WEEKDAY[weekday - 1] ?? '?';
 
 /**
@@ -27,7 +51,9 @@ export function describeWeek(days: WorkScheduleRow['days']): string {
   if (days.length === 0) return 'Sin días laborables';
   const groups: { from: number; to: number; hours: string }[] = [];
   for (const day of [...days].sort((a, b) => a.weekday - b.weekday)) {
-    const hours = `${day.shift.startTime}–${day.shift.endTime}`;
+    const hours = day.shift.flexible
+      ? `sin hora fija (${formatMinutes(expectedMinutes(day.shift))} al día)`
+      : `${day.shift.startTime}–${day.shift.endTime}`;
     const last = groups.at(-1);
     if (last && last.to === day.weekday - 1 && last.hours === hours) last.to = day.weekday;
     else groups.push({ from: day.weekday, to: day.weekday, hours });

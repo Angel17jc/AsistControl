@@ -12,6 +12,8 @@ export const attendancePolicySchema = z.object({
   lateToleranceMinutes: z.number().int().min(0).max(240),
   /** Minutes before shift end within which leaving is not flagged. Shifts may override. */
   earlyLeaveToleranceMinutes: z.number().int().min(0).max(240),
+  /** False: the company does not pay overtime, so none is calculated or proposed. */
+  overtimeEnabled: z.boolean(),
   /** Minimum extra minutes before overtime is recognized. Shifts may override. */
   overtimeThresholdMinutes: z.number().int().min(0).max(480),
   /**
@@ -43,6 +45,7 @@ export const DEFAULT_ATTENDANCE_POLICY: AttendancePolicy = Object.freeze({
   duplicatePunchWindowSeconds: 60,
   lateToleranceMinutes: 5,
   earlyLeaveToleranceMinutes: 0,
+  overtimeEnabled: true,
   overtimeThresholdMinutes: 15,
   overtimeBasis: 'AFTER_SHIFT_END',
   countEarlyArrivalAsOvertime: false,

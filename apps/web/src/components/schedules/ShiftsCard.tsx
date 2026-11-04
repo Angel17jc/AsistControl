@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
-import { describeHours } from '../../lib/schedules';
+import { useFeatures } from '../../lib/features';
+import { formatMinutes } from '../../lib/format';
+import { describeShift, expectedMinutes } from '../../lib/schedules';
 import type { WorkShiftRow } from '../../lib/types';
 import { Button, Card, CardHeader, ErrorState, Field, Input, Spinner, Table, Td } from '../ui';
 
@@ -47,7 +49,7 @@ export function ShiftsCard({ manage }: { manage: boolean }) {
           {shifts.data.map((s) => (
             <tr key={s.id}>
               <Td className="font-medium">{s.name}</Td>
-              <Td className="tabular">{describeHours(s.startTime, s.endTime)}</Td>
+              <Td className="tabular">{describeShift(s)}</Td>
               <Td className="tabular text-ink-2">
                 {s.breakStart && s.breakEnd ? `${s.breakStart}–${s.breakEnd}` : '—'}
               </Td>
@@ -76,6 +78,11 @@ export function ShiftsCard({ manage }: { manage: boolean }) {
 }
 
 function describeTolerances(s: WorkShiftRow): string {
+  if (s.flexible) {
+    return s.earlyLeaveToleranceMinutes !== null
+      ? `faltan hasta ${s.earlyLeaveToleranceMinutes} min sin aviso`
+      : 'Las de la política';
+  }
   const parts = [
     s.lateToleranceMinutes !== null && `atraso ${s.lateToleranceMinutes} min`,
     s.earlyLeaveToleranceMinutes !== null && `salida ${s.earlyLeaveToleranceMinutes} min`,
@@ -88,6 +95,7 @@ const optionalMinutes = (value: string) => (value === '' ? null : Number(value))
 
 function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void }) {
   const queryClient = useQueryClient();
+  const { overtimeEnabled } = useFeatures();
   const [form, setForm] = useState({
     name: shift?.name ?? '',
     startTime: shift?.startTime ?? '08:00',
@@ -97,11 +105,14 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
     lateToleranceMinutes: String(shift?.lateToleranceMinutes ?? ''),
     earlyLeaveToleranceMinutes: String(shift?.earlyLeaveToleranceMinutes ?? ''),
     overtimeThresholdMinutes: String(shift?.overtimeThresholdMinutes ?? ''),
+    flexible: shift?.flexible ?? false,
   });
-  const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
+  const set = (key: Exclude<keyof typeof form, 'flexible'>) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
   // Lunch is both times or neither: the API refuses half of it.
   const breakIncomplete = (form.breakStart === '') !== (form.breakEnd === '');
+  // Its days are calendar days, so its reference day cannot end on the next one.
+  const overnight = form.flexible && form.endTime <= form.startTime;
 
   const save = useMutation({
     mutationFn: () => {
@@ -114,6 +125,7 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
         lateToleranceMinutes: optionalMinutes(form.lateToleranceMinutes),
         earlyLeaveToleranceMinutes: optionalMinutes(form.earlyLeaveToleranceMinutes),
         overtimeThresholdMinutes: optionalMinutes(form.overtimeThresholdMinutes),
+        flexible: form.flexible,
       };
       return shift
         ? api(`/work-shifts/${shift.id}`, { method: 'PATCH', body })
@@ -142,15 +154,41 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
       <Field label="Nombre" hint="Para reconocerlo al armar horarios, p. ej. «Oficina» o «Noche»">
         <Input required minLength={2} value={form.name} onChange={set('name')} />
       </Field>
-      <Field label="Entrada" hint="Los atrasos se miden desde esta hora">
+      <label className="flex items-start gap-2 text-sm text-ink-1 sm:col-span-2 lg:col-span-3 lg:pt-6">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-[var(--accent)]"
+          checked={form.flexible}
+          onChange={(e) => setForm((f) => ({ ...f, flexible: e.target.checked }))}
+        />
+        <span>
+          Sin hora fija de entrada ni de salida
+          <span className="block text-xs text-ink-3">
+            Cada día pueden entrar y salir a distinta hora. Nadie se marca atrasado: solo se avisa
+            si el día termina con menos horas de las esperadas.
+          </span>
+        </span>
+      </label>
+      <Field
+        label={form.flexible ? 'Entrada habitual' : 'Entrada'}
+        hint={
+          form.flexible
+            ? 'Solo para saber cuántas horas se esperan al día'
+            : 'Los atrasos se miden desde esta hora'
+        }
+      >
         <Input type="time" required value={form.startTime} onChange={set('startTime')} />
       </Field>
       <Field
-        label="Salida"
+        label={form.flexible ? 'Salida habitual' : 'Salida'}
         hint={
-          form.endTime && form.endTime <= form.startTime
-            ? 'Termina al día siguiente (turno de noche)'
-            : 'Si es menor que la entrada, el turno termina al día siguiente'
+          form.flexible
+            ? overnight
+              ? 'Debe ser posterior a la entrada habitual'
+              : `Se esperan ${formatMinutes(expectedMinutes(form))} al día, sin el almuerzo`
+            : form.endTime && form.endTime <= form.startTime
+              ? 'Termina al día siguiente (turno de noche)'
+              : 'Si es menor que la entrada, el turno termina al día siguiente'
         }
       >
         <Input type="time" required value={form.endTime} onChange={set('endTime')} />
@@ -166,21 +204,27 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
           <Input type="time" value={form.breakEnd} onChange={set('breakEnd')} />
         </Field>
       </div>
+      {!form.flexible && (
+        <Field
+          label="Tolerancia de atraso (min)"
+          hint="Minutos de gracia: llegar dentro de ellos no es atraso. Vacío: lo de Configuración"
+        >
+          <Input
+            type="number"
+            min={0}
+            max={240}
+            value={form.lateToleranceMinutes}
+            onChange={set('lateToleranceMinutes')}
+          />
+        </Field>
+      )}
       <Field
-        label="Tolerancia de atraso (min)"
-        hint="Minutos de gracia: llegar dentro de ellos no es atraso. Vacío: lo de Configuración"
-      >
-        <Input
-          type="number"
-          min={0}
-          max={240}
-          value={form.lateToleranceMinutes}
-          onChange={set('lateToleranceMinutes')}
-        />
-      </Field>
-      <Field
-        label="Tolerancia de salida (min)"
-        hint="Salir hasta estos minutos antes no es salida anticipada. Vacío: lo de Configuración"
+        label={form.flexible ? 'Tolerancia de horas (min)' : 'Tolerancia de salida (min)'}
+        hint={
+          form.flexible
+            ? 'Si faltan hasta estos minutos para las horas esperadas, no se avisa. Vacío: lo de Configuración'
+            : 'Salir hasta estos minutos antes no es salida anticipada. Vacío: lo de Configuración'
+        }
       >
         <Input
           type="number"
@@ -190,20 +234,27 @@ function ShiftForm({ shift, onDone }: { shift?: WorkShiftRow; onDone: () => void
           onChange={set('earlyLeaveToleranceMinutes')}
         />
       </Field>
-      <Field
-        label="Horas extra desde (min)"
-        hint="Menos minutos extra que estos no se proponen como horas extra. Vacío: lo de Configuración"
-      >
-        <Input
-          type="number"
-          min={0}
-          max={480}
-          value={form.overtimeThresholdMinutes}
-          onChange={set('overtimeThresholdMinutes')}
-        />
-      </Field>
+      {overtimeEnabled && (
+        <Field
+          label="Horas extra desde (min)"
+          hint="Menos minutos extra que estos no se proponen como horas extra. Vacío: lo de Configuración"
+        >
+          <Input
+            type="number"
+            min={0}
+            max={480}
+            value={form.overtimeThresholdMinutes}
+            onChange={set('overtimeThresholdMinutes')}
+          />
+        </Field>
+      )}
       <div className="flex items-end gap-2">
-        <Button type="submit" variant="primary" loading={save.isPending} disabled={breakIncomplete}>
+        <Button
+          type="submit"
+          variant="primary"
+          loading={save.isPending}
+          disabled={breakIncomplete || overnight}
+        >
           {shift ? 'Guardar turno' : 'Crear turno'}
         </Button>
         <Button type="button" variant="ghost" onClick={onDone}>

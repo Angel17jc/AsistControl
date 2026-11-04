@@ -76,7 +76,14 @@ export interface PresenceEntry {
   state: PresenceState;
   /** The work day "now" belongs to: yesterday's during a night shift that crosses midnight. */
   workDate: string;
-  shift: { start: string; end: string; breakStart: string | null; breakEnd: string | null } | null;
+  shift: {
+    /** No fixed hours: `start` and `end` only measure how long the day is expected to be. */
+    flexible: boolean;
+    start: string;
+    end: string;
+    breakStart: string | null;
+    breakEnd: string | null;
+  } | null;
   /** When the person is expected, moved by approved leave (e.g. a morning permission). */
   expectedStart: string | null;
   expectedEnd: string | null;
@@ -85,6 +92,11 @@ export interface PresenceEntry {
   lastPunch: { at: string; reading: PunchReading; deviceName: string | null } | null;
   /** The approved leave covering this moment, if any. */
   leaveType: LeaveType | null;
+}
+
+/** GET /settings/features: what any signed-in person's screens depend on. */
+export interface CompanyFeatures {
+  overtimeEnabled: boolean;
 }
 
 /** GET /attendance/presence */

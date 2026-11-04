@@ -107,6 +107,7 @@ export class PresenceService {
         state: presence.state,
         workDate: day.workDate,
         shift: day.shift && {
+          flexible: day.shift.flexible,
           start: day.shift.start.toISOString(),
           end: day.shift.end.toISOString(),
           breakStart: day.shift.breakStart?.toISOString() ?? null,

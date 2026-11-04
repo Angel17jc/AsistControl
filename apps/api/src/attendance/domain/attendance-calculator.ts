@@ -92,7 +92,11 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
 
     const isUnscheduledWorkday = day.dayType === 'WORKDAY';
     const overtime =
-      !isUnscheduledWorkday && workedMinutes >= policy.overtimeThresholdMinutes ? workedMinutes : 0;
+      policy.overtimeEnabled &&
+      !isUnscheduledWorkday &&
+      workedMinutes >= policy.overtimeThresholdMinutes
+        ? workedMinutes
+        : 0;
     if (overtime > 0) anomalies.add('OVERTIME');
 
     return {
@@ -103,6 +107,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
       earlyLeaveMinutes: 0,
       overtimeMinutes: overtime,
       overtimeKind: overtime > 0 ? kind : null,
+      shortMinutes: 0,
     };
   }
 
@@ -111,7 +116,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   // Lateness can only be measured if the first segment has a real entry.
   let lateMinutes = 0;
   const firstSegment = segments[0]!;
-  if (firstSegment.in) {
+  if (firstSegment.in && !shift.flexible) {
     const lateBy = minutesBetween(expectedStart, firstSegment.in);
     if (lateBy > shift.lateToleranceMinutes) {
       lateMinutes = lateBy;
@@ -123,7 +128,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   // employee may simply be at lunch.
   let earlyLeaveMinutes = 0;
   const lastSegment = segments.at(-1)!;
-  if (lastSegment.out && now >= expectedEnd) {
+  if (lastSegment.out && now >= expectedEnd && !shift.flexible) {
     const earlyBy = minutesBetween(lastSegment.out, expectedEnd);
     if (earlyBy > shift.earlyLeaveToleranceMinutes) {
       earlyLeaveMinutes = earlyBy;
@@ -135,17 +140,26 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   if (overtimeMinutes > 0) anomalies.add('OVERTIME');
 
   const marginMs = policy.outOfScheduleMarginMinutes * MINUTE_MS;
-  const outOfSchedule = kept.some(
-    (p) =>
-      p.at.getTime() < shift.start.getTime() - marginMs ||
-      p.at.getTime() > shift.end.getTime() + marginMs,
-  );
+  const outOfSchedule =
+    !shift.flexible &&
+    kept.some(
+      (p) =>
+        p.at.getTime() < shift.start.getTime() - marginMs ||
+        p.at.getTime() > shift.end.getTime() + marginMs,
+    );
   if (outOfSchedule) anomalies.add('OUT_OF_SCHEDULE_PUNCH');
 
   let status: AttendanceStatus = 'PRESENT';
   if (anomalies.has('MISSING_CHECK_IN') || anomalies.has('MISSING_CHECK_OUT'))
     status = 'INCOMPLETE';
   else if (lateMinutes > 0) status = 'LATE';
+
+  // Only a closed day with all its punches can be short: an open one may still go on.
+  const shortMinutes =
+    shift.flexible && isFinal && status !== 'INCOMPLETE'
+      ? missingMinutes(shift, input.leaves, workedMinutes)
+      : 0;
+  if (shortMinutes > 0) anomalies.add('SHORT_HOURS');
 
   return {
     ...base,
@@ -155,6 +169,7 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
     earlyLeaveMinutes,
     overtimeMinutes,
     overtimeKind: overtimeMinutes > 0 ? 'REGULAR' : null,
+    shortMinutes,
   };
 }
 
@@ -279,14 +294,49 @@ export function expectedPresence(
   return { expectedStart, expectedEnd };
 }
 
+/**
+ * When someone who has not punched stops being on their way. A flexible shift has no hour to
+ * be late for, only the end of its reference day.
+ */
+export function arrivalDeadline(shift: ResolvedShift, expectedStart: Date): Date {
+  return shift.flexible
+    ? shift.end
+    : new Date(expectedStart.getTime() + shift.lateToleranceMinutes * MINUTE_MS);
+}
+
+/** What a flexible day lacks of its expected hours, which approved leave reduces. */
+function missingMinutes(
+  shift: ResolvedShift,
+  leaves: LeaveInterval[],
+  workedMinutes: number,
+): number {
+  const onLeaveMs = leaves.reduce(
+    (sum, l) =>
+      sum +
+      overlapOf(l, shift.start, shift.end) -
+      (shift.breakStart && shift.breakEnd ? overlapOf(l, shift.breakStart, shift.breakEnd) : 0),
+    0,
+  );
+  const missing = scheduledWorkMinutes(shift) - Math.floor(onLeaveMs / MINUTE_MS) - workedMinutes;
+  return missing > shift.earlyLeaveToleranceMinutes ? missing : 0;
+}
+
+function overlapOf(interval: { start: Date; end: Date }, from: Date, to: Date): number {
+  const start = Math.max(interval.start.getTime(), from.getTime());
+  const end = Math.min(interval.end.getTime(), to.getTime());
+  return Math.max(0, end - start);
+}
+
 function computeOvertime(
   policy: AttendancePolicy,
   shift: ResolvedShift,
   complete: CompleteSegment[],
   workedMinutes: number,
 ): number {
+  if (!policy.overtimeEnabled) return 0;
   let extra: number;
-  if (policy.overtimeBasis === 'EXCESS_WORKED_TIME') {
+  // Without a fixed exit, the only measure is what passes the expected hours.
+  if (shift.flexible || policy.overtimeBasis === 'EXCESS_WORKED_TIME') {
     extra = workedMinutes - scheduledWorkMinutes(shift);
   } else {
     extra = Math.floor(overlapMs(complete, shift.end, null) / MINUTE_MS);
@@ -325,6 +375,7 @@ function emptyResult(isFinal: boolean): Omit<CalculationResult, 'status'> {
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
     overtimeKind: null,
+    shortMinutes: 0,
     ignoredPunchIds: [],
     isFinal,
   };

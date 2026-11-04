@@ -110,19 +110,20 @@ Decisiones clave:
 
 Todas viven en `SystemSetting["attendance.policy"]` (editable vía `PATCH /api/settings/attendance-policy`, auditado) y los turnos pueden sobrescribir tolerancias:
 
-| Parámetro                             | Por defecto       | Significado                                             |
-| ------------------------------------- | ----------------- | ------------------------------------------------------- |
-| `lateToleranceMinutes`                | 5                 | Minutos de gracia; superados, el atraso cuenta completo |
-| `earlyLeaveToleranceMinutes`          | 0                 | Gracia para salida anticipada                           |
-| `overtimeThresholdMinutes`            | 15                | Mínimo para reconocer horas extra                       |
-| `overtimeBasis`                       | `AFTER_SHIFT_END` | O `EXCESS_WORKED_TIME` (compensa atrasos primero)       |
-| `countEarlyArrivalAsOvertime`         | `false`           | Llegar antes cuenta como extra                          |
-| `punchPairing`                        | `SEQUENTIAL`      | O `DEVICE_TYPE`                                         |
-| `autoDeductUnpunchedBreak`            | `true`            | Descontar del almuerzo lo que no se marcó               |
-| `minBreakMinutes`                     | 0                 | Almuerzo mínimo (0 = no se controla)                    |
-| `duplicatePunchWindowSeconds`         | 60                | Ventana de doble marcación                              |
-| `outOfScheduleMarginMinutes`          | 180               | Margen para marcar "fuera de horario"                   |
-| `punchWindowBefore/AfterShiftMinutes` | 240 / 360         | Ventana de pertenencia de marcaciones                   |
+| Parámetro                             | Por defecto       | Significado                                                         |
+| ------------------------------------- | ----------------- | ------------------------------------------------------------------- |
+| `lateToleranceMinutes`                | 5                 | Minutos de gracia; superados, el atraso cuenta completo             |
+| `earlyLeaveToleranceMinutes`          | 0                 | Gracia para salida anticipada                                       |
+| `overtimeEnabled`                     | `true`            | La empresa paga horas extra; apagado, no se calculan ni se proponen |
+| `overtimeThresholdMinutes`            | 15                | Mínimo para reconocer horas extra                                   |
+| `overtimeBasis`                       | `AFTER_SHIFT_END` | O `EXCESS_WORKED_TIME` (compensa atrasos primero)                   |
+| `countEarlyArrivalAsOvertime`         | `false`           | Llegar antes cuenta como extra                                      |
+| `punchPairing`                        | `SEQUENTIAL`      | O `DEVICE_TYPE`                                                     |
+| `autoDeductUnpunchedBreak`            | `true`            | Descontar del almuerzo lo que no se marcó                           |
+| `minBreakMinutes`                     | 0                 | Almuerzo mínimo (0 = no se controla)                                |
+| `duplicatePunchWindowSeconds`         | 60                | Ventana de doble marcación                                          |
+| `outOfScheduleMarginMinutes`          | 180               | Margen para marcar "fuera de horario"                               |
+| `punchWindowBefore/AfterShiftMinutes` | 240 / 360         | Ventana de pertenencia de marcaciones                               |
 
 > **Sobre legislación laboral.** Ningún valor asume la ley de Ecuador ni de otro país. Recargos de horas suplementarias/extraordinarias, límites semanales o jornada nocturna legal deben configurarse o implementarse como políticas explícitas y documentadas (ver roadmap). Los feriados del seed son **datos de ejemplo**.
 
@@ -156,19 +157,20 @@ Los hechos que alguien debe atender (un marcador caído o recuperado, una solici
 
 ## Decisiones registradas (ADR)
 
-| #                                           | Decisión                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------ |
-| [0001](adr/0001-monorepo-and-stack.md)      | Monorepo con npm workspaces y versiones estables                   |
-| [0002](adr/0002-adapter-pattern-devices.md) | Patrón Adapter + registro de drivers para dispositivos             |
-| [0003](adr/0003-rbac-in-code.md)            | Roles fijos y permisos en código + alcance por fila                |
-| [0004](adr/0004-opaque-sync-cursor.md)      | Cursor de sincronización opaco por adaptador                       |
-| [0005](adr/0005-events-vs-records.md)       | Marcaciones inmutables, jornadas derivadas y recalculables         |
-| [0006](adr/0006-unified-leave-requests.md)  | Permisos y vacaciones en un único flujo                            |
-| [0007](adr/0007-notifications.md)           | Notificaciones: datos por destinatario, un aviso por incidente     |
-| [0008](adr/0008-vacation-balances.md)       | Saldos de vacaciones: reglas por tipo de contrato, saldo calculado |
-| [0009](adr/0009-vacation-expiry.md)         | Caducidad de días de vacaciones no usados                          |
-| [0010](adr/0010-half-day-vacations.md)      | Medios días de vacaciones                                          |
-| [0011](adr/0011-email-notifications.md)     | Notificaciones por correo: un canal más, con outbox                |
-| [0012](adr/0012-calendar-year-vacations.md) | Vacaciones por año calendario                                      |
-| [0013](adr/0013-migrations-as-a-job.md)     | Migraciones como tarea aparte, no al arrancar la API               |
-| [0014](adr/0014-error-codes.md)             | Errores con código: la API dice qué pasó y cada cliente lo redacta |
+| #                                              | Decisión                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| [0001](adr/0001-monorepo-and-stack.md)         | Monorepo con npm workspaces y versiones estables                   |
+| [0002](adr/0002-adapter-pattern-devices.md)    | Patrón Adapter + registro de drivers para dispositivos             |
+| [0003](adr/0003-rbac-in-code.md)               | Roles fijos y permisos en código + alcance por fila                |
+| [0004](adr/0004-opaque-sync-cursor.md)         | Cursor de sincronización opaco por adaptador                       |
+| [0005](adr/0005-events-vs-records.md)          | Marcaciones inmutables, jornadas derivadas y recalculables         |
+| [0006](adr/0006-unified-leave-requests.md)     | Permisos y vacaciones en un único flujo                            |
+| [0007](adr/0007-notifications.md)              | Notificaciones: datos por destinatario, un aviso por incidente     |
+| [0008](adr/0008-vacation-balances.md)          | Saldos de vacaciones: reglas por tipo de contrato, saldo calculado |
+| [0009](adr/0009-vacation-expiry.md)            | Caducidad de días de vacaciones no usados                          |
+| [0010](adr/0010-half-day-vacations.md)         | Medios días de vacaciones                                          |
+| [0011](adr/0011-email-notifications.md)        | Notificaciones por correo: un canal más, con outbox                |
+| [0012](adr/0012-calendar-year-vacations.md)    | Vacaciones por año calendario                                      |
+| [0013](adr/0013-migrations-as-a-job.md)        | Migraciones como tarea aparte, no al arrancar la API               |
+| [0014](adr/0014-error-codes.md)                | Errores con código: la API dice qué pasó y cada cliente lo redacta |
+| [0015](adr/0015-shifts-without-fixed-hours.md) | Turnos sin hora fija y empresas que no pagan horas extra           |

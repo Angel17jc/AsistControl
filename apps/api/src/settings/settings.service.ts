@@ -1,3 +1,4 @@
+import type { CompanyFeatures } from '@asistcontrol/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { z } from 'zod';
@@ -36,6 +37,11 @@ export class SettingsService {
 
   async getTimezone(): Promise<string> {
     return (await this.load()).timezone;
+  }
+
+  async getFeatures(): Promise<CompanyFeatures> {
+    const { overtimeEnabled } = await this.getAttendancePolicy();
+    return { overtimeEnabled };
   }
 
   async getAll() {

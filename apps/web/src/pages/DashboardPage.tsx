@@ -18,6 +18,7 @@ import {
   Td,
 } from '../components/ui';
 import { api } from '../lib/api';
+import { useFeatures } from '../lib/features';
 import {
   PUNCH_LABEL,
   formatDate,
@@ -27,6 +28,7 @@ import {
 } from '../lib/format';
 
 export function DashboardPage() {
+  const { overtimeEnabled } = useFeatures();
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api<DashboardSummary>('/dashboard/summary'),
@@ -55,9 +57,15 @@ export function DashboardPage() {
         <p>
           <strong className="text-ink-1">Presentes</strong>: marcaron hoy, aunque ya se hayan ido.{' '}
           <strong className="text-ink-1">Ausentes</strong>: ya pasó su hora de entrada más la
-          tolerancia y no han marcado. <strong className="text-ink-1">Permisos</strong>: tienen uno
-          aprobado para este momento. <strong className="text-ink-1">Horas extra</strong>: las del
-          mes, propuestas y aprobadas.
+          tolerancia (sin hora fija, el fin de su jornada) y no han marcado.{' '}
+          <strong className="text-ink-1">Permisos</strong>: tienen uno aprobado para este momento.
+          {overtimeEnabled && (
+            <>
+              {' '}
+              <strong className="text-ink-1">Horas extra</strong>: las del mes, propuestas y
+              aprobadas.
+            </>
+          )}
         </p>
         <p>
           Para ver quién está ahora mismo, con nombres, abra Presencia («Ver quién está»). Las
@@ -88,12 +96,14 @@ export function DashboardPage() {
           iconClass="text-accent"
           detail={`${data.pendingRequests.leave} por aprobar`}
         />
-        <KpiTile
-          label="Horas extra"
-          value={formatMinutes(data.overtimeMinutesMonth)}
-          icon={Timer}
-          detail={`mes · ${data.pendingRequests.overtime} por aprobar`}
-        />
+        {overtimeEnabled && (
+          <KpiTile
+            label="Horas extra"
+            value={formatMinutes(data.overtimeMinutesMonth)}
+            icon={Timer}
+            detail={`mes · ${data.pendingRequests.overtime} por aprobar`}
+          />
+        )}
         <KpiTile
           label="Dispositivos"
           value={`${devices.online} / ${devices.total}`}

@@ -124,6 +124,8 @@ enum AttendanceAnomaly {
   WORKED_ON_HOLIDAY
   /// A punch of this calendar day outside every work day window: not counted, reported.
   STRAY_PUNCH
+  /// A shift without fixed hours: the day was closed with fewer hours than expected.
+  SHORT_HOURS
 }
 
 enum SyncStatus {
@@ -290,6 +292,9 @@ model WorkShift {
   lateToleranceMinutes       Int?      @map("late_tolerance_minutes")
   earlyLeaveToleranceMinutes Int?      @map("early_leave_tolerance_minutes")
   overtimeThresholdMinutes   Int?      @map("overtime_threshold_minutes")
+  /// No fixed hours: nobody is late or leaves early. Start, end and break only say how long
+  /// the day is expected to be (ADR 0015).
+  flexible                   Boolean   @default(false)
   deletedAt                  DateTime? @map("deleted_at") @db.Timestamptz(3)
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -460,6 +465,8 @@ model AttendanceRecord {
   lateMinutes       Int                 @default(0) @map("late_minutes")
   earlyLeaveMinutes Int                 @default(0) @map("early_leave_minutes")
   overtimeMinutes   Int                 @default(0) @map("overtime_minutes")
+  /// Hours missing from a closed day of a flexible shift.
+  shortMinutes      Int                 @default(0) @map("short_minutes")
   anomalies         AttendanceAnomaly[]
   /// Worked intervals [{in, out}] in chronological order.
   segments          Json                @default("[]")

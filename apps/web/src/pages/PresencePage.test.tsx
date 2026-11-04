@@ -11,6 +11,7 @@ const fetchMock = vi.fn<typeof fetch>();
 /** 12:30 in Guayaquil (UTC-5) on 2026-09-18; the office shift is 08:00–17:00. */
 const AT = '2026-09-18T17:30:00.000Z';
 const SHIFT = {
+  flexible: false,
   start: '2026-09-18T13:00:00.000Z',
   end: '2026-09-18T22:00:00.000Z',
   breakStart: '2026-09-18T17:00:00.000Z',
@@ -117,6 +118,50 @@ afterEach(() => {
 });
 
 describe('PresencePage', () => {
+  it('shows no hours for a shift without fixed hours', async () => {
+    const flexible = { ...SHIFT, flexible: true };
+    const noHours = { shift: flexible, expectedStart: null, expectedEnd: null };
+    const lunchAt = '2026-09-18T17:30:00.000Z';
+    fetchMock.mockImplementation(async () =>
+      Response.json({
+        at: '2026-09-18T17:40:00.000Z',
+        timezone: 'America/Guayaquil',
+        counts: {
+          IN: 0,
+          ON_BREAK: 1,
+          LEFT: 0,
+          NOT_ARRIVED: 1,
+          NOT_YET: 1,
+          ON_LEAVE: 0,
+          DAY_OFF: 0,
+          NO_SCHEDULE: 0,
+        },
+        entries: [
+          entry('1', 'Ana', null, {
+            ...noHours,
+            state: 'ON_BREAK',
+            lastPunch: { at: lunchAt, reading: 'BREAK_OUT', deviceName: 'Puerta' },
+          }),
+          entry('2', 'Beto', null, { ...noHours, state: 'NOT_YET' }),
+          entry('3', 'Carla', null, { ...noHours, state: 'NOT_ARRIVED' }),
+        ],
+      }),
+    );
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <PresencePage />
+      </QueryClientProvider>,
+    );
+    await screen.findByText('Vera Ana');
+    expect(rowOf('Ana')).toHaveTextContent('Sin hora fija');
+    expect(rowOf('Ana')).toHaveTextContent('desde 12:30');
+    expect(rowOf('Ana')).not.toHaveTextContent('vuelve');
+    expect(rowOf('Beto')).not.toHaveTextContent('entra ');
+    expect(rowOf('Carla')).toHaveTextContent('no marcó en todo el día');
+  });
+
   it('says where each person is and since when', async () => {
     renderPage();
     expect(await screen.findByText('Vera Ana')).toBeInTheDocument();

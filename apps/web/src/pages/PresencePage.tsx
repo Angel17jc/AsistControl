@@ -214,7 +214,11 @@ export function PresencePage() {
                     )}
                   </Td>
                   <Td className="tabular whitespace-nowrap text-ink-2">
-                    {e.shift ? `${formatTime(e.shift.start)}–${formatTime(e.shift.end)}` : '—'}
+                    {!e.shift
+                      ? '—'
+                      : e.shift.flexible
+                        ? 'Sin hora fija'
+                        : `${formatTime(e.shift.start)}–${formatTime(e.shift.end)}`}
                   </Td>
                 </tr>
               ))}
@@ -233,7 +237,8 @@ function detail(e: PresenceEntry, at: string): string | null {
     case 'IN':
       return e.lastPunch ? `desde ${timeOf(e.lastPunch.at, today)}` : null;
     case 'ON_BREAK': {
-      const back = e.shift?.breakEnd ? ` · vuelve ${formatTime(e.shift.breakEnd)}` : '';
+      const back =
+        e.shift?.breakEnd && !e.shift.flexible ? ` · vuelve ${formatTime(e.shift.breakEnd)}` : '';
       return e.lastPunch ? `desde ${timeOf(e.lastPunch.at, today)}${back}` : null;
     }
     case 'LEFT': {
@@ -245,6 +250,7 @@ function detail(e: PresenceEntry, at: string): string | null {
       return `a las ${timeOf(e.lastPunch.at, today)}${early}`;
     }
     case 'NOT_ARRIVED': {
+      if (e.shift?.flexible) return 'no marcó en todo el día';
       if (!e.expectedStart) return null;
       const over = e.expectedEnd !== null && Date.parse(at) >= Date.parse(e.expectedEnd);
       return over ? 'no marcó en todo su turno' : `debía entrar ${formatTime(e.expectedStart)}`;

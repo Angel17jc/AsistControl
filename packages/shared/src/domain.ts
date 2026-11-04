@@ -81,6 +81,7 @@ export const ATTENDANCE_ANOMALIES = values(
   'WORKED_ON_REST_DAY',
   'WORKED_ON_HOLIDAY',
   'STRAY_PUNCH',
+  'SHORT_HOURS',
 );
 export type AttendanceAnomaly = (typeof ATTENDANCE_ANOMALIES)[number];
 

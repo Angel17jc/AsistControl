@@ -1,5 +1,10 @@
 import type { PresenceState, PunchReading, PunchType } from '@asistcontrol/shared';
-import { calculateAttendance, expectedPresence, readPunches } from './attendance-calculator';
+import {
+  arrivalDeadline,
+  calculateAttendance,
+  expectedPresence,
+  readPunches,
+} from './attendance-calculator';
 import type { CalculationInput, Punch, ResolvedShift } from './types';
 
 const MINUTE_MS = 60_000;
@@ -12,7 +17,7 @@ export interface Presence {
   lateMinutes: number;
   /** The latest punch that counts: not a double press, not outside the day. */
   lastPunch: { id: string; at: Date; type: PunchType; reading: PunchReading } | null;
-  /** When the person is expected, moved by approved leave. Null without a shift. */
+  /** When the person is expected, moved by approved leave. Null without fixed hours. */
   expectedStart: Date | null;
   expectedEnd: Date | null;
 }
@@ -47,7 +52,10 @@ export function presenceAt(input: CalculationInput): Presence {
     expectedStart: expected?.expectedStart ?? null,
     expectedEnd: expected?.expectedEnd ?? null,
   };
-  return { ...presence, state: stateOf(presence, input) };
+  const state = stateOf(presence, input);
+  return day.shift?.flexible
+    ? { ...presence, state, expectedStart: null, expectedEnd: null }
+    : { ...presence, state };
 }
 
 function stateOf(
@@ -62,8 +70,7 @@ function stateOf(
   if (leaves.some((l) => l.start <= now && l.end > now)) return 'ON_LEAVE';
   if (day.dayType !== 'WORKDAY') return 'DAY_OFF';
   if (!day.shift || !expectedStart) return 'NO_SCHEDULE';
-  const deadline = expectedStart.getTime() + day.shift.lateToleranceMinutes * MINUTE_MS;
-  return now.getTime() > deadline ? 'NOT_ARRIVED' : 'NOT_YET';
+  return now > arrivalDeadline(day.shift, expectedStart) ? 'NOT_ARRIVED' : 'NOT_YET';
 }
 
 function stateAfter(

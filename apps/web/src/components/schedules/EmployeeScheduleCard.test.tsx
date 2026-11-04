@@ -8,8 +8,22 @@ import { EmployeeScheduleCard } from './EmployeeScheduleCard';
 
 const fetchMock = vi.fn<typeof fetch>();
 
-const office = { name: 'Oficina', startTime: '08:00', endTime: '17:00' };
-const night = { name: 'Noche', startTime: '22:00', endTime: '06:00' };
+const office = {
+  name: 'Oficina',
+  startTime: '08:00',
+  endTime: '17:00',
+  breakStart: null,
+  breakEnd: null,
+  flexible: false,
+};
+const night = {
+  name: 'Noche',
+  startTime: '22:00',
+  endTime: '06:00',
+  breakStart: null,
+  breakEnd: null,
+  flexible: false,
+};
 const SCHEDULES: WorkScheduleRow[] = [
   {
     id: 's-office',

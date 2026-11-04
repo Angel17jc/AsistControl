@@ -18,7 +18,9 @@ const OFFICE: ShiftTemplate = {
   lateToleranceMinutes: null,
   earlyLeaveToleranceMinutes: null,
   overtimeThresholdMinutes: null,
+  flexible: false,
 };
+const FLEX: ShiftTemplate = { ...OFFICE, id: 'flex', flexible: true };
 const NIGHT: ShiftTemplate = {
   ...OFFICE,
   id: 'night',
@@ -146,5 +148,30 @@ describe('presenceAt', () => {
       at(t('06:30', NEXT), [punch('22:01'), punch('06:02', 'UNKNOWN', NEXT)], { template: NIGHT })
         .state,
     ).toBe('LEFT');
+  });
+});
+
+describe('presenceAt without fixed hours', () => {
+  const options = { template: FLEX };
+
+  it('is not yet in, not late, until the reference day ends', () => {
+    expect(at(t('10:30'), [], options).state).toBe('NOT_YET');
+    expect(at(t('16:59'), [], options).state).toBe('NOT_YET');
+    expect(at(t('17:01'), [], options).state).toBe('NOT_ARRIVED');
+  });
+
+  it('shows no hour to be expected at', () => {
+    const p = at(t('10:30'), [], options);
+    expect(p).toMatchObject({ expectedStart: null, expectedEnd: null, lateMinutes: 0 });
+  });
+
+  it('follows the punches of the day', () => {
+    const entry = punch('09:30');
+    expect(at(t('10:00'), [entry], options)).toMatchObject({ state: 'IN', lateMinutes: 0 });
+    const lunch = [entry, punch('12:30')];
+    expect(at(t('12:40'), lunch, options).state).toBe('ON_BREAK');
+    const back = [...lunch, punch('13:30')];
+    expect(at(t('14:00'), back, options).state).toBe('IN');
+    expect(at(t('18:30'), [...back, punch('18:10')], options).state).toBe('LEFT');
   });
 });

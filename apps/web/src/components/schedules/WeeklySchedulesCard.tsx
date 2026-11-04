@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
-import { WEEKDAYS, describeHours, describeWeek } from '../../lib/schedules';
+import { WEEKDAYS, describeShift, describeWeek } from '../../lib/schedules';
 import type { WorkScheduleRow, WorkShiftRow } from '../../lib/types';
 import {
   Button,
@@ -150,7 +150,7 @@ function ScheduleForm({ schedule, onDone }: { schedule?: WorkScheduleRow; onDone
               <option value="">Descanso</option>
               {shifts.data?.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} · {describeHours(s.startTime, s.endTime)}
+                  {s.name} · {describeShift(s)}
                 </option>
               ))}
             </Select>

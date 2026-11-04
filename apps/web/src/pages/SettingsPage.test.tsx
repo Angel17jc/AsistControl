@@ -12,6 +12,7 @@ const POLICY: AttendancePolicy = {
   duplicatePunchWindowSeconds: 60,
   lateToleranceMinutes: 5,
   earlyLeaveToleranceMinutes: 0,
+  overtimeEnabled: true,
   overtimeThresholdMinutes: 15,
   overtimeBasis: 'AFTER_SHIFT_END',
   countEarlyArrivalAsOvertime: false,
@@ -112,6 +113,18 @@ describe('SettingsPage', () => {
     await userEvent.clear(tolerance);
     await userEvent.type(tolerance, '999');
     expect(within(form).getByRole('button', { name: 'Guardar reglas' })).toBeDisabled();
+  });
+
+  it('hides the overtime rules when the company does not pay overtime, and saves that', async () => {
+    renderPage();
+    const form = await policyForm();
+    await userEvent.click(within(form).getByLabelText('La empresa paga horas extra'));
+    expect(within(form).queryByLabelText('Qué cuenta como hora extra')).toBeNull();
+    expect(within(form).queryByLabelText('Mínimo para reconocer horas extra (min)')).toBeNull();
+
+    await userEvent.click(within(form).getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(sent('PATCH')).toBeDefined());
+    expect(sent('PATCH')!.body).toEqual({ overtimeEnabled: false });
   });
 
   it('only counts early arrivals as overtime when overtime starts at the shift end', async () => {
