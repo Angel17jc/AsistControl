@@ -145,8 +145,11 @@ export function DevicesPage() {
                     {SYNC_STATUS[l.status].label}
                   </StatusBadge>
                   {l.errorMessage && (
-                    <p className="mt-1 max-w-56 truncate text-xs text-ink-3" title={l.errorMessage}>
-                      {l.errorMessage}
+                    <p
+                      className="mt-1 max-w-56 truncate text-xs text-ink-3"
+                      title={explainDeviceError(l.errorMessage)}
+                    >
+                      {explainDeviceError(l.errorMessage)}
                     </p>
                   )}
                 </Td>
