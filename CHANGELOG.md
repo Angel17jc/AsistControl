@@ -30,6 +30,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Fixed
 
+- Un almuerzo marcado fuera de la hora programada ya no se resta dos veces: quien almorzaba de 12:00 a 13:00 con almuerzo programado de 13:00 a 14:00 figuraba con 7 h en lugar de 8.
 - Una marcación que no cae en ninguna jornada ya no se pierde en silencio: el día la reporta como «Marcación fuera de jornada» (#121).
 - Cierre de sesión real con el token de acceso vencido (#85); la política de asistencia rechaza claves desconocidas (#89).
 - Producción: el seed demo se salta en vez de fallar y las tareas programadas corren en la hora de la empresa (#104).

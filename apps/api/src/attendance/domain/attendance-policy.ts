@@ -26,7 +26,7 @@ export const attendancePolicySchema = z.object({
    * against people pressing the wrong key). DEVICE_TYPE: trust the punch type reported.
    */
   punchPairing: z.enum(['SEQUENTIAL', 'DEVICE_TYPE']),
-  /** When the shift has a break but nobody punched for it, deduct the scheduled break. */
+  /** Working through the scheduled break deducts what the punched pauses left of it. */
   autoDeductUnpunchedBreak: z.boolean(),
   /** Breaks shorter than this are flagged (0 disables). */
   minBreakMinutes: z.number().int().min(0).max(240),
