@@ -110,6 +110,7 @@ export interface ApiErrorParams {
   OVERTIME_ALREADY_DECIDED: { status: RequestStatus };
   NOTIFICATION_NOT_FOUND: undefined;
   REPORT_UNKNOWN: undefined;
+  REPORT_FORMAT_UNSUPPORTED: undefined;
 }
 
 export type ApiErrorCode = keyof ApiErrorParams;
