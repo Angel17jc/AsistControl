@@ -19,7 +19,7 @@ flowchart TB
   WEB[Web React] -- HTTPS REST / WebSocket --> API[API NestJS]
   API -- SQL --> PG[(PostgreSQL)]
   API -- LAN TCP/HTTP --> DEV[Marcadores biométricos]
-  API -. CSV .-> NOMINA[Proceso de nómina]
+  API -. Excel, PDF, CSV .-> NOMINA[Proceso de nómina]
 ```
 
 ## Estructura del backend (por dominio)
@@ -41,7 +41,7 @@ apps/api/src/
   device-sync/     pipeline de ingesta, orquestador, polling programado
   leave-requests/  permisos y vacaciones
   overtime/        aprobación de horas extra
-  reports/         read models + CSV
+  reports/         read models + CSV, Excel y PDF
   dashboard/       KPIs del día
   audit/           bitácora inmutable
   realtime/        gateway Socket.IO + fachada de publicación
@@ -147,7 +147,7 @@ Los hechos que alguien debe atender (un marcador caído o recuperado, una solici
 - Access token solo en memoria; al recargar se restaura con la cookie httpOnly. Los `401` concurrentes comparten **un único refresh** (el servidor rota el token y trataría un segundo uso como robo).
 - Tokens de diseño en CSS (`--surface-*`, `--ink-*`, estados), modo claro y oscuro propios.
 - Gráficos: una sola serie (marcaciones por hora) con un solo color; los estados (presente/atraso/ausencia) usan la paleta de estados reservada y siempre van con icono + etiqueta; cada gráfico ofrece vista de tabla.
-- Los recorridos completos (sesión y cookie de refresco, rutas por rol, ciclo de un marcador, tiempo real, descarga de CSV, uso en teléfono) se verifican en un navegador real con Playwright sobre el bundle de producción: [`apps/e2e/`](../apps/e2e/README.md).
+- Los recorridos completos (sesión y cookie de refresco, rutas por rol, ciclo de un marcador, tiempo real, descarga de reportes, uso en teléfono) se verifican en un navegador real con Playwright sobre el bundle de producción: [`apps/e2e/`](../apps/e2e/README.md).
 
 ## Observabilidad
 

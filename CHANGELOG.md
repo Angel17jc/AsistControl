@@ -22,6 +22,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - Reportes en español: estados, novedades, tipos y origen con su nombre, «Sí»/«No», y la hora de revisión de las horas extra en la hora de la empresa (antes, en UTC).
 - Errores en español: la API añade un código estable con sus datos y la web los redacta en un solo lugar, también sin red o con el servidor caído ([ADR 0014](docs/adr/0014-error-codes.md)).
 - Turnos sin hora fija: nadie se marca atrasado y se avisa si un día termina con menos horas de las esperadas. Las horas extra se pueden apagar para toda la empresa (ADR 0015).
+- Asistencia del mes: entrada, almuerzo y salida de cada persona, día por día, descargable en Excel (con horas que se pueden sumar y una hoja de totales) y en PDF (una página por persona, con firmas). Todos los reportes se descargan en Excel.
 
 ### Changed
 
@@ -31,6 +32,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Fixed
 
+- El CSV usa coma, y Excel en Ecuador espera punto y coma: al abrirlo salía todo en una columna. Excel ahora tiene su propia descarga, y el CSV queda para cargar datos en otros sistemas.
+- El resumen mensual cuenta como asistido cualquier día con entrada, también sin horario asignado.
 - Un almuerzo marcado fuera de la hora programada ya no se resta dos veces: quien almorzaba de 12:00 a 13:00 con almuerzo programado de 13:00 a 14:00 figuraba con 7 h en lugar de 8.
 - Una marcación en las ventanas de dos turnos seguidos (turno de noche y mañana siguiente) ya no cuenta en los dos días: es del turno más cercano.
 - Una marcación que no cae en ninguna jornada ya no se pierde en silencio: el día la reporta como «Marcación fuera de jornada» (#121).

@@ -119,6 +119,7 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
   OVERTIME_ALREADY_DECIDED: ({ status }) =>
     `Estas horas extra ya se revisaron (${REQUEST_STATUS[status].label.toLowerCase()}).`,
   NOTIFICATION_NOT_FOUND: () => 'No se encontró esa notificación.',
+  REPORT_FORMAT_UNSUPPORTED: () => 'Este reporte no se puede descargar en ese formato.',
   REPORT_UNKNOWN: () => 'Ese reporte no existe.',
 };
 

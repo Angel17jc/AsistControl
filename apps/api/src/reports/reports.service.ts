@@ -16,14 +16,35 @@ import { DateTime } from 'luxon';
 import { AccessScopeService } from '../common/access/access-scope.service';
 import type { AuthenticatedUser } from '../common/auth/authenticated-user';
 import { apiError } from '../common/errors/api-error';
-import { eachDate, fromDbDate, localDayBounds, toDbDate } from '../common/utils/date-only';
+import { eachDate, fromDbDate, localDayBounds, toDbDate, todayIn } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import {
+  type AttendanceMonth,
+  type MonthRecord,
+  buildAttendanceMonth,
+  longestPause,
+  monthRows,
+} from './attendance-month';
+import { attendanceMonthPdf } from './attendance-pdf';
 import { type CsvColumn, toCsv } from './csv';
 import type { ReportKind, ReportQueryDto } from './reports.dto';
+import { attendanceMonthXlsx, rowsXlsx } from './xlsx';
 
 const MAX_REPORT_DAYS = 93;
 const MAX_ROWS = 50_000;
+/** Reports of a whole month: `from` is any day of it. */
+const MONTHLY_KINDS: ReportKind[] = ['attendance', 'monthly'];
+const SHEET_NAMES: Record<ReportKind, string> = {
+  attendance: 'Asistencia',
+  daily: 'Asistencia diaria',
+  monthly: 'Resumen mensual',
+  late: 'Atrasos',
+  absences: 'Ausencias',
+  overtime: 'Horas extra',
+  events: 'Marcaciones',
+  sync: 'Sincronización',
+};
 
 export interface Report {
   kind: ReportKind;
@@ -49,9 +70,35 @@ export class ReportsService {
   ) {}
 
   async build(kind: ReportKind, query: ReportQueryDto, user: AuthenticatedUser): Promise<Report> {
+    const { range, employeeWhere } = this.scopeOf(kind, query, user);
+    const rows = await this.rows(kind, range, employeeWhere);
+    return { kind, from: range.from, to: range.to, rows, columns: columnsOf(rows) };
+  }
+
+  /** The report as a file for people: an Excel workbook or, for the month, a PDF to sign. */
+  async file(
+    kind: ReportKind,
+    format: 'xlsx' | 'pdf',
+    query: ReportQueryDto,
+    user: AuthenticatedUser,
+  ): Promise<{ name: string; content: Buffer }> {
+    if (kind === 'attendance') {
+      const { range, employeeWhere } = this.scopeOf(kind, query, user);
+      const month = await this.attendanceMonth(range, employeeWhere);
+      const write = format === 'pdf' ? attendanceMonthPdf : attendanceMonthXlsx;
+      return { name: `asistencia-${month.month}.${format}`, content: await write(month) };
+    }
+    const report = await this.build(kind, query, user);
+    return {
+      name: `asistcontrol-${kind}-${report.from}_${report.to}.xlsx`,
+      content: await rowsXlsx(SHEET_NAMES[kind], report.rows),
+    };
+  }
+
+  private scopeOf(kind: ReportKind, query: ReportQueryDto, user: AuthenticatedUser) {
     let { from } = query;
     let to = query.to ?? query.from;
-    if (kind === 'monthly') {
+    if (MONTHLY_KINDS.includes(kind)) {
       const month = DateTime.fromISO(from, { zone: 'utc' });
       from = month.startOf('month').toISODate()!;
       to = month.endOf('month').toISODate()!;
@@ -71,10 +118,7 @@ export class ReportsService {
         query.departmentId ? { departmentId: query.departmentId } : {},
       ],
     };
-    const range = { from, to };
-
-    const rows = await this.rows(kind, range, employeeWhere);
-    return { kind, from, to, rows, columns: columnsOf(rows) };
+    return { range: { from, to }, employeeWhere };
   }
 
   toCsv(report: Report): string {
@@ -87,6 +131,8 @@ export class ReportsService {
     employee: Prisma.EmployeeWhereInput,
   ): Promise<Row[]> {
     switch (kind) {
+      case 'attendance':
+        return monthRows(await this.attendanceMonth(range, employee));
       case 'daily':
         return this.recordRows(range, employee);
       case 'late':
@@ -104,14 +150,93 @@ export class ReportsService {
     }
   }
 
+  /** Everyone who was with the company that month: active people, and whoever left a record. */
+  private async attendanceMonth(
+    range: { from: string; to: string },
+    employee: Prisma.EmployeeWhereInput,
+  ): Promise<AttendanceMonth> {
+    const timezone = await this.settings.getTimezone();
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        AND: [
+          employee,
+          {
+            deletedAt: null,
+            hireDate: { lte: toDbDate(range.to) },
+            OR: [{ terminatedAt: null }, { terminatedAt: { gte: toDbDate(range.from) } }],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        hireDate: true,
+        terminatedAt: true,
+        department: { select: { name: true } },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        employeeId: { in: employees.map((e) => e.id) },
+        workDate: { gte: toDbDate(range.from), lte: toDbDate(range.to) },
+      },
+      orderBy: { workDate: 'asc' },
+    });
+    const recordsOf = new Map<string, MonthRecord[]>();
+    for (const r of records) {
+      const own = recordsOf.get(r.employeeId) ?? [];
+      own.push({
+        date: fromDbDate(r.workDate),
+        status: r.status,
+        firstIn: r.firstIn,
+        lastOut: r.lastOut,
+        segments: r.segments as unknown as MonthRecord['segments'],
+        workedMinutes: r.workedMinutes,
+        breakMinutes: r.breakMinutes,
+        lateMinutes: r.lateMinutes,
+        overtimeMinutes: r.overtimeMinutes,
+        shortMinutes: r.shortMinutes,
+        anomalies: r.anomalies,
+        isFinal: r.isFinal,
+      });
+      recordsOf.set(r.employeeId, own);
+    }
+    return buildAttendanceMonth({
+      ...range,
+      today: todayIn(timezone),
+      timezone,
+      employees: employees
+        // Inactive people only appear if they have something to show.
+        .filter((e) => e.status === 'ACTIVE' || recordsOf.has(e.id))
+        .map((e) => ({
+          code: e.employeeCode,
+          name: `${e.lastName} ${e.firstName}`,
+          department: e.department?.name ?? null,
+          hireDate: fromDbDate(e.hireDate),
+          terminatedAt: e.terminatedAt ? fromDbDate(e.terminatedAt) : null,
+          records: recordsOf.get(e.id) ?? [],
+        })),
+    });
+  }
+
   private async recordRows(
     range: { from: string; to: string },
     employee: Prisma.EmployeeWhereInput,
     extra: Prisma.AttendanceRecordWhereInput = {},
   ): Promise<Row[]> {
-    const timezone = await this.settings.getTimezone();
-    const time = (d: Date | null) =>
-      d ? DateTime.fromJSDate(d, { zone: timezone }).toFormat('HH:mm') : null;
+    const [timezone, { overtimeEnabled }] = await Promise.all([
+      this.settings.getTimezone(),
+      this.settings.getAttendancePolicy(),
+    ]);
+    const time = (d: Date | string | null) => {
+      if (!d) return null;
+      const at = typeof d === 'string' ? DateTime.fromISO(d) : DateTime.fromJSDate(d);
+      return at.setZone(timezone).toFormat('HH:mm');
+    };
     const records = await this.prisma.attendanceRecord.findMany({
       where: {
         workDate: { gte: toDbDate(range.from), lte: toDbDate(range.to) },
@@ -131,23 +256,33 @@ export class ReportsService {
       orderBy: [{ workDate: 'asc' }, { employee: { lastName: 'asc' } }],
       take: MAX_ROWS,
     });
-    return records.map((r) => ({
-      fecha: fromDbDate(r.workDate),
-      codigo: r.employee.employeeCode,
-      empleado: `${r.employee.lastName} ${r.employee.firstName}`,
-      departamento: r.employee.department?.name ?? null,
-      estado: ATTENDANCE_STATUS_LABEL[r.status],
-      horario: r.scheduledStart ? `${time(r.scheduledStart)}-${time(r.scheduledEnd)}` : null,
-      entrada: time(r.firstIn),
-      salida: time(r.lastOut),
-      horas_trabajadas: formatMinutes(r.workedMinutes),
-      minutos_trabajados: r.workedMinutes,
-      minutos_atraso: r.lateMinutes,
-      minutos_salida_anticipada: r.earlyLeaveMinutes,
-      minutos_extra: r.overtimeMinutes,
-      novedades: r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · '),
-      cerrado: yesNo(r.isFinal),
-    }));
+    return records.map((r) => {
+      const lunch = longestPause(r.segments as unknown as MonthRecord['segments']);
+      return {
+        fecha: fromDbDate(r.workDate),
+        codigo: r.employee.employeeCode,
+        empleado: `${r.employee.lastName} ${r.employee.firstName}`,
+        departamento: r.employee.department?.name ?? null,
+        estado: ATTENDANCE_STATUS_LABEL[r.status],
+        horario: r.scheduledStart
+          ? `${time(r.scheduledStart)}-${time(r.scheduledEnd)}`
+          : r.shiftId
+            ? 'Sin hora fija'
+            : null,
+        entrada: time(r.firstIn),
+        salida_almuerzo: time(lunch?.out ?? null),
+        regreso_almuerzo: time(lunch?.back ?? null),
+        salida: time(r.lastOut),
+        horas_trabajadas: formatMinutes(r.workedMinutes),
+        minutos_trabajados: r.workedMinutes,
+        minutos_atraso: r.lateMinutes,
+        minutos_salida_anticipada: r.earlyLeaveMinutes,
+        minutos_faltantes: r.shortMinutes,
+        ...(overtimeEnabled ? { minutos_extra: r.overtimeMinutes } : {}),
+        novedades: r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · '),
+        cerrado: yesNo(r.isFinal),
+      };
+    });
   }
 
   private async monthlyRows(
@@ -155,6 +290,7 @@ export class ReportsService {
     employee: Prisma.EmployeeWhereInput,
   ): Promise<Row[]> {
     const where = { workDate: { gte: toDbDate(range.from), lte: toDbDate(range.to) }, employee };
+    const { overtimeEnabled } = await this.settings.getAttendancePolicy();
     const [employees, records, overtime] = await Promise.all([
       this.prisma.employee.findMany({
         where: { AND: [employee, { deletedAt: null }] },
@@ -172,9 +308,11 @@ export class ReportsService {
         select: {
           employeeId: true,
           status: true,
+          firstIn: true,
           workedMinutes: true,
           lateMinutes: true,
           earlyLeaveMinutes: true,
+          shortMinutes: true,
         },
       }),
       this.prisma.overtimeRecord.findMany({
@@ -195,7 +333,8 @@ export class ReportsService {
         codigo: e.employeeCode,
         empleado: `${e.lastName} ${e.firstName}`,
         departamento: e.department?.name ?? null,
-        dias_asistidos: count('PRESENT', 'LATE', 'INCOMPLETE'),
+        // Any day with an entry: also without a schedule, or on a day off.
+        dias_asistidos: own.filter((r) => r.firstIn !== null).length,
         dias_atraso: own.filter((r) => r.lateMinutes > 0).length,
         ausencias: count('ABSENT'),
         dias_permiso: count('ON_LEAVE'),
@@ -204,12 +343,17 @@ export class ReportsService {
         horas_trabajadas: formatMinutes(sum((r) => r.workedMinutes)),
         minutos_atraso: sum((r) => r.lateMinutes),
         minutos_salida_anticipada: sum((r) => r.earlyLeaveMinutes),
-        minutos_extra_aprobados: ot
-          .filter((o) => o.status === 'APPROVED')
-          .reduce((s, o) => s + o.minutes, 0),
-        minutos_extra_pendientes: ot
-          .filter((o) => o.status === 'PENDING')
-          .reduce((s, o) => s + o.minutes, 0),
+        minutos_faltantes: sum((r) => r.shortMinutes),
+        ...(overtimeEnabled
+          ? {
+              minutos_extra_aprobados: ot
+                .filter((o) => o.status === 'APPROVED')
+                .reduce((s, o) => s + o.minutes, 0),
+              minutos_extra_pendientes: ot
+                .filter((o) => o.status === 'PENDING')
+                .reduce((s, o) => s + o.minutes, 0),
+            }
+          : {}),
       };
     });
   }
