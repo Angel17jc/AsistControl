@@ -26,6 +26,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 - Imagen de la API más pequeña; migraciones como tarea de un solo uso fuera de la imagen (#61, #62).
 - El recálculo de rangos procesa tres empleados a la vez y sin un evento en vivo por jornada (#90).
+- Para compilar en desarrollo hace falta Node.js ≥ 22.18, por `tsup` 9, que cierra el aviso de `esbuild`; lo generado no cambia.
 
 ### Fixed
 
