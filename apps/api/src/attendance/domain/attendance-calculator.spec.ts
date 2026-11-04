@@ -7,8 +7,8 @@ import {
   readPunches,
 } from './attendance-calculator';
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from './attendance-policy';
-import type { CalculationInput, LeaveInterval, Punch } from './types';
-import { type ShiftTemplate, assignWorkDate, buildWorkDay, isStrayPunch } from './work-day';
+import type { CalculationInput, LeaveInterval, Punch, WorkDayContext } from './types';
+import { type ShiftTemplate, assignWorkDate, buildWorkDay, inWindow } from './work-day';
 
 const TZ = 'America/Guayaquil'; // UTC-5, no DST
 const DATE = '2026-09-21';
@@ -441,6 +441,8 @@ describe('calculateAttendance', () => {
       });
     const PREVIOUS = '2026-09-20';
     const NEXT = '2026-09-22';
+    const isStrayPunch = (at: Date, previous: WorkDayContext, current: WorkDayContext) =>
+      assignWorkDate(at, previous, current) === current.workDate && !inWindow(at, current);
 
     it('finds the punches no work day takes', () => {
       // Night shift 22:00 → 06:00: its window runs 18:00 → 12:00 the next morning.
