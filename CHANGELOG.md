@@ -23,15 +23,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - Errores en español: la API añade un código estable con sus datos y la web los redacta en un solo lugar, también sin red o con el servidor caído ([ADR 0014](docs/adr/0014-error-codes.md)).
 - Turnos sin hora fija: nadie se marca atrasado y se avisa si un día termina con menos horas de las esperadas. Las horas extra se pueden apagar para toda la empresa (ADR 0015).
 - Asistencia del mes: entrada, almuerzo y salida de cada persona, día por día, descargable en Excel (con horas que se pueden sumar y una hoja de totales) y en PDF (una página por persona, con firmas). Todos los reportes se descargan en Excel.
+- Configuración rápida: horas al día, almuerzo y días laborables en un solo paso, aplicado a todos los empleados. Quien se registra después entra con ese horario.
 
 ### Changed
 
+- Organización y Contratos salen del menú y pasan a **Configuración → Más opciones**; en el alta de un empleado, los datos opcionales se pliegan si la empresa no los usa.
 - Imagen de la API más pequeña; migraciones como tarea de un solo uso fuera de la imagen (#61, #62).
 - El recálculo de rangos procesa tres empleados a la vez y sin un evento en vivo por jornada (#90).
 - Para compilar en desarrollo hace falta Node.js ≥ 22.18, por `tsup` 9, que cierra el aviso de `esbuild`; lo generado no cambia.
 
 ### Fixed
 
+- La tarjeta de tiempo de un empleado muestra su cabecera también en un período sin jornadas.
 - El CSV usa coma, y Excel en Ecuador espera punto y coma: al abrirlo salía todo en una columna. Excel ahora tiene su propia descarga, y el CSV queda para cargar datos en otros sistemas.
 - El resumen mensual cuenta como asistido cualquier día con entrada, también sin horario asignado.
 - Un almuerzo marcado fuera de la hora programada ya no se resta dos veces: quien almorzaba de 12:00 a 13:00 con almuerzo programado de 13:00 a 14:00 figuraba con 7 h en lugar de 8.

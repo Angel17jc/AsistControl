@@ -92,3 +92,15 @@ test('RRHH crea un turno, un horario semanal y un feriado', async ({ page }) => 
   await holiday.getByRole('button', { name: `Eliminar feriado Feriado QA ${suffix}` }).click();
   await expect(holiday).toHaveCount(0);
 });
+
+test('la jornada de la empresa se ofrece primero, sin esconder los horarios a medida', async ({
+  page,
+}) => {
+  await signIn(page, USERS.admin);
+  await page.getByRole('link', { name: 'Horarios' }).click();
+  const setup = page.getByRole('form', { name: 'Jornada de la empresa' });
+  await expect(setup.getByLabel('Horas de trabajo al día')).toBeVisible();
+  await expect(setup.getByLabel('Sábado')).toBeVisible();
+  // This database has shifts with fixed hours, so they stay in view.
+  await expect(page.getByRole('button', { name: 'Nuevo turno' })).toBeVisible();
+});

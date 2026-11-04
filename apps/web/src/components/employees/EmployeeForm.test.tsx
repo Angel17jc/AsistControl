@@ -27,11 +27,20 @@ const LUIS: EmployeeRow = {
   user: null,
 };
 
-function renderForm(employee?: EmployeeRow) {
+function renderForm(
+  employee?: EmployeeRow,
+  {
+    departments = [{ id: 'd1', name: 'Operaciones' }],
+    schedules = [] as { id: string; name: string }[],
+  } = {},
+) {
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);
     if (init?.method && init.method !== 'GET') return Response.json({ id: 'x' });
-    if (url === '/api/departments') return Response.json([{ id: 'd1', name: 'Operaciones' }]);
+    if (url === '/api/departments') return Response.json(departments);
+    if (url === '/api/work-schedules') {
+      return Response.json(schedules.map((s) => ({ ...s, description: null, days: [] })));
+    }
     if (url.startsWith('/api/employees')) {
       return Response.json({
         data: [{ ...LUIS, id: 'e2', firstName: 'María', lastName: 'Vera' }, LUIS],
@@ -104,6 +113,83 @@ describe('EmployeeForm when editing', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(sent('PATCH')?.body).toMatchObject({ status: 'ACTIVE', terminatedAt: null });
+  });
+});
+
+describe('EmployeeForm for a small company', () => {
+  const COMPANY = { id: 's1', name: 'Jornada de la empresa' };
+  beforeEach(() => {
+    useAuth.setState({
+      user: {
+        id: 'u1',
+        email: 'rrhh@empresa.local',
+        role: 'HR',
+        employeeId: null,
+        displayName: 'RRHH',
+        mustChangePassword: false,
+      },
+    });
+  });
+  afterEach(() => useAuth.setState({ user: null }));
+
+  const fillRequired = async () => {
+    await userEvent.type(screen.getByLabelText('Código interno'), 'EMP-1');
+    await userEvent.type(screen.getByLabelText('Identificación'), '0912345678');
+    await userEvent.type(screen.getByLabelText('Nombres'), 'Ana');
+    await userEvent.type(screen.getByLabelText('Apellidos'), 'Vera');
+  };
+
+  it('folds what it does not use: no departments, no positions, no data of the person', async () => {
+    renderForm(undefined, { departments: [] });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith('/api/departments', expect.anything()),
+    );
+    expect(screen.getByLabelText('Departamento')).not.toBeVisible();
+    expect(screen.getByLabelText('Correo')).not.toBeVisible();
+    expect(screen.getByLabelText('ID biométrico')).toBeVisible();
+  });
+
+  it('unfolds it when the company has departments', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('Departamento')).toBeVisible());
+  });
+
+  it('unfolds it when the person has that data, even if the company does not use it', async () => {
+    renderForm({ ...LUIS, department: null, supervisor: null }, { departments: [] });
+    await waitFor(() => expect(screen.getByLabelText('Correo')).toBeVisible());
+  });
+
+  it('hires on the only schedule there is, without asking to choose', async () => {
+    const onDone = renderForm(undefined, { schedules: [COMPANY] });
+    await waitFor(() => expect(screen.getByLabelText('Horario')).toHaveValue('s1'));
+    await fillRequired();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(sent('POST')?.body).toMatchObject({ scheduleId: 's1' });
+  });
+
+  it('leaves the choice open between several schedules, and allows none', async () => {
+    const onDone = renderForm(undefined, {
+      schedules: [COMPANY, { id: 's2', name: 'Guardias' }],
+    });
+    await screen.findByRole('option', { name: 'Guardias' });
+    expect(screen.getByLabelText('Horario')).toHaveValue('');
+    await fillRequired();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(sent('POST')?.body).not.toHaveProperty('scheduleId');
+  });
+
+  it('points to where to set it up when there is no schedule yet', async () => {
+    renderForm();
+    expect(
+      await screen.findByText('Aún no hay ninguno: configure la jornada en Horarios'),
+    ).toBeVisible();
+  });
+
+  it('does not ask for a schedule when editing: that has its own card', () => {
+    renderForm(LUIS);
+    expect(screen.queryByLabelText('Horario')).toBeNull();
   });
 });
 

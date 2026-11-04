@@ -1,0 +1,189 @@
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { PrismaClient } from '@prisma/client';
+import request from 'supertest';
+import { at, bearer, createApp, createFixture, type Fixture, login } from './utils';
+
+/** A small company configures itself in one step, and new people land on the same workday. */
+describe('Quick setup of the workday (e2e)', () => {
+  let app: NestExpressApplication;
+  let prisma: PrismaClient;
+  let fx: Fixture;
+  let hr: string;
+  let admin: string;
+  const http = () => request(app.getHttpServer());
+  const NEAR_PAST = (() => {
+    const d = new Date(Date.now() - 20 * 86_400_000);
+    return d.toISOString().slice(0, 10);
+  })();
+  const WORKDAY = {
+    dailyMinutes: 480,
+    lunchMinutes: 60,
+    weekdays: [1, 2, 3, 4, 5],
+    effectiveFrom: NEAR_PAST,
+    overtimeEnabled: false,
+  };
+  const setup = (body: object, token = admin) =>
+    http().post('/api/work-schedules/setup').set(bearer(token)).send(body);
+  const currentAssignment = (employeeId: string) =>
+    prisma.employeeSchedule.findFirst({
+      where: { employeeId, effectiveTo: null },
+      include: { schedule: { include: { days: { include: { shift: true } } } } },
+    });
+
+  beforeAll(async () => {
+    app = await createApp();
+    prisma = new PrismaClient();
+    fx = await createFixture(prisma, 'wks');
+    hr = await login(app, fx.emails.hr);
+    admin = await login(app, fx.emails.admin);
+  });
+
+  afterAll(async () => {
+    await http()
+      .patch('/api/settings/attendance-policy')
+      .set(bearer(admin))
+      .send({ overtimeEnabled: true })
+      .expect(200);
+    await prisma.employeeSchedule.deleteMany({
+      where: { schedule: { name: 'Jornada de la empresa' } },
+    });
+    await prisma.$disconnect();
+    await app.close();
+  });
+
+  it('is for whoever can change both the schedules and the rules', async () => {
+    await setup(WORKDAY, hr).expect(403);
+  });
+
+  it('refuses a date whose days could not be recalculated', async () => {
+    const res = await setup({ ...WORKDAY, effectiveFrom: '2020-01-01' }).expect(400);
+    expect(res.body).toMatchObject({ code: 'ASSIGNMENT_TOO_OLD', params: { maxDays: 62 } });
+  });
+
+  it('refuses a week without working days', async () => {
+    const res = await setup({ ...WORKDAY, weekdays: [] }).expect(400);
+    expect(res.body).toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  it('puts everyone on one workday without fixed hours, and turns overtime off', async () => {
+    const res = await setup(WORKDAY).expect(201);
+    expect(res.body.onSchedule).toBeGreaterThanOrEqual(2);
+
+    const assignment = await currentAssignment(fx.employee.id);
+    expect(assignment?.schedule.name).toBe('Jornada de la empresa');
+    expect(assignment?.schedule.days.map((d) => d.weekday).sort()).toEqual([1, 2, 3, 4, 5]);
+    expect(assignment?.schedule.days[0]?.shift).toMatchObject({
+      flexible: true,
+      startTime: '08:00',
+      endTime: '17:00',
+      breakStart: '13:00',
+      breakEnd: '14:00',
+    });
+    const features = await http().get('/api/settings/features').set(bearer(hr)).expect(200);
+    expect(features.body).toEqual({ overtimeEnabled: false });
+  });
+
+  it('recalculates the days already punched', async () => {
+    await http()
+      .post('/api/attendance/events/batch')
+      .set(bearer(hr))
+      .send({
+        employeeId: fx.teammate.id,
+        punches: ['09:00', '13:00', '14:00', '20:00'].map((t) => ({
+          occurredAt: at(t, NEAR_PAST),
+        })),
+        reason: 'Jornada (e2e)',
+      })
+      .expect(201);
+    await setup(WORKDAY).expect(201);
+    const record = await prisma.attendanceRecord.findFirst({
+      where: { employeeId: fx.teammate.id, workDate: new Date(`${NEAR_PAST}T00:00:00Z`) },
+    });
+    expect(record).toMatchObject({ lateMinutes: 0, overtimeMinutes: 0, scheduledStart: null });
+  });
+
+  it('runs again with other values for everyone, without a second assignment', async () => {
+    const res = await setup({ ...WORKDAY, dailyMinutes: 540, weekdays: [1, 2, 3, 4, 5, 6] }).expect(
+      201,
+    );
+    expect(res.body.assigned).toBe(0);
+    const assignments = await prisma.employeeSchedule.count({
+      where: { employeeId: fx.employee.id, schedule: { name: 'Jornada de la empresa' } },
+    });
+    expect(assignments).toBe(1);
+    const assignment = await currentAssignment(fx.employee.id);
+    expect(assignment?.schedule.days).toHaveLength(6);
+    expect(assignment?.schedule.days[0]?.shift.endTime).toBe('18:00');
+    await setup(WORKDAY).expect(201);
+  });
+
+  it('leaves alone someone whose schedule starts on or after that date', async () => {
+    const other = await prisma.workSchedule.create({ data: { name: 'Propio wks' } });
+    const employee = await prisma.employee.create({
+      data: {
+        employeeCode: 'WKS-KEEP',
+        identification: 'WKSKEEP01',
+        firstName: 'Con',
+        lastName: 'Horario',
+        hireDate: new Date('2026-01-01'),
+        scheduleAssignments: {
+          create: { scheduleId: other.id, effectiveFrom: new Date(`${NEAR_PAST}T00:00:00Z`) },
+        },
+      },
+    });
+    const res = await setup(WORKDAY).expect(201);
+    expect(res.body.kept).toBeGreaterThanOrEqual(1);
+    const assignment = await currentAssignment(employee.id);
+    expect(assignment?.scheduleId).toBe(other.id);
+  });
+
+  it('hires someone on a schedule from their first day', async () => {
+    const { id: scheduleId } = await prisma.workSchedule.findUniqueOrThrow({
+      where: { name: 'Jornada de la empresa' },
+    });
+    const res = await http()
+      .post('/api/employees')
+      .set(bearer(hr))
+      .send({
+        employeeCode: 'WKS-NEW',
+        identification: 'WKSNEW001',
+        firstName: 'Nueva',
+        lastName: 'Persona',
+        hireDate: NEAR_PAST,
+        scheduleId,
+      })
+      .expect(201);
+    const assignment = await currentAssignment((res.body as { id: string }).id);
+    expect(assignment?.scheduleId).toBe(scheduleId);
+    expect(assignment?.effectiveFrom.toISOString().slice(0, 10)).toBe(NEAR_PAST);
+  });
+
+  it('refuses a schedule that does not exist, and creates nobody', async () => {
+    const res = await http()
+      .post('/api/employees')
+      .set(bearer(hr))
+      .send({
+        employeeCode: 'WKS-BAD',
+        identification: 'WKSBAD001',
+        firstName: 'Mala',
+        lastName: 'Referencia',
+        hireDate: NEAR_PAST,
+        scheduleId: '00000000-0000-4000-8000-000000000000',
+      })
+      .expect(400);
+    expect(res.body).toMatchObject({
+      code: 'RELATED_RECORD_NOT_FOUND',
+      params: { record: 'schedule' },
+    });
+    expect(await prisma.employee.count({ where: { employeeCode: 'WKS-BAD' } })).toBe(0);
+  });
+
+  it('does not take a schedule when editing: that has its own history', async () => {
+    const res = await http()
+      .patch(`/api/employees/${fx.employee.id}`)
+      .set(bearer(hr))
+      .send({ scheduleId: '00000000-0000-4000-8000-000000000000' })
+      .expect(400);
+    expect(res.body).toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+});

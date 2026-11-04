@@ -1,53 +1,66 @@
+import { useQuery } from '@tanstack/react-query';
 import { HolidaysCard } from '../components/schedules/HolidaysCard';
+import { QuickSetupCard } from '../components/schedules/QuickSetupCard';
 import { ShiftsCard } from '../components/schedules/ShiftsCard';
 import { WeeklySchedulesCard } from '../components/schedules/WeeklySchedulesCard';
 import { PageHeader, PageHelp } from '../components/ui';
+import { api } from '../lib/api';
+import type { WorkShiftRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
 /**
- * Everything the attendance engine measures against: shifts, the weekly schedules built from
- * them, and holidays. Assigning a schedule to a person is done from their panel in Empleados.
+ * Everything the attendance engine measures against. A company without fixed hours only needs
+ * its workday and its holidays; shifts and weekly schedules stay at hand for one that has them.
  */
 export function SchedulesPage() {
   const manage = useAuth((s) => s.can('schedules:write'));
+  const canSetUp = useAuth((s) => s.can('schedules:write') && s.can('settings:write'));
+  const shifts = useQuery({
+    queryKey: ['work-shifts'],
+    queryFn: () => api<WorkShiftRow[]>('/work-shifts'),
+  });
+  // Folded until a shift with fixed hours exists, or if this person cannot use the quick setup.
+  const custom = !canSetUp || (shifts.data ?? []).some((s) => !s.flexible);
+
   return (
     <>
       <PageHeader
         title="Horarios"
-        description="Turnos, horarios semanales y feriados con los que se calcula la asistencia"
+        description="La jornada de la empresa y sus feriados, con los que se calcula la asistencia"
       />
       <PageHelp>
-        <p>Se arma en tres pasos y se asigna en un cuarto:</p>
-        <ol className="list-decimal space-y-1 pl-5">
-          <li>
-            <strong className="text-ink-1">Turnos</strong>: las horas de una jornada. Ejemplo:
-            «Oficina», 08:00–17:00, almuerzo 12:00–13:00.
-          </li>
-          <li>
-            <strong className="text-ink-1">Horarios semanales</strong>: qué turno toca cada día.
-            Ejemplo: «Lunes a viernes», con «Oficina» de lunes a viernes y descanso el fin de
-            semana.
-          </li>
-          <li>
-            <strong className="text-ink-1">Feriados</strong>: días sin trabajo para todos.
-          </li>
-          <li>
-            Asigne el horario a cada persona en{' '}
-            <strong className="text-ink-1">Empleados → Horario</strong>, desde una fecha. Sin
-            horario, el sistema no sabe a qué hora debía entrar y no calcula atrasos ni horas extra.
-          </li>
-        </ol>
         <p>
-          Las tolerancias que deje vacías en un turno toman el valor general de Configuración. Si
-          cambia las horas de un turno que ya se usa, los días pasados quedan como estaban hasta que
-          se recalculen, y entonces usarán las horas nuevas. Para cambiar el horario de una persona
-          desde cierta fecha, mejor asígnele otro horario en Empleados.
+          Si cada día se entra y se sale a distinta hora, basta con{' '}
+          <strong className="text-ink-1">Jornada de la empresa</strong>: se indica cuántas horas se
+          trabajan al día, el almuerzo y qué días, y queda aplicado a todos los empleados. Nadie se
+          marca atrasado; solo se avisa si un día termina con menos horas de las esperadas.
+        </p>
+        <p>
+          Cargue también los <strong className="text-ink-1">feriados</strong> del año: sin eso, ese
+          día las personas figuran ausentes.
+        </p>
+        <p>
+          Si alguien sí tiene hora fija, abra{' '}
+          <strong className="text-ink-1">Horarios a medida</strong>: un{' '}
+          <strong className="text-ink-1">turno</strong> son las horas de una jornada, un{' '}
+          <strong className="text-ink-1">horario semanal</strong> dice qué turno toca cada día, y se
+          asigna a cada persona en <strong className="text-ink-1">Empleados → Horario</strong>. Las
+          tolerancias que deje vacías toman el valor de Configuración. Si cambia un turno que ya se
+          usa, los días pasados quedan como estaban hasta que se recalculen.
         </p>
       </PageHelp>
       <div className="space-y-6">
-        <ShiftsCard manage={manage} />
-        <WeeklySchedulesCard manage={manage} />
+        {canSetUp && <QuickSetupCard />}
         <HolidaysCard manage={manage} />
+        <details open={custom} className="group space-y-6">
+          <summary className="cursor-pointer text-sm font-medium text-ink-1">
+            Horarios a medida: turnos y horarios semanales, para quien sí tiene hora fija
+          </summary>
+          <div className="mt-4 space-y-6">
+            <ShiftsCard manage={manage} />
+            <WeeklySchedulesCard manage={manage} />
+          </div>
+        </details>
       </div>
     </>
   );

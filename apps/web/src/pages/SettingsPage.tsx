@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router';
 import {
   Button,
   Card,
@@ -167,6 +168,7 @@ const GROUPS: { title: string; subtitle: string; rules: Rule[] }[] = [
  */
 export function SettingsPage() {
   const canRecompute = useAuth((s) => s.can('attendance:write'));
+  const canSeeOrganization = useAuth((s) => s.can('organization:read'));
   const settings = useQuery({
     queryKey: ['settings'],
     queryFn: () => api<SettingsResponse>('/settings'),
@@ -195,9 +197,40 @@ export function SettingsPage() {
         <div className="grid gap-6">
           <PolicyForm settings={settings.data} />
           {canRecompute && <RecomputeCard />}
+          {canSeeOrganization && <MoreOptionsCard />}
         </div>
       )}
     </>
+  );
+}
+
+/** What a small company can do without: out of the menu, one click away if it is ever needed. */
+function MoreOptionsCard() {
+  return (
+    <Card>
+      <CardHeader
+        title="Más opciones"
+        subtitle="Opcionales: el sistema funciona sin configurar nada de esto"
+      />
+      <ul className="grid gap-3 px-5 py-4 text-sm sm:grid-cols-2">
+        <li>
+          <Link className="font-medium text-accent hover:underline" to="/organizacion">
+            Organización
+          </Link>
+          <p className="mt-0.5 text-xs text-ink-3">
+            Departamentos y cargos, para agrupar a las personas en listados y reportes.
+          </p>
+        </li>
+        <li>
+          <Link className="font-medium text-accent hover:underline" to="/contratos">
+            Contratos
+          </Link>
+          <p className="mt-0.5 text-xs text-ink-3">
+            Tipos de contrato, si la empresa quiere llevar aquí los saldos de vacaciones.
+          </p>
+        </li>
+      </ul>
+    </Card>
   );
 }
 

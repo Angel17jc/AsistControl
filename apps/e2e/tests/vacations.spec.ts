@@ -60,6 +60,7 @@ test.describe('Vacaciones', () => {
     await expect.poll(() => available(panel)).toBe(before);
 
     // Contract types: create one, then remove it (nobody uses it yet).
+    await page.getByRole('link', { name: 'Configuración' }).click();
     await page.getByRole('link', { name: 'Contratos' }).click();
     const name = `Pasantía QA ${Date.now().toString().slice(-6)}`;
     await page.getByRole('button', { name: 'Nuevo tipo de contrato' }).click();

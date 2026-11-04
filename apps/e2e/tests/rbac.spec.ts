@@ -52,6 +52,14 @@ test.describe('Permisos en la interfaz', () => {
       await expect(nav.getByRole('link', { name: label })).toBeVisible();
     }
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
+
+    // What a small company can do without is out of the menu, one click away.
+    for (const hidden of ['Organización', 'Contratos']) {
+      await expect(nav.getByRole('link', { name: hidden })).toHaveCount(0);
+    }
+    await nav.getByRole('link', { name: 'Configuración' }).click();
+    await page.getByRole('main').getByRole('link', { name: 'Organización' }).click();
+    await expect(page.getByRole('heading', { name: 'Organización', level: 1 })).toBeVisible();
   });
 
   test('un supervisor ve a su equipo pero no dispositivos ni auditoría', async ({ page }) => {

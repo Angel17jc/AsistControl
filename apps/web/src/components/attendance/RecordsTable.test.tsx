@@ -220,6 +220,13 @@ describe('RecordsTable', () => {
     });
   });
 
+  it('heads an employee card with their name also on a period without days', async () => {
+    renderTable('EMPLOYEE', 'e1', []);
+    const card = await screen.findByRole('region', { name: 'Tarjeta de tiempo' });
+    expect(card).toHaveTextContent('Tarjeta de tiempo · X');
+    expect(card).toHaveTextContent('Ausencias');
+  });
+
   it('keeps the schedule and lateness columns on days with fixed hours', async () => {
     renderTable('HR');
     await screen.findByText('vie, 2 oct');

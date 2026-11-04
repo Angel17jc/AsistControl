@@ -47,7 +47,9 @@ export interface ApiErrorParams {
   EMPLOYEE_NOT_FOUND: undefined;
   EMPLOYEE_OUT_OF_SCOPE: undefined;
   SUPERVISOR_IS_SELF: undefined;
-  RELATED_RECORD_NOT_FOUND: { record: 'department' | 'position' | 'contractType' | 'supervisor' };
+  RELATED_RECORD_NOT_FOUND: {
+    record: 'department' | 'position' | 'contractType' | 'supervisor' | 'schedule';
+  };
   DEPARTMENT_NOT_FOUND: undefined;
   DEPARTMENT_IN_USE: { employees: number };
   POSITION_NOT_FOUND: undefined;

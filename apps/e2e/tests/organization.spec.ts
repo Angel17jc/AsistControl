@@ -11,6 +11,7 @@ test('RRHH crea un departamento, lo asigna y ya no se puede eliminar', async ({ 
   const name = `Bodega ${suffix}`;
 
   await signIn(page, USERS.hr);
+  await page.getByRole('link', { name: 'Configuración' }).click();
   await page.getByRole('link', { name: 'Organización' }).click();
   const departments = card(page, 'Departamentos');
   await departments.getByRole('button', { name: 'Nuevo departamento' }).click();
@@ -35,6 +36,7 @@ test('RRHH crea un departamento, lo asigna y ya no se puede eliminar', async ({ 
   await hire.getByRole('button', { name: 'Guardar' }).click();
   await expect(hire).toHaveCount(0);
 
+  await page.getByRole('link', { name: 'Configuración' }).click();
   await page.getByRole('link', { name: 'Organización' }).click();
   await expect(row.getByRole('cell').nth(3)).toHaveText('1');
   await expect(row.getByRole('button', { name: `Eliminar ${name}` })).toHaveCount(0);
