@@ -22,7 +22,8 @@ PORT="${SMOKE_PORT:-3999}"
 WEB_PORT="${SMOKE_WEB_PORT:-3998}"
 
 cleanup() {
-  docker rm -f "$WEB" "$API" "$DB" >/dev/null 2>&1 || true
+  # -v: the database container leaves an anonymous volume behind otherwise, on every run.
+  docker rm -f -v "$WEB" "$API" "$DB" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
