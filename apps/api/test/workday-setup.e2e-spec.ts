@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import { todayIn } from '../src/common/utils/date-only';
 import { at, bearer, createApp, createFixture, type Fixture, login } from './utils';
 
 /** A small company configures itself in one step, and new people land on the same workday. */
@@ -161,7 +162,8 @@ describe('Quick setup of the workday (e2e)', () => {
   describe('punches that arrive late, like the first download of a terminal', () => {
     const daysBefore = (date: string, days: number) =>
       new Date(Date.parse(`${date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
-    const today = new Date().toISOString().slice(0, 10);
+    // The company's today, not UTC's: from 19:00 in Guayaquil, UTC is already on the next day.
+    const today = todayIn('America/Guayaquil');
     const statusOf = async (employeeId: string, date: string) =>
       (
         await prisma.attendanceRecord.findUnique({
@@ -171,7 +173,7 @@ describe('Quick setup of the workday (e2e)', () => {
         })
       )?.status;
     const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
-    const hireWithPunch = async (code: string, date: string) => {
+    const hireWithPunch = async (code: string, date: string, hours = ['08:00', '17:00']) => {
       const { id: scheduleId } = await prisma.workSchedule.findUniqueOrThrow({
         where: { name: 'Jornada de la empresa' },
       });
@@ -193,7 +195,7 @@ describe('Quick setup of the workday (e2e)', () => {
         .set(bearer(hr))
         .send({
           employeeId: id,
-          punches: ['08:00', '17:00'].map((t) => ({ occurredAt: at(t, date) })),
+          punches: hours.map((t) => ({ occurredAt: at(t, date) })),
           reason: 'Historia (e2e)',
         })
         .expect(201);
@@ -219,7 +221,8 @@ describe('Quick setup of the workday (e2e)', () => {
     });
 
     it('leaves the finalizer the days of a punch from today', async () => {
-      const id = await hireWithPunch('WKS-NOW', today);
+      // At midnight: any later hour of today could still be in the future, which is refused.
+      const id = await hireWithPunch('WKS-NOW', today, ['00:00']);
       expect(await prisma.attendanceRecord.count({ where: { employeeId: id } })).toBe(1);
     });
 
