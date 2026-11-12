@@ -73,7 +73,9 @@ export function AttendanceComposition({
             />
           ))}
       </div>
-      <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-5">
+      {/* Two columns on a phone; wider, each entry takes the room its words need and the row
+          wraps. Five equal columns overlapped once the card shared the row with the chart. */}
+      <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:flex sm:flex-wrap">
         {segments.map(({ key, label, value, color, icon: Icon }) => (
           <li key={key} className="flex items-center gap-2 text-sm">
             <Icon className="size-4 shrink-0" style={{ color }} aria-hidden />
