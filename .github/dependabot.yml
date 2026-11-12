@@ -1,9 +1,14 @@
 version: 2
+# Every ecosystem waits 4 days after a release before proposing it: the project takes no
+# version younger than that, indirect ones included ("Versiones con al menos 4 días" in
+# docs/security.md). Security updates are not delayed by cooldown.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 4
     open-pull-requests-limit: 5
     groups:
       # Upgrade framework families together; they are released in lockstep.
@@ -35,6 +40,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 4
     groups:
       # One PR (and one CI run) for all workflow actions instead of one per action.
       github-actions:
@@ -46,6 +53,8 @@ updates:
     directory: /infra/docker
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 4
     ignore:
       # The runtime follows the Node.js LTS line used by CI and .nvmrc; changed deliberately.
       - dependency-name: 'node'
