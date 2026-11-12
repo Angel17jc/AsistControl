@@ -2,7 +2,7 @@ import { COMPANY_SCHEDULE_NAME } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { api } from '../../lib/api';
-import { useFeatures } from '../../lib/features';
+import { featuresQuery } from '../../lib/features';
 import { todayIso } from '../../lib/format';
 import { WEEKDAYS, expectedMinutes } from '../../lib/schedules';
 import type { WorkScheduleRow } from '../../lib/types';
@@ -34,7 +34,12 @@ export function QuickSetupCard() {
     queryKey: ['work-schedules'],
     queryFn: () => api<WorkScheduleRow[]>('/work-schedules'),
   });
-  const { overtimeEnabled } = useFeatures();
+  // The form sends the overtime rule back on «Aplicar», so it starts from the rule as it is
+  // now: not the default assumed while loading, nor a value kept from before someone changed
+  // it in another tab or session.
+  const features = useQuery({ ...featuresQuery, refetchOnMount: 'always' });
+  const fresh = features.isFetchedAfterMount ? features.data : undefined;
+  const error = schedules.error ?? features.error;
 
   return (
     <Card>
@@ -42,13 +47,15 @@ export function QuickSetupCard() {
         title="Jornada de la empresa"
         subtitle="Para empresas sin hora fija de entrada ni de salida: es lo único que hace falta configurar"
       />
-      {schedules.isLoading && <Spinner />}
-      {schedules.error && <ErrorState error={schedules.error} />}
-      {schedules.data && (
+      {error ? (
+        <ErrorState error={error} />
+      ) : schedules.data && fresh ? (
         <SetupForm
           current={schedules.data.find((s) => s.name === COMPANY_SCHEDULE_NAME)}
-          overtimeEnabled={overtimeEnabled}
+          overtimeEnabled={fresh.overtimeEnabled}
         />
+      ) : (
+        <Spinner />
       )}
     </Card>
   );
