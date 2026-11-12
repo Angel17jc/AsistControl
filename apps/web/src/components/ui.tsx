@@ -6,19 +6,23 @@ import {
   CircleDashed,
   CircleHelp,
   Clock,
+  Eye,
+  EyeOff,
   Loader2,
   MinusCircle,
   XCircle,
 } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,
-  type InputHTMLAttributes,
+  type ComponentProps,
+  type KeyboardEvent,
   type ReactElement,
   type ReactNode,
   type SelectHTMLAttributes,
   cloneElement,
   isValidElement,
   useId,
+  useState,
 } from 'react';
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
@@ -134,14 +138,18 @@ export function Button({
 export function Field({
   label,
   hint,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
+  /** What is wrong with the value: shown under the control and read with it. */
+  error?: string | null;
   children: ReactNode;
 }) {
   const controlId = useId();
   const hintId = useId();
+  const errorId = useId();
   // Anything other than one control (e.g. a password input with its show button) keeps the
   // wrapping label, which names the control inside it.
   if (!isControl(children)) {
@@ -159,12 +167,14 @@ export function Field({
       </div>
     );
   }
-  // The label names the control alone: the hint describes it and the required mark is only
-  // for the eye (screen readers already announce the control as required).
+  // The label names the control alone: the hint and the error describe it, and the required
+  // mark is only for the eye (screen readers already announce the control as required).
   const id = children.props.id ?? controlId;
+  const describedBy = [error && errorId, hint && hintId].filter(Boolean).join(' ');
   const control = cloneElement(children as ReactElement<ControlProps>, {
     id,
-    ...(hint && { 'aria-describedby': hintId }),
+    ...(describedBy && { 'aria-describedby': describedBy }),
+    ...(error && { 'aria-invalid': true }),
   });
   return (
     <div className="flex flex-col gap-1.5 text-sm">
@@ -178,6 +188,11 @@ export function Field({
         )}
       </span>
       {control}
+      {error && (
+        <span id={errorId} className="text-xs font-medium text-critical">
+          {error}
+        </span>
+      )}
       {hint && (
         <span id={hintId} className="text-xs text-ink-3">
           {hint}
@@ -187,12 +202,18 @@ export function Field({
   );
 }
 
-type ControlProps = { id?: string; required?: boolean; 'aria-describedby'?: string };
+type ControlProps = {
+  id?: string;
+  required?: boolean;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean;
+};
 
 function isControl(node: ReactNode): node is ReactElement<ControlProps> {
   return (
     isValidElement(node) &&
     (node.type === Input ||
+      node.type === PasswordInput ||
       node.type === Select ||
       node.type === 'input' ||
       node.type === 'select' ||
@@ -203,9 +224,67 @@ function isControl(node: ReactNode): node is ReactElement<ControlProps> {
 const inputClass =
   'rounded-lg border border-line bg-surface-1 px-3 py-2 text-sm text-ink-1 placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20';
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={clsx(inputClass, props.className ?? 'w-full')} />;
+export function Input(props: ComponentProps<'input'>) {
+  return (
+    <input
+      {...props}
+      className={clsx(inputClass, 'aria-invalid:border-critical', props.className ?? 'w-full')}
+    />
+  );
 }
+
+/**
+ * A password field with an eye button to show what was typed, and a warning while Caps Lock
+ * is on (a common reason for "wrong password"). The button is named by hidden text, not
+ * aria-label, so a label search for "Contraseña" still finds only the field.
+ */
+export function PasswordInput({ className, onKeyDown, onKeyUp, onBlur, ...props }: PasswordProps) {
+  const [visible, setVisible] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  const readCapsLock = (e: KeyboardEvent<HTMLInputElement>) =>
+    setCapsLock(e.getModifierState?.('CapsLock') ?? false);
+
+  return (
+    <div className={clsx('grid gap-1', className ?? 'w-full')}>
+      <div className="relative">
+        <input
+          {...props}
+          type={visible ? 'text' : 'password'}
+          onKeyDown={(e) => (readCapsLock(e), onKeyDown?.(e))}
+          onKeyUp={(e) => (readCapsLock(e), onKeyUp?.(e))}
+          onBlur={(e) => (setCapsLock(false), onBlur?.(e))}
+          className={clsx(inputClass, 'aria-invalid:border-critical w-full pr-11')}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-pressed={visible}
+          aria-controls={props.id}
+          title={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-ink-3 hover:text-ink-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
+          {visible ? (
+            <EyeOff className="size-4" aria-hidden />
+          ) : (
+            <Eye className="size-4" aria-hidden />
+          )}
+          <span className="sr-only">Mostrar contraseña</span>
+        </button>
+      </div>
+      {capsLock && (
+        <span
+          role="status"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-2"
+        >
+          <AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />
+          Bloq Mayús está activado.
+        </span>
+      )}
+    </div>
+  );
+}
+
+type PasswordProps = Omit<ComponentProps<'input'>, 'type'>;
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={clsx(inputClass, 'pr-8', props.className ?? 'w-full')} />;

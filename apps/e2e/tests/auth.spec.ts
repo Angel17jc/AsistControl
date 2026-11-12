@@ -18,6 +18,33 @@ test.describe('Sesión', () => {
     await expect(page.getByRole('navigation', { name: 'Principal' })).toHaveCount(0);
   });
 
+  test('señala lo que falta, deja ver la contraseña y entra con lo corregido', async ({ page }) => {
+    await page.goto('/login');
+    const email = page.getByLabel('Correo electrónico');
+    const password = page.getByLabel('Contraseña');
+    await expect(email).toBeFocused();
+
+    await email.fill('admin@asistcontrol');
+    await password.fill(PASSWORD);
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await expect(email).toHaveAttribute('aria-invalid', 'true');
+    await expect(
+      page.getByText('Revise el correo: debe tener la forma nombre@empresa.com.'),
+    ).toBeVisible();
+
+    const eye = page.getByRole('button', { name: 'Mostrar contraseña' });
+    await eye.click();
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(password).toHaveValue(PASSWORD);
+    await eye.click();
+    await expect(password).toHaveAttribute('type', 'password');
+
+    await email.fill(USERS.admin.email);
+    await expect(email).not.toHaveAttribute('aria-invalid');
+    await page.getByRole('button', { name: 'Ingresar' }).click();
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
+  });
+
   test('un enlace profundo sin sesión termina en el login', async ({ page }) => {
     await page.goto('/reportes');
     await expect(page.getByRole('button', { name: 'Ingresar' })).toBeVisible();
