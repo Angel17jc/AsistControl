@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Cpu,
   FileSpreadsheet,
-  Fingerprint,
   LayoutDashboard,
   LogOut,
   ScrollText,
@@ -20,6 +19,7 @@ import { Link, NavLink, Outlet } from 'react-router';
 import { ROLE_LABEL } from '../lib/accounts';
 import { logout } from '../lib/api';
 import { type ConnectionState, useRealtime } from '../lib/realtime';
+import { BrandLogo } from './BrandLogo';
 import { NotificationBell } from './NotificationBell';
 import { useAuth } from '../stores/auth';
 
@@ -44,17 +44,35 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col bg-sidebar text-sidebar-ink lg:sticky lg:top-0 lg:h-screen lg:w-60 print:hidden">
-        <div className="flex items-center gap-2 px-5 py-5 text-white">
-          <Fingerprint className="size-6 text-[#86b6ef]" aria-hidden />
-          <span className="text-lg font-semibold tracking-tight">AsistControl</span>
-          <NotificationBell className="ml-auto" />
-          <Link to="/mi-cuenta" className="lg:hidden" aria-label="Mi cuenta">
-            <UserRound className="size-4" aria-hidden />
+      <aside className="flex shrink-0 flex-col border-b border-line bg-sidebar text-sidebar-ink lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:border-b-0 lg:border-r print:hidden">
+        <div className="flex items-center gap-3 px-5 pb-3 pt-4 lg:pb-5 lg:pt-6">
+          <Link
+            to="/"
+            className="flex flex-col gap-1"
+            aria-label="AsistControl de Kairosig, inicio"
+          >
+            <BrandLogo className="h-9 lg:h-12" />
+            <span className="hidden text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3 lg:block">
+              AsistControl
+            </span>
           </Link>
-          <button onClick={() => void logout()} className="lg:hidden" aria-label="Cerrar sesión">
-            <LogOut className="size-4" aria-hidden />
-          </button>
+          <div className="ml-auto flex items-center gap-1 text-ink-2">
+            <NotificationBell />
+            <Link
+              to="/mi-cuenta"
+              className="rounded-lg p-1.5 hover:bg-surface-2 hover:text-ink-1 lg:hidden"
+              aria-label="Mi cuenta"
+            >
+              <UserRound className="size-5" aria-hidden />
+            </Link>
+            <button
+              onClick={() => void logout()}
+              className="rounded-lg p-1.5 hover:bg-surface-2 hover:text-ink-1 lg:hidden"
+              aria-label="Cerrar sesión"
+            >
+              <LogOut className="size-5" aria-hidden />
+            </button>
+          </div>
         </div>
         <nav
           aria-label="Principal"
@@ -67,29 +85,35 @@ export function AppShell() {
               end={to === '/'}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition',
+                  'relative flex items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition',
                   isActive
-                    ? 'bg-white/10 font-medium text-white'
-                    : 'hover:bg-white/5 hover:text-white',
+                    ? // The helmet's yellow marks where you are: under the tab on a phone,
+                      // at its left edge in the sidebar.
+                      'bg-sidebar-active font-semibold text-sidebar-active-ink before:absolute before:inset-x-3 before:bottom-0 before:h-[3px] before:rounded-full before:bg-brand-yellow lg:before:inset-x-auto lg:before:inset-y-2 lg:before:left-0 lg:before:h-auto lg:before:w-[3px]'
+                    : 'hover:bg-surface-2 hover:text-ink-1',
                 )
               }
             >
-              <Icon className="size-4" aria-hidden />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <Icon className={clsx('size-4', isActive && 'text-accent')} aria-hidden />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="hidden border-t border-white/10 px-5 py-4 text-xs lg:block">
+        <div className="hidden border-t border-line px-5 py-4 text-xs lg:block">
           <ConnectionIndicator state={connection} />
-          <p className="mt-3 truncate font-medium text-white">{user?.displayName}</p>
-          <p className="text-sidebar-ink/80">{user ? ROLE_LABEL[user.role] : ''}</p>
+          <p className="mt-3 truncate font-medium text-ink-1">{user?.displayName}</p>
+          <p className="text-ink-3">{user ? ROLE_LABEL[user.role] : ''}</p>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-            <Link to="/mi-cuenta" className="inline-flex items-center gap-1.5 hover:text-white">
+            <Link to="/mi-cuenta" className="inline-flex items-center gap-1.5 hover:text-accent">
               <UserRound className="size-3.5" aria-hidden /> Mi cuenta
             </Link>
             <button
               onClick={() => void logout()}
-              className="inline-flex items-center gap-1.5 hover:text-white"
+              className="inline-flex items-center gap-1.5 hover:text-accent"
             >
               <LogOut className="size-3.5" aria-hidden /> Cerrar sesión
             </button>

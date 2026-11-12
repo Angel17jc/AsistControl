@@ -43,7 +43,7 @@ export function CardHeader({
   return (
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
       <div>
-        <h2 className="text-sm font-semibold text-ink-1">{title}</h2>
+        <h2 className="font-display text-sm font-semibold text-ink-1">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-ink-3">{subtitle}</p>}
       </div>
       {actions}
@@ -63,7 +63,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink-1">{title}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-1">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-2">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
@@ -118,7 +118,7 @@ export function Button({
       className={clsx(
         'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50',
-        variant === 'primary' && 'bg-accent text-accent-ink hover:brightness-110',
+        variant === 'primary' && 'bg-accent text-accent-ink hover:bg-accent-strong',
         variant === 'secondary' && 'border border-line bg-surface-1 text-ink-1 hover:bg-surface-2',
         variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink-1',
         variant === 'danger' && 'border border-critical/40 text-critical hover:bg-critical/10',

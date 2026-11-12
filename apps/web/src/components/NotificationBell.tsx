@@ -76,7 +76,7 @@ export function NotificationBell({ className }: { className?: string }) {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={count > 0 ? `Notificaciones, ${count} sin leer` : 'Notificaciones'}
-        className="relative rounded-lg p-1.5 hover:bg-white/10"
+        className="relative rounded-lg p-1.5 hover:bg-surface-2 hover:text-ink-1"
       >
         <Bell className="size-5" aria-hidden />
         {count > 0 && (

@@ -25,6 +25,17 @@ describe('LoginPage', () => {
     vi.unstubAllGlobals();
   });
 
+  it('presents AsistControl under the Kairosig brand', () => {
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'AsistControl', level: 1 })).toBeInTheDocument();
+    // One logo per theme; the stylesheet shows the one that matches.
+    const logos = screen.getAllByRole('img', { name: 'Kairosig' });
+    expect(logos.map((img) => img.className)).toEqual([
+      expect.stringContaining('brand-logo-light'),
+      expect.stringContaining('brand-logo-dark'),
+    ]);
+  });
+
   it('keeps the submit button disabled until both fields are filled', async () => {
     renderPage();
     const submit = screen.getByRole('button', { name: 'Ingresar' });

@@ -17,7 +17,9 @@ export function KpiTile({ label, value, icon: Icon, iconClass, detail }: KpiTile
         <Icon className={clsx('size-4', iconClass ?? 'text-ink-3')} aria-hidden />
         {label}
       </div>
-      <p className="tabular mt-2 text-3xl font-semibold tracking-tight text-ink-1">{value}</p>
+      <p className="tabular mt-2 font-display text-3xl font-semibold tracking-tight text-ink-1">
+        {value}
+      </p>
       {detail && <p className="mt-1 text-xs text-ink-3">{detail}</p>}
     </div>
   );

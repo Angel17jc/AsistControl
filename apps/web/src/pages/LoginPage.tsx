@@ -1,6 +1,6 @@
-import { Fingerprint } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Navigate } from 'react-router';
+import { BrandLogo } from '../components/BrandLogo';
 import { Button, Field, Input } from '../components/ui';
 import { login } from '../lib/api';
 import { useAuth } from '../stores/auth';
@@ -28,20 +28,20 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center px-4 py-12">
+    <div className="flex min-h-full items-center justify-center bg-surface-1 px-4 py-12 sm:bg-surface-0">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-3 rounded-2xl bg-accent p-3 text-accent-ink">
-            <Fingerprint className="size-7" aria-hidden />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">AsistControl</h1>
+          <BrandLogo className="mb-5 h-20" />
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-1">
+            AsistControl
+          </h1>
           <p className="mt-1 text-sm text-ink-2">
             Control de asistencia y dispositivos biométricos
           </p>
         </div>
         <form
           onSubmit={onSubmit}
-          className="space-y-4 rounded-xl border border-line bg-surface-1 p-6 shadow-sm"
+          className="space-y-4 rounded-xl border border-t-4 border-line border-t-brand-yellow bg-surface-1 p-6 shadow-sm"
           noValidate
         >
           <Field label="Correo electrónico">
