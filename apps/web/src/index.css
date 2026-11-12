@@ -39,30 +39,10 @@
   --sidebar-active-ink: #2a428c;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --surface-0: #0e0f22;
-    --surface-1: #16182f;
-    --surface-2: #20223f;
-    --border: #2c2f52;
-    --ink-1: #f3f4fb;
-    --ink-2: #c0c3dc;
-    --ink-3: #9497b8;
-    --accent: #8fa3ee;
-    --accent-strong: #a9b8f3;
-    --accent-soft: #1f2448;
-    --accent-ink: #0e0f22;
-    --series-1: #8fa3ee;
-    --grid: #25284a;
-    --neutral-mark: #5b5e85;
-    --sidebar: #13142b;
-    --sidebar-ink: #c0c3dc;
-    --sidebar-active: #22274e;
-    --sidebar-active-ink: #ffffff;
-  }
-}
-
+/*
+ * Dark only when chosen: src/lib/theme.ts sets data-theme to "dark" for "Oscuro", or for
+ * "Como la computadora" on a computer in dark mode. Without a choice the app stays white.
+ */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --surface-0: #0e0f22;
@@ -103,14 +83,6 @@
 /* The logo has a version for each theme; only the one that matches is shown. */
 .brand-logo-dark {
   display: none;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .brand-logo-light {
-    display: none;
-  }
-  :root:not([data-theme='light']) .brand-logo-dark {
-    display: block;
-  }
 }
 :root[data-theme='dark'] .brand-logo-light {
   display: none;

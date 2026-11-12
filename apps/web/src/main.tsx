@@ -4,10 +4,15 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ApiError } from './lib/api';
+import { applyTheme, followSystemTheme, readThemePreference } from './lib/theme';
 // Bundled with the app, not loaded from Google: the server often runs inside a LAN.
 import '@fontsource/poppins/latin-600.css';
 import '@fontsource/poppins/latin-700.css';
 import './index.css';
+
+// theme-init.js already did this before the first paint; repeated here in case it did not load.
+applyTheme(readThemePreference());
+followSystemTheme();
 
 // By default a browser that believes it is offline pauses requests in silence: the button keeps
 // spinning and nobody is told. This app talks to its own server, often inside a LAN, so it tries
