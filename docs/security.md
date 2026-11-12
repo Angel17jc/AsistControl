@@ -28,6 +28,7 @@ No abras un issue público. Usa **GitHub → Security → Report a vulnerability
 - **Privilegios**: solo `SUPER_ADMIN` crea/modifica administradores; nadie puede cambiarse su propio rol ni desactivarse.
 - **Contenedores**: imágenes multi-stage, la API corre como usuario `node`, sin dependencias de desarrollo.
 - **Cadena de suministro**: `npm ci` con lockfile, Dependabot, CodeQL (`security-extended`), CODEOWNERS en áreas críticas.
+- **Versiones con al menos 4 días**: una versión recién publicada es donde suele aparecer un paquete comprometido, antes de que lo retiren. Ninguna entra con menos de 4 días, tampoco una dependencia indirecta. Dependabot espera esos días (`cooldown` en `.github/dependabot.yml`; las actualizaciones de seguridad no esperan). A mano: `npm install --before=<fecha de hace 4 días>` y revisar el diff del lockfile. Un PR de Dependabot se revisa sobre el commit que se fusiona: Dependabot puede rehacerlo con otra versión.
 
 ## Decisiones conscientes (trade-offs)
 
