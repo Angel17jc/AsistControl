@@ -1,9 +1,10 @@
+import { AppearanceCard } from '../components/account/AppearanceCard';
 import { ChangePasswordForm } from '../components/account/ChangePasswordForm';
 import { Card, CardHeader, PageHeader } from '../components/ui';
 import { ROLE_LABEL } from '../lib/accounts';
 import { useAuth } from '../stores/auth';
 
-/** The signed-in person's own account: who they are signed in as, and their password. */
+/** The signed-in person's own account: who they are, their password and how the app looks. */
 export function AccountPage() {
   const user = useAuth((s) => s.user);
   if (!user) return null;
@@ -39,6 +40,9 @@ export function AccountPage() {
           />
           <ChangePasswordForm email={user.email} />
         </Card>
+        <div className="lg:col-span-2">
+          <AppearanceCard />
+        </div>
       </div>
     </>
   );

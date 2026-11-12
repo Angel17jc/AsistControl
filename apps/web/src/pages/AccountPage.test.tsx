@@ -44,6 +44,8 @@ beforeEach(() => vi.stubGlobal('fetch', fetchMock));
 afterEach(() => {
   fetchMock.mockReset();
   vi.unstubAllGlobals();
+  localStorage.clear();
+  document.documentElement.removeAttribute('data-theme');
 });
 
 describe('AccountPage', () => {
@@ -52,6 +54,19 @@ describe('AccountPage', () => {
     expect(screen.getByText('Ana Ruiz')).toBeVisible();
     expect(screen.getByText('ana@e.local')).toBeVisible();
     expect(screen.getByText('Empleado')).toBeVisible();
+  });
+
+  it('switches the appearance at once and remembers it', async () => {
+    renderPage();
+    const appearance = screen.getByRole('group', { name: 'Apariencia' });
+    expect(within(appearance).getByRole('radio', { name: /^Claro/ })).toBeChecked();
+
+    await userEvent.click(within(appearance).getByRole('radio', { name: /^Oscuro/ }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(localStorage.getItem('asistcontrol.theme')).toBe('dark');
+
+    await userEvent.click(within(appearance).getByRole('radio', { name: /^Claro/ }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
   });
 
   it('changes the password and clears the form', async () => {
