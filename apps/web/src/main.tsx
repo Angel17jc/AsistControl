@@ -4,6 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ApiError } from './lib/api';
+// Bundled with the app, not loaded from Google: the server often runs inside a LAN.
+import '@fontsource/poppins/latin-600.css';
+import '@fontsource/poppins/latin-700.css';
 import './index.css';
 
 // By default a browser that believes it is offline pauses requests in silence: the button keeps
