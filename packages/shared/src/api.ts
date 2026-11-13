@@ -46,6 +46,23 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+/** Someone registered on a terminal, and who they are in AsistControl if already there. */
+export interface DevicePerson {
+  /** Their user number on the terminal: Employee.biometricId. */
+  deviceUserId: string;
+  /** As typed on the terminal (often in capitals). */
+  name: string;
+  /** A terminal administrator, not necessarily someone who punches. */
+  admin: boolean;
+  employee: { id: string; firstName: string; lastName: string; employeeCode: string } | null;
+}
+
+/** What an import from a terminal did, person by person. */
+export interface ImportEmployeesResult {
+  created: { biometricId: string; employeeId: string; employeeCode: string }[];
+  skipped: { biometricId: string; reason: 'ALREADY_REGISTERED' | 'CODE_IN_USE' }[];
+}
+
 /** What the sign-in page may offer, before anyone is signed in. */
 export interface AuthOptions {
   /** "Olvidé mi contraseña" and invitations work: the server can send (or show) the email. */

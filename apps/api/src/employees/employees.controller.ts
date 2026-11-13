@@ -14,7 +14,12 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
-import { CreateEmployeeDto, EmployeeQueryDto, UpdateEmployeeDto } from './employees.dto';
+import {
+  CreateEmployeeDto,
+  EmployeeQueryDto,
+  ImportEmployeesDto,
+  UpdateEmployeeDto,
+} from './employees.dto';
 import { EmployeesService } from './employees.service';
 
 @ApiTags('Employees')
@@ -34,6 +39,22 @@ export class EmployeesController {
   @RequirePermissions('employees:read')
   get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.employees.get(id, user);
+  }
+
+  @Post('import')
+  @RequirePermissions('employees:write')
+  @ApiOperation({
+    summary: 'Create employees from the people on a terminal (see GET /devices/:id/people)',
+    description:
+      'Whoever already has that biometric ID is skipped (ALREADY_REGISTERED), as is a code ' +
+      'already in use (CODE_IN_USE). Their cédula is filled in later.',
+  })
+  importPeople(
+    @Body() dto: ImportEmployeesDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ) {
+    return this.employees.importPeople(dto, actor, ctx);
   }
 
   @Post()

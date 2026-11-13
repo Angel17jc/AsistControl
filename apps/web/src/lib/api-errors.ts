@@ -1,8 +1,9 @@
-import type {
-  ApiErrorCode,
-  ApiErrorParams,
-  ApiErrorResponse,
-  ApiViolation,
+import {
+  type ApiErrorCode,
+  type ApiErrorParams,
+  type ApiErrorResponse,
+  type ApiViolation,
+  explainDeviceError,
 } from '@asistcontrol/shared';
 import { REQUEST_STATUS } from '../components/status';
 import { ROLE_LABEL } from './accounts';
@@ -103,6 +104,7 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
   DEVICE_ADDRESS_IN_USE: ({ name, host, port }) =>
     `El dispositivo «${name}» ya usa la dirección ${host}:${port}.`,
   DRIVER_NOT_AVAILABLE: ({ driver }) => `El driver ${driver} no está disponible en este servidor.`,
+  DEVICE_READ_FAILED: ({ reason }) => `No se pudo leer el marcador: ${explainDeviceError(reason)}`,
   SYNC_ALREADY_RUNNING: () => 'Ya hay una sincronización en curso. Espere a que termine.',
   MOCK_DEVICES_DISABLED: () => 'El simulador de dispositivos está apagado en este servidor.',
   SIMULATION_MOCK_ONLY: () => 'Esto solo está disponible en dispositivos simulados (MOCK).',

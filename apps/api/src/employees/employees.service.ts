@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { ApiErrorParams } from '@asistcontrol/shared';
+import type { ApiErrorParams, ImportEmployeesResult } from '@asistcontrol/shared';
 import type { Prisma } from '@prisma/client';
 import { AttendanceProcessingService } from '../attendance/attendance-processing.service';
 import { AuditService, diff } from '../audit/audit.service';
@@ -9,7 +9,21 @@ import { paginate, skipTake } from '../common/dto/pagination.dto';
 import { apiError } from '../common/errors/api-error';
 import { fromDbDate, toDbDate } from '../common/utils/date-only';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CreateEmployeeDto, EmployeeQueryDto, UpdateEmployeeDto } from './employees.dto';
+import type {
+  CreateEmployeeDto,
+  EmployeeQueryDto,
+  ImportEmployeesDto,
+  UpdateEmployeeDto,
+} from './employees.dto';
+
+/** The form always has a cédula; someone imported from a terminal does not, yet. */
+type NewEmployee = Omit<CreateEmployeeDto, 'identification'> & { identification?: string };
+
+/** EMP- and the terminal number with at least three digits (EMP-012), as the seed does. */
+export function defaultEmployeeCode(biometricId: string): string {
+  const code = `EMP-${biometricId.toUpperCase().padStart(3, '0')}`;
+  return code.length <= 20 ? code : biometricId.toUpperCase().slice(0, 20);
+}
 
 const EMPLOYEE_INCLUDE = {
   department: { select: { id: true, name: true, code: true } },
@@ -70,7 +84,58 @@ export class EmployeesService {
     return serialize(employee);
   }
 
-  async create(dto: CreateEmployeeDto, actor: AuthenticatedUser, ctx: RequestContext) {
+  /**
+   * Employees from the people registered on a terminal (number and name), as HR confirmed
+   * them; their cédula is filled in later. Whoever already has that number here is left alone,
+   * so importing again only adds the new ones. Punches the terminal sent before they were
+   * employees are linked to them, as with any new employee.
+   */
+  async importPeople(
+    dto: ImportEmployeesDto,
+    actor: AuthenticatedUser,
+    ctx: RequestContext,
+  ): Promise<ImportEmployeesResult> {
+    if (dto.scheduleId) {
+      await this.exists(
+        this.prisma.workSchedule.count({ where: { id: dto.scheduleId, deletedAt: null } }),
+        'schedule',
+      );
+    }
+    const registered = await this.prisma.employee.findMany({
+      where: { biometricId: { in: dto.people.map((p) => p.biometricId) } },
+      select: { biometricId: true },
+    });
+    const taken = new Set(registered.map((e) => e.biometricId));
+    const result: ImportEmployeesResult = { created: [], skipped: [] };
+    for (const { biometricId, firstName, lastName, employeeCode } of dto.people) {
+      if (taken.has(biometricId)) {
+        result.skipped.push({ biometricId, reason: 'ALREADY_REGISTERED' });
+        continue;
+      }
+      taken.add(biometricId);
+      const code = employeeCode ?? defaultEmployeeCode(biometricId);
+      if (await this.prisma.employee.count({ where: { employeeCode: code } })) {
+        result.skipped.push({ biometricId, reason: 'CODE_IN_USE' });
+        continue;
+      }
+      const employee = await this.create(
+        {
+          employeeCode: code,
+          firstName,
+          lastName,
+          hireDate: dto.hireDate,
+          biometricId,
+          scheduleId: dto.scheduleId,
+        },
+        actor,
+        ctx,
+      );
+      result.created.push({ biometricId, employeeId: employee.id, employeeCode: code });
+    }
+    return result;
+  }
+
+  async create(dto: NewEmployee, actor: AuthenticatedUser, ctx: RequestContext) {
     const { scheduleId, ...fields } = dto;
     await this.assertReferences(dto);
     if (scheduleId) {

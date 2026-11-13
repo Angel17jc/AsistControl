@@ -7,6 +7,8 @@ import {
   type OnApplicationBootstrap,
 } from '@nestjs/common';
 import type { Device, DeviceStatus, Prisma } from '@prisma/client';
+import type { DeviceUser } from '@asistcontrol/biometric-core';
+import type { DevicePerson } from '@asistcontrol/shared';
 import { AuditService, diff } from '../audit/audit.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { apiError } from '../common/errors/api-error';
@@ -204,6 +206,45 @@ export class DevicesService implements OnApplicationBootstrap {
       );
     });
     await this.connections.release(id);
+  }
+
+  /**
+   * Who is registered on the terminal (number and name), and who of them is already an
+   * employee here, matched by biometric ID. Only reads: nothing changes on either side.
+   */
+  async readPeople(id: string): Promise<DevicePerson[]> {
+    const device = await this.getEntity(id);
+    if (device.status === 'DISABLED')
+      throw new BadRequestException(apiError('DEVICE_DISABLED', 'Device is disabled'));
+    this.assertDriver(device.driver);
+
+    const adapter = this.connections.adapterFor(device);
+    let users: DeviceUser[];
+    try {
+      if (!adapter.isConnected()) await adapter.connect();
+      users = await adapter.getUsers();
+    } catch (e) {
+      throw new ConflictException(
+        apiError('DEVICE_READ_FAILED', 'Could not read the people on the device', {
+          reason: describeDeviceError(e),
+        }),
+      );
+    }
+
+    // Terminated employees keep their number: it stays theirs, as a record.
+    const employees = await this.prisma.employee.findMany({
+      where: { biometricId: { in: users.map((u) => u.deviceUserId) }, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true, employeeCode: true, biometricId: true },
+    });
+    const byNumber = new Map(employees.map(({ biometricId, ...e }) => [biometricId, e]));
+    return users
+      .map((u) => ({
+        deviceUserId: u.deviceUserId,
+        name: u.name.trim(),
+        admin: u.privilege === 'ADMIN',
+        employee: byNumber.get(u.deviceUserId) ?? null,
+      }))
+      .sort((a, b) => a.deviceUserId.localeCompare(b.deviceUserId, 'es', { numeric: true }));
   }
 
   /**

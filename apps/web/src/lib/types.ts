@@ -97,7 +97,8 @@ export interface DayPreview {
 export interface EmployeeRow {
   id: string;
   employeeCode: string;
-  identification: string;
+  /** Null for someone imported from a terminal until HR fills it in. */
+  identification: string | null;
   firstName: string;
   lastName: string;
   email: string | null;

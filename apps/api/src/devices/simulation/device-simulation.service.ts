@@ -14,7 +14,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
 import { MOCK_DEVICE_NETWORK } from '../adapters.provider';
 import { DevicesService } from '../devices.service';
-import type { SimulateFaultsDto, SimulatePunchDto, SimulateWorkdayDto } from './simulation.dto';
+import type {
+  SimulateEnrollDto,
+  SimulateFaultsDto,
+  SimulatePunchDto,
+  SimulateWorkdayDto,
+} from './simulation.dto';
 
 /** Weighted distribution for MIXED days: mostly normal, some realistic problems. */
 const MIXED_WEIGHTS: [WorkdayScenario, number][] = [
@@ -43,6 +48,12 @@ export class DeviceSimulationService {
     private readonly config: AppConfigService,
     private readonly calendars: WorkCalendarService,
   ) {}
+
+  /** Registers someone on the virtual terminal only, as HR would on a real one. */
+  async enroll(deviceId: string, dto: SimulateEnrollDto) {
+    const sim = await this.simulator(deviceId);
+    return sim.enrollUser({ deviceUserId: dto.deviceUserId, name: dto.name });
+  }
 
   async state(deviceId: string) {
     const sim = await this.simulator(deviceId);
