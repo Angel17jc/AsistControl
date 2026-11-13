@@ -270,7 +270,9 @@ model Position {
 model Employee {
   id             String         @id @default(uuid()) @db.Uuid
   employeeCode   String         @unique @map("employee_code")
-  identification String         @unique
+  /// Cédula or passport. Null for people imported from a terminal, which only knows their
+  /// name and number, until HR fills it in. The form still asks for it.
+  identification String?        @unique
   firstName      String         @map("first_name")
   lastName       String         @map("last_name")
   email          String?        @unique

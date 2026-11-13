@@ -11,6 +11,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { DevicePerson } from '@asistcontrol/shared';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { CurrentUser, ReqContext, RequirePermissions } from '../common/decorators';
 import { CreateDeviceDto, UpdateDeviceDto } from './devices.dto';
@@ -18,6 +19,7 @@ import { DevicesService } from './devices.service';
 import { DeviceSimulationService } from './simulation/device-simulation.service';
 import {
   SimulateAutoDto,
+  SimulateEnrollDto,
   SimulateFaultsDto,
   SimulatePunchDto,
   SimulateWorkdayDto,
@@ -85,6 +87,18 @@ export class DevicesController {
     return this.devices.remove(id, actor, ctx);
   }
 
+  @Get(':id/people')
+  // It is the first step of creating employees from the terminal.
+  @RequirePermissions('employees:write')
+  @ApiOperation({
+    summary: 'Who is registered on the terminal, and who of them is already an employee',
+    description:
+      'Reads the terminal live: 409 DEVICE_READ_FAILED if it does not answer (not 502: clients read that as the server being down).',
+  })
+  readPeople(@Param('id', ParseUUIDPipe) id: string): Promise<DevicePerson[]> {
+    return this.devices.readPeople(id);
+  }
+
   @Post(':id/test-connection')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('devices:sync')
@@ -100,6 +114,13 @@ export class DevicesController {
   @ApiOperation({ summary: '[Mock] Virtual terminal state' })
   simulationState(@Param('id', ParseUUIDPipe) id: string) {
     return this.simulation.state(id);
+  }
+
+  @Post(':id/simulate/enroll')
+  @RequirePermissions('devices:write')
+  @ApiOperation({ summary: '[Mock] Register someone on the terminal only (ID and name)' })
+  simulateEnroll(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SimulateEnrollDto) {
+    return this.simulation.enroll(id, dto);
   }
 
   @Post(':id/simulate/punch')

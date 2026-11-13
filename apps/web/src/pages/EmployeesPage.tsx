@@ -1,8 +1,9 @@
 import type { EmployeeStatus, PaginatedResponse } from '@asistcontrol/shared';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Palmtree, Pencil, Plus, Search } from 'lucide-react';
+import { CalendarClock, Download, Palmtree, Pencil, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { EMPLOYEE_STATUS_LABEL, EmployeeForm } from '../components/employees/EmployeeForm';
+import { ImportFromDeviceCard } from '../components/employees/ImportFromDeviceCard';
 import { EmployeeScheduleCard } from '../components/schedules/EmployeeScheduleCard';
 import {
   Button,
@@ -57,6 +58,7 @@ export function EmployeesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState<EmployeeRow | null>(null);
   const [vacationsOf, setVacationsOf] = useState<EmployeeRow | null>(null);
   const [scheduleOf, setScheduleOf] = useState<EmployeeRow | null>(null);
@@ -77,13 +79,21 @@ export function EmployeesPage() {
         description="Nómina de personal y su identificador biométrico"
         actions={
           canWrite && (
-            <Button
-              variant="primary"
-              icon={<Plus className="size-4" />}
-              onClick={() => setCreating(true)}
-            >
-              Nuevo empleado
-            </Button>
+            <>
+              <Button
+                icon={<Download className="size-4" />}
+                onClick={() => (setCreating(false), setImporting(true))}
+              >
+                Importar del marcador
+              </Button>
+              <Button
+                variant="primary"
+                icon={<Plus className="size-4" />}
+                onClick={() => (setImporting(false), setCreating(true))}
+              >
+                Nuevo empleado
+              </Button>
+            </>
           )
         }
       />
@@ -106,10 +116,16 @@ export function EmployeesPage() {
           no se calculan atrasos ni horas extra).
         </p>
         <p>
+          Si las personas ya están registradas en el marcador,{' '}
+          <strong className="text-ink-1">Importar del marcador</strong> lee su número y su nombre y
+          crea sus fichas de una vez; después se completa la cédula de cada una.
+        </p>
+        <p>
           Para que la persona entre al sistema con su propio usuario, créele una cuenta en Usuarios
           y vincúlela a su ficha.
         </p>
       </PageHelp>
+      {importing && <ImportFromDeviceCard onDone={() => setImporting(false)} />}
       {creating && <EmployeeForm onDone={() => setCreating(false)} />}
       {editing && (
         <EmployeeForm key={editing.id} employee={editing} onDone={() => setEditing(null)} />

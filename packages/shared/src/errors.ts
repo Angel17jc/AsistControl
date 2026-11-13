@@ -91,6 +91,8 @@ export interface ApiErrorParams {
   DEVICE_DISABLED: undefined;
   DEVICE_ADDRESS_IN_USE: { name: string; host: string; port: number };
   DRIVER_NOT_AVAILABLE: { driver: string };
+  /** The terminal did not answer a read; `reason` is "CODE: detail" (see explainDeviceError). */
+  DEVICE_READ_FAILED: { reason: string };
   SYNC_ALREADY_RUNNING: undefined;
   MOCK_DEVICES_DISABLED: undefined;
   SIMULATION_MOCK_ONLY: undefined;

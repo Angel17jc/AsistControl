@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { WORKDAY_SCENARIOS, type WorkdayScenario } from '@asistcontrol/biometric-core';
 import { PUNCH_TYPES, type PunchType } from '@asistcontrol/shared';
 import {
@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Length,
   Matches,
   Max,
   Min,
@@ -103,6 +104,19 @@ export class SimulateFaultsDto {
   @IsOptional()
   @IsBoolean()
   reset?: boolean;
+}
+
+/** Someone registered on the terminal itself (ID and name), not yet in AsistControl. */
+export class SimulateEnrollDto {
+  @ApiProperty({ example: '12', description: 'The user number on the terminal' })
+  @IsString()
+  @Matches(/^[A-Za-z0-9]{1,20}$/, { message: 'deviceUserId must be 1-20 letters or digits' })
+  deviceUserId: string;
+
+  @ApiProperty({ example: 'MELANIE ZAMBRANO' })
+  @IsString()
+  @Length(1, 64)
+  name: string;
 }
 
 export class SimulateAutoDto {
