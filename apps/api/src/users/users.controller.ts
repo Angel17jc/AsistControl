@@ -71,4 +71,16 @@ export class UsersController {
   ) {
     return this.users.resetPassword(id, dto.password, actor, ctx);
   }
+
+  /** A new invitation for an account that never signed in; the previous link stops working. */
+  @Post(':id/invitation')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('users:write')
+  resendInvitation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @ReqContext() ctx: RequestContext,
+  ) {
+    return this.users.resendInvitation(id, actor, ctx);
+  }
 }

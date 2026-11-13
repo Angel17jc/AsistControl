@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { PRIVILEGED_ROLES, type Role, SCOPED_ROLES } from '@asistcontrol/shared';
 import { AuditService } from '../audit/audit.service';
 import { PasswordLinksService } from '../auth/password-links.service';
@@ -27,7 +29,27 @@ const PUBLIC_USER = {
   createdAt: true,
   updatedAt: true,
   employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+  // A pending invitation: the newest unused one (ADR 0016).
+  passwordLinks: {
+    where: { purpose: 'INVITE', usedAt: null },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { expiresAt: true },
+  },
 } satisfies Prisma.UserSelect;
+
+type SelectedUser = Prisma.UserGetPayload<{ select: typeof PUBLIC_USER }>;
+
+/** `invitation` is set while an invitation waits to be used, expired or not. */
+function toPublic({ passwordLinks, ...user }: SelectedUser, now = new Date()) {
+  const pending = passwordLinks[0];
+  return {
+    ...user,
+    invitation: pending
+      ? { expiresAt: pending.expiresAt, expired: pending.expiresAt <= now }
+      : null,
+  };
+}
 
 @Injectable()
 export class UsersService {
@@ -35,6 +57,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
     private readonly audit: AuditService,
+    private readonly links: PasswordLinksService,
   ) {}
 
   async list(query: UserQueryDto) {
@@ -51,44 +74,125 @@ export class UsersService {
       }),
       this.prisma.user.count({ where }),
     ]);
-    return paginate(items, total, query);
+    return paginate(
+      items.map((user) => toPublic(user)),
+      total,
+      query,
+    );
   }
 
   async get(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id }, select: PUBLIC_USER });
     if (!user) throw new NotFoundException(apiError('USER_NOT_FOUND', 'User not found'));
-    return user;
+    return toPublic(user);
   }
 
+  /**
+   * A new account. Either with a temporary password the administrator passes on (its owner
+   * replaces it when signing in), or with an invitation: an email with a link to choose the
+   * password (ADR 0016). An invited account gets a random password nobody knows meanwhile.
+   */
   async create(dto: CreateUserDto, actor: AuthenticatedUser, ctx: RequestContext) {
     assertCanGrant(actor, dto.role);
     assertScopedRoleHasEmployee(dto.role, dto.employeeId ?? null);
-    const passwordHash = await this.passwords.hash(dto.password);
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        // The administrator chose this password: its owner replaces it when signing in.
+    const invite = dto.invite === true;
+    if (invite) this.assertLinksAvailable();
+    const passwordHash = await this.passwords.hash(
+      invite ? randomBytes(32).toString('base64url') : dto.password!,
+    );
+    const { user, link } = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
         data: {
           email: dto.email,
           passwordHash,
           role: dto.role,
           employeeId: dto.employeeId,
-          mustChangePassword: true,
+          mustChangePassword: !invite,
         },
-        select: PUBLIC_USER,
+        select: { id: true },
       });
+      const link = invite ? await this.links.issueInvitation(tx, created.id, actor.id) : null;
       await this.audit.record(
         {
           actorId: actor.id,
           action: 'create',
           entity: 'User',
-          entityId: user.id,
+          entityId: created.id,
           context: ctx,
-          metadata: { email: user.email, role: user.role },
+          metadata: { email: dto.email, role: dto.role, invited: invite },
         },
         tx,
       );
-      return user;
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: created.id },
+        select: PUBLIC_USER,
+      });
+      return { user, link };
     });
+    if (link) void this.sendInvitation(user, link, actor);
+    return toPublic(user);
+  }
+
+  /**
+   * Sends a new invitation to an account that never signed in (the first one expired, or
+   * went to spam). The previous link stops working.
+   */
+  async resendInvitation(id: string, actor: AuthenticatedUser, ctx: RequestContext) {
+    const target = await this.get(id);
+    assertCanGrant(actor, target.role);
+    if (target.lastLoginAt) {
+      throw new ConflictException(
+        apiError('INVITATION_NOT_NEEDED', 'This account already signed in'),
+      );
+    }
+    if (!target.isActive) {
+      throw new ConflictException(apiError('INVITATION_NOT_NEEDED', 'This account is disabled'));
+    }
+    this.assertLinksAvailable();
+    // A temporary password given before must not keep working next to the invitation.
+    const passwordHash = await this.passwords.hash(randomBytes(32).toString('base64url'));
+    const link = await this.prisma.$transaction(async (tx) => {
+      const issued = await this.links.issueInvitation(tx, id, actor.id);
+      await tx.user.update({ where: { id }, data: { passwordHash, mustChangePassword: false } });
+      await this.audit.record(
+        {
+          actorId: actor.id,
+          action: 'auth.invitation_sent',
+          entity: 'User',
+          entityId: id,
+          context: ctx,
+          metadata: { email: target.email, resent: true },
+        },
+        tx,
+      );
+      return issued;
+    });
+    void this.sendInvitation(target, link, actor);
+    return { expiresAt: link.expiresAt };
+  }
+
+  private assertLinksAvailable() {
+    if (!this.links.available) {
+      throw new BadRequestException(
+        apiError('PASSWORD_LINKS_UNAVAILABLE', 'This server cannot email password links'),
+      );
+    }
+  }
+
+  /** Signs the invitation with the inviter's name when they have an employee record. */
+  private async sendInvitation(
+    user: { id: string; email: string },
+    link: { token: string; expiresAt: Date },
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { employee: { select: { firstName: true, lastName: true } } },
+    });
+    const name = inviter?.employee
+      ? `${inviter.employee.firstName} ${inviter.employee.lastName}`
+      : actor.email;
+    await this.links.send(user, 'INVITE', link.token, link.expiresAt, name);
   }
 
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser, ctx: RequestContext) {
@@ -140,7 +244,7 @@ export class UsersService {
         },
         tx,
       );
-      return user;
+      return toPublic(user);
     });
   }
 

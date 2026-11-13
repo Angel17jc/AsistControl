@@ -39,6 +39,10 @@ export interface ApiErrorParams {
   /** The password link was used, replaced by a newer one, or its account was disabled. */
   PASSWORD_LINK_INVALID: undefined;
   PASSWORD_LINK_EXPIRED: { purpose: 'RESET' | 'INVITE' };
+  /** The server cannot deliver password links: no email, or no public address to link to. */
+  PASSWORD_LINKS_UNAVAILABLE: undefined;
+  /** Invitation for an account that already signed in: it has a password of its own. */
+  INVITATION_NOT_NEEDED: undefined;
 
   // Accounts
   USER_NOT_FOUND: undefined;

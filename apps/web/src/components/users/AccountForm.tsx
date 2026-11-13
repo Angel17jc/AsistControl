@@ -3,11 +3,27 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { ROLE_LABEL, generatePassword, grantableRoles, needsEmployee } from '../../lib/accounts';
 import { api } from '../../lib/api';
+import { useAuthOptions } from '../../lib/auth-options';
 import type { UserRow } from '../../lib/types';
 import { Button, Field, Input, Select } from '../ui';
 import { EmployeePicker, type PickedEmployee } from './EmployeePicker';
 
 export const PASSWORD_HINT = 'Al menos 10 caracteres, con letras y números';
+
+type Access = 'invite' | 'password';
+
+const ACCESS_OPTIONS: { value: Access; label: string; hint: string }[] = [
+  {
+    value: 'invite',
+    label: 'Enviarle una invitación por correo',
+    hint: 'Le llega un enlace para elegir su contraseña. Vale 72 horas.',
+  },
+  {
+    value: 'password',
+    label: 'Darle una contraseña temporal',
+    hint: 'Usted se la pasa y la persona la cambia al entrar. Para quien no tiene correo propio.',
+  },
+];
 
 /**
  * Creates an account, or changes the role and the employee of an existing one. Only offers
@@ -32,13 +48,20 @@ export function AccountForm({
   actorRole: Role;
   /** People cannot change their own role (the API refuses it). */
   isSelf: boolean;
-  onDone: () => void;
+  /** `notice`: what to tell the administrator once it is done (e.g. where the invitation went). */
+  onDone: (notice?: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const options = useAuthOptions();
   const roles = grantableRoles(actorRole);
   const [email, setEmail] = useState(account?.email ?? '');
   const [role, setRole] = useState<Role>(account?.role ?? 'EMPLOYEE');
   const [password, setPassword] = useState('');
+  // How the person gets in the first time. An invitation when the server can email it: nobody
+  // else ever knows their password.
+  const [chosenAccess, setAccess] = useState<Access | null>(null);
+  const canInvite = options?.passwordLinks === true;
+  const access: Access = chosenAccess ?? (canInvite ? 'invite' : 'password');
   const [employee, setEmployee] = useState<PickedEmployee | null>(
     account?.employee
       ? {
@@ -48,7 +71,7 @@ export function AccountForm({
       : null,
   );
   const employeeMissing = needsEmployee(role) && employee === null;
-  const passwordInvalid = !account && !isStrongPassword(password);
+  const passwordInvalid = !account && access === 'password' && !isStrongPassword(password);
 
   const save = useMutation({
     mutationFn: () =>
@@ -62,14 +85,23 @@ export function AccountForm({
           })
         : api('/users', {
             method: 'POST',
-            body: { email, password, role, ...(employee && { employeeId: employee.id }) },
+            body: {
+              email,
+              role,
+              ...(access === 'invite' ? { invite: true } : { password }),
+              ...(employee && { employeeId: employee.id }),
+            },
           }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['users'] }),
         queryClient.invalidateQueries({ queryKey: ['employees'] }),
       ]);
-      onDone();
+      onDone(
+        !account && access === 'invite'
+          ? `Invitación enviada a ${email.trim().toLowerCase()}. El enlace vale 72 horas.`
+          : undefined,
+      );
     },
   });
 
@@ -111,6 +143,34 @@ export function AccountForm({
         required={needsEmployee(role)}
       />
       {!account && (
+        <fieldset className="grid gap-2 lg:col-span-2">
+          <legend className="mb-1 text-sm font-medium text-ink-2">Primer acceso</legend>
+          {canInvite ? (
+            ACCESS_OPTIONS.map(({ value, label, hint }) => (
+              <label key={value} className="flex items-start gap-2 text-sm text-ink-1">
+                <input
+                  type="radio"
+                  name="access"
+                  value={value}
+                  checked={access === value}
+                  onChange={() => setAccess(value)}
+                  className="mt-0.5 size-4 accent-[var(--accent)]"
+                />
+                <span>
+                  {label}
+                  <span className="block text-xs text-ink-3">{hint}</span>
+                </span>
+              </label>
+            ))
+          ) : (
+            <p className="text-xs text-ink-3">
+              Para enviar invitaciones por correo hace falta configurar el correo del servidor.
+              Mientras tanto, dele una contraseña temporal.
+            </p>
+          )}
+        </fieldset>
+      )}
+      {!account && access === 'password' && (
         <Field
           label="Contraseña inicial"
           hint={`${PASSWORD_HINT}. Compártala por un canal seguro; la persona elegirá una propia al entrar.`}
@@ -145,7 +205,7 @@ export function AccountForm({
         >
           {account ? 'Guardar cambios' : 'Crear cuenta'}
         </Button>
-        <Button type="button" variant="ghost" onClick={onDone}>
+        <Button type="button" variant="ghost" onClick={() => onDone()}>
           Cancelar
         </Button>
       </div>

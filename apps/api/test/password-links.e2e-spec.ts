@@ -216,4 +216,87 @@ describe('Password links (e2e)', () => {
     const res = await http().post('/api/auth/password-link').send({ token: 'abc' }).expect(400);
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
+
+  /** An administrator creates the account; the person chooses the password from the email. */
+  describe('invitations', () => {
+    let inv: Fixture;
+    let admin: string;
+    let employeeId: string;
+
+    beforeAll(async () => {
+      inv = await createFixture(prisma, 'inv');
+      admin = await login(app, inv.emails.admin);
+      employeeId = inv.teammate.id;
+    });
+
+    const invite = (email: string) =>
+      http()
+        .post('/api/users')
+        .set(bearer(admin))
+        .send({ email, role: 'EMPLOYEE', employeeId, invite: true });
+
+    it('emails a link to choose the first password, and the account works only after it', async () => {
+      const email = 'melanie-inv@e2e.local';
+      const created = await invite(email).expect(201);
+      expect(created.body).toMatchObject({ email, mustChangePassword: false });
+      expect(Date.parse(created.body.invitation.expiresAt) - Date.now()).toBeGreaterThan(
+        71 * 3_600_000,
+      );
+
+      const message = await nextMail(email, 1);
+      expect(message.subject).toBe('Su cuenta de AsistControl');
+      expect(message.text).toContain(`${inv.emails.admin} le creó una cuenta en AsistControl`);
+      const token = tokenOf(message);
+      const info = await http().post('/api/auth/password-link').send({ token }).expect(200);
+      expect(info.body).toMatchObject({ email, purpose: 'INVITE' });
+
+      // Nobody knows the password the account was created with.
+      await http().post('/api/auth/login').send({ email, password: PASSWORD }).expect(401);
+      await http()
+        .post('/api/auth/reset-password')
+        .send({ token, newPassword: NEW_PASSWORD })
+        .expect(204);
+      await http().post('/api/auth/login').send({ email, password: NEW_PASSWORD }).expect(200);
+
+      const row = await http().get(`/api/users/${created.body.id}`).set(bearer(admin)).expect(200);
+      expect(row.body.invitation).toBeNull();
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: 'auth.invitation_accepted', entityId: created.body.id },
+      });
+      expect(audit).not.toBeNull();
+
+      const again = await http()
+        .post(`/api/users/${created.body.id}/invitation`)
+        .set(bearer(admin))
+        .expect(409);
+      expect(again.body.code).toBe('INVITATION_NOT_NEEDED');
+    });
+
+    it('sends a new invitation on request and the old link stops working', async () => {
+      const email = 'pedro-inv@e2e.local';
+      await prisma.user.deleteMany({ where: { employeeId } });
+      const created = await invite(email).expect(201);
+      const first = tokenOf(await nextMail(email, 1));
+
+      const res = await http()
+        .post(`/api/users/${created.body.id}/invitation`)
+        .set(bearer(admin))
+        .expect(200);
+      expect(res.body.expiresAt).toEqual(expect.any(String));
+      const second = tokenOf(await nextMail(email, 2));
+
+      const old = await http().post('/api/auth/password-link').send({ token: first }).expect(400);
+      expect(old.body.code).toBe('PASSWORD_LINK_INVALID');
+      await http().post('/api/auth/password-link').send({ token: second }).expect(200);
+    });
+
+    it('still needs a password when there is no invitation', async () => {
+      const res = await http()
+        .post('/api/users')
+        .set(bearer(admin))
+        .send({ email: 'sin-clave-inv@e2e.local', role: 'HR' })
+        .expect(400);
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+    });
+  });
 });

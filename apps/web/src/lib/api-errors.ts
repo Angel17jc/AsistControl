@@ -43,6 +43,10 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
     purpose === 'INVITE'
       ? 'Esta invitación venció. Pida a un administrador que le envíe otra.'
       : 'Este enlace venció. Pida uno nuevo desde «¿Olvidó su contraseña?».',
+  PASSWORD_LINKS_UNAVAILABLE: () =>
+    'El servidor todavía no puede enviar correos: cree la cuenta con una contraseña temporal.',
+  INVITATION_NOT_NEEDED: () =>
+    'Esta cuenta ya entró al sistema y tiene su contraseña. Si la olvidó, puede restablecerla.',
 
   USER_NOT_FOUND: () => 'No se encontró esa cuenta: puede que ya no exista.',
   SELF_ACCOUNT_CHANGE: () => 'No puede cambiar su propio rol ni desactivar su propia cuenta.',

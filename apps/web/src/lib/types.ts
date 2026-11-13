@@ -124,6 +124,8 @@ export interface UserRow {
   lastLoginAt: string | null;
   /** An administrator chose the password; its owner must replace it when signing in. */
   mustChangePassword: boolean;
+  /** An invitation waiting to be used (it may have expired); null once a password is chosen. */
+  invitation: { expiresAt: string; expired: boolean } | null;
   createdAt: string;
   employee: { id: string; firstName: string; lastName: string; employeeCode: string } | null;
 }

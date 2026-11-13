@@ -1,6 +1,6 @@
 import { isStrongPassword, type PaginatedResponse, ROLES, type Role } from '@asistcontrol/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Pencil, Plus, Search } from 'lucide-react';
+import { KeyRound, Mail, Pencil, Plus, Search } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { AccountForm, PASSWORD_HINT } from '../components/users/AccountForm';
 import {
@@ -20,7 +20,8 @@ import {
 } from '../components/ui';
 import { ROLE_LABEL, canManageAccount, generatePassword } from '../lib/accounts';
 import { api } from '../lib/api';
-import { relativeTime } from '../lib/format';
+import { useAuthOptions } from '../lib/auth-options';
+import { formatDateTime, relativeTime } from '../lib/format';
 import type { UserRow } from '../lib/types';
 import { useAuth } from '../stores/auth';
 
@@ -37,6 +38,7 @@ export function UsersPage() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<UserRow | 'new' | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const users = useQuery({
     queryKey: ['users', search, role, page],
     queryFn: () =>
@@ -56,7 +58,7 @@ export function UsersPage() {
             <Button
               variant="primary"
               icon={<Plus className="size-4" />}
-              onClick={() => (setResetting(null), setEditing('new'))}
+              onClick={() => (setResetting(null), setNotice(null), setEditing('new'))}
             >
               Nueva cuenta
             </Button>
@@ -71,10 +73,21 @@ export function UsersPage() {
           asistencia.
         </p>
         <p>
-          La contraseña inicial es temporal: al entrar por primera vez, la persona elige una propia.
+          Para el primer acceso, la persona recibe una{' '}
+          <strong className="text-ink-1">invitación por correo</strong> y elige su contraseña con el
+          enlace (si el servidor tiene el correo configurado), o usted le da una contraseña temporal
+          que cambiará al entrar.
+        </p>
+        <p>
+          Una invitación vale 72 horas: si venció o no le llegó, use «Reenviar invitación».
           Restablecer una contraseña cierra las sesiones abiertas de esa cuenta.
         </p>
       </PageHelp>
+      {notice && (
+        <p role="status" className="mb-6 rounded-lg bg-good/10 px-4 py-3 text-sm text-ink-1">
+          {notice}
+        </p>
+      )}
       {editing && (
         <Card className="mb-6">
           <AccountForm
@@ -82,7 +95,7 @@ export function UsersPage() {
             account={editing === 'new' ? undefined : editing}
             actorRole={me.role}
             isSelf={editing !== 'new' && editing.id === me.id}
-            onDone={() => setEditing(null)}
+            onDone={(message) => (setEditing(null), setNotice(message ?? null))}
           />
         </Card>
       )}
@@ -168,6 +181,7 @@ function AccountRow({
   onReset: () => void;
 }) {
   const queryClient = useQueryClient();
+  const canInvite = useAuthOptions()?.passwordLinks === true;
   const [confirming, setConfirming] = useState(false);
   const toggle = useMutation({
     mutationFn: (isActive: boolean) =>
@@ -177,6 +191,15 @@ function AccountRow({
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
+  const resend = useMutation({
+    mutationFn: () => api(`/users/${account.id}/invitation`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  });
+  // Never signed in: an invitation is how they get in (a new one replaces the old link).
+  const invitable = account.isActive && account.lastLoginAt === null;
+  // The server says whether it expired: the browser's clock may be off.
+  const invitation = account.invitation ?? null;
+  const expired = invitation?.expired === true;
 
   return (
     <tr>
@@ -198,6 +221,23 @@ function AccountRow({
         </StatusBadge>
         {account.mustChangePassword && (
           <p className="mt-1 text-xs text-ink-3">Contraseña temporal: la cambiará al entrar</p>
+        )}
+        {invitation && (
+          <p className={`mt-1 text-xs ${expired ? 'font-medium text-critical' : 'text-ink-3'}`}>
+            {expired
+              ? 'Invitación vencida: reenvíela'
+              : `Invitación enviada · vence el ${formatDateTime(invitation.expiresAt)}`}
+          </p>
+        )}
+        {resend.isSuccess && (
+          <p role="status" className="mt-1 text-xs text-ink-1">
+            Invitación reenviada.
+          </p>
+        )}
+        {resend.error && (
+          <p role="alert" className="mt-1 text-xs text-critical">
+            {resend.error.message}
+          </p>
         )}
       </Td>
       <Td className="text-ink-2">{relativeTime(account.lastLoginAt)}</Td>
@@ -234,6 +274,18 @@ function AccountRow({
                 >
                   Editar
                 </Button>
+                {invitable && canInvite && (
+                  <Button
+                    variant="ghost"
+                    className="px-2 py-1 text-xs"
+                    icon={<Mail className="size-3.5" />}
+                    aria-label={`Reenviar invitación a ${account.email}`}
+                    loading={resend.isPending}
+                    onClick={() => resend.mutate()}
+                  >
+                    {invitation ? 'Reenviar invitación' : 'Enviar invitación'}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   className="px-2 py-1 text-xs"
