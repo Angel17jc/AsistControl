@@ -15,6 +15,7 @@ import type { AccessTokenPayload, RefreshTokenPayload } from '../common/auth/tok
 import { apiError } from '../common/errors/api-error';
 import { AppConfigService } from '../config/app-config.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PasswordLinksService } from './password-links.service';
 import { PasswordService } from './password.service';
 
 export interface IssuedSession extends AuthSession {
@@ -205,6 +206,8 @@ export class AuthService {
         where: { userId: user.id, id: { not: actor.sessionId }, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      // A link emailed before this change would undo it: it stops working.
+      await PasswordLinksService.retireLinks(tx, user.id);
       await this.audit.record(
         {
           actorId: user.id,

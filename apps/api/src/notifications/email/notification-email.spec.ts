@@ -94,9 +94,8 @@ describe('renderNotificationEmail', () => {
 describe('renderNotificationEmail — HTML', () => {
   it('carries the same message with the link as a button', () => {
     const email = render({ type: 'DEVICE_RECOVERED', data: { deviceName: 'Bodega' } });
-    expect(email.html).toContain(
-      '<h1 style="margin:0 0 16px;font-size:18px">Dispositivo en línea de nuevo: Bodega</h1>',
-    );
+    expect(email.html).toMatch(/<h1 style="[^"]*">Dispositivo en línea de nuevo: Bodega<\/h1>/);
+    expect(email.html).toContain('AsistControl · Kairosig');
     expect(email.html).toContain('href="https://asistencia.empresa.com/dispositivos"');
     expect(email.html).toContain('Abrir en AsistControl</a>');
     // Plain text stays plain.

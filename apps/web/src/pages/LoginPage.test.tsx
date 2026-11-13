@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -5,12 +6,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../stores/auth';
 import { LoginPage } from './LoginPage';
 
-const renderPage = () =>
+const fetchMock = vi.fn<typeof fetch>();
+
+/**
+ * The page asks the server what it may offer as soon as it opens: answer by address, so the
+ * sign-in request gets its own answer whatever the order.
+ */
+function renderPage({
+  passwordLinks = false,
+  login = new Response(null, { status: 500 }) as Response,
+  state = undefined as { email: string } | undefined,
+} = {}) {
+  fetchMock.mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.startsWith('/api/auth/options')) return Response.json({ passwordLinks });
+    if (url.startsWith('/api/auth/login')) return login;
+    return new Response(null, { status: 404 });
+  });
   render(
-    <MemoryRouter>
-      <LoginPage />
-    </MemoryRouter>,
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={[{ pathname: '/login', state }]}>
+        <LoginPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+}
+const loginCalls = () =>
+  fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/auth/login'));
 
 const emailField = () => screen.getByLabelText('Correo electrónico');
 const passwordField = () => screen.getByLabelText('Contraseña');
@@ -30,8 +54,6 @@ const SESSION = {
 };
 
 describe('LoginPage', () => {
-  const fetchMock = vi.fn<typeof fetch>();
-
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock);
     useAuth.setState({ status: 'anonymous', user: null, accessToken: null });
@@ -59,6 +81,21 @@ describe('LoginPage', () => {
     expect(screen.getByText(/Pida a un administrador que se la restablezca/)).toBeVisible();
   });
 
+  it('offers "olvidé mi contraseña" when the server can email the link', async () => {
+    renderPage({ passwordLinks: true });
+    expect(await screen.findByRole('link', { name: '¿Olvidó su contraseña?' })).toHaveAttribute(
+      'href',
+      '/olvide-contrasena',
+    );
+    expect(screen.queryByText(/Pida a un administrador/)).toBeNull();
+  });
+
+  it('comes back from choosing a password with the address filled in', () => {
+    renderPage({ state: { email: 'melanie@empresa.com' } });
+    expect(emailField()).toHaveValue('melanie@empresa.com');
+    expect(passwordField()).toHaveFocus();
+  });
+
   it('says what is missing instead of asking the server', async () => {
     renderPage();
     await submit();
@@ -66,7 +103,7 @@ describe('LoginPage', () => {
     expect(emailField()).toHaveAttribute('aria-invalid', 'true');
     expect(passwordField()).toHaveAccessibleDescription('Escriba su contraseña.');
     expect(emailField()).toHaveFocus();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loginCalls()).toHaveLength(0);
   });
 
   it('points at a mistyped email, and stops once it is fixed', async () => {
@@ -77,7 +114,7 @@ describe('LoginPage', () => {
     expect(emailField()).toHaveAccessibleDescription(
       'Revise el correo: debe tener la forma nombre@empresa.com.',
     );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loginCalls()).toHaveLength(0);
 
     await userEvent.type(emailField(), '.com');
     expect(emailField()).not.toHaveAttribute('aria-invalid');
@@ -112,13 +149,12 @@ describe('LoginPage', () => {
   });
 
   it('on wrong credentials, explains and gets the password ready to retype', async () => {
-    fetchMock.mockResolvedValueOnce(
-      Response.json(
+    renderPage({
+      login: Response.json(
         { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
         { status: 401 },
       ),
-    );
-    renderPage();
+    });
     await userEvent.type(emailField(), 'admin@asistcontrol.local');
     await userEvent.type(passwordField(), 'wrong');
     await submit();
@@ -133,13 +169,12 @@ describe('LoginPage', () => {
 
   it('sends the email without surrounding spaces and keeps the session in memory only', async () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(SESSION), { status: 200 }));
-    renderPage();
+    renderPage({ login: new Response(JSON.stringify(SESSION), { status: 200 }) });
     await userEvent.type(emailField(), '  a@b.co ');
     await userEvent.type(passwordField(), 'pw');
     await submit();
     await vi.waitFor(() => expect(useAuth.getState().status).toBe('authenticated'));
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [, init] = loginCalls()[0]!;
     expect(JSON.parse(String(init?.body))).toEqual({ email: 'a@b.co', password: 'pw' });
     expect(useAuth.getState().accessToken).toBe('tok');
     expect(setItem).not.toHaveBeenCalled();

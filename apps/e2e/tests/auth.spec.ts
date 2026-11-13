@@ -45,6 +45,27 @@ test.describe('Sesión', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
   });
 
+  test('«¿Olvidó su contraseña?» responde igual exista o no la cuenta', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('link', { name: '¿Olvidó su contraseña?' }).click();
+    await expect(page.getByRole('heading', { name: '¿Olvidó su contraseña?' })).toBeVisible();
+
+    await page.getByLabel('Correo electrónico').fill('nadie@empresa.com');
+    await page.getByRole('button', { name: 'Enviar enlace' }).click();
+    await expect(page.getByRole('status')).toContainText(
+      'Si hay una cuenta con nadie@empresa.com, le llegará un correo',
+    );
+    await page.getByRole('link', { name: 'Volver a iniciar sesión' }).click();
+    await expect(page.getByRole('button', { name: 'Ingresar' })).toBeVisible();
+  });
+
+  test('un enlace de contraseña vencido o inventado lo dice, sin pedir nada', async ({ page }) => {
+    await page.goto(`/restablecer#${'x'.repeat(43)}`);
+    await expect(page.getByRole('heading', { name: 'Este enlace ya no sirve' })).toBeVisible();
+    await expect(page).toHaveURL(/\/restablecer$/);
+    await expect(page.getByRole('link', { name: 'Pedir un enlace nuevo' })).toBeVisible();
+  });
+
   test('un enlace profundo sin sesión termina en el login', async ({ page }) => {
     await page.goto('/reportes');
     await expect(page.getByRole('button', { name: 'Ingresar' })).toBeVisible();

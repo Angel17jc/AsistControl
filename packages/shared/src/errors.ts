@@ -36,6 +36,9 @@ export interface ApiErrorParams {
   PASSWORD_UNCHANGED: undefined;
   PASSWORD_CHANGED_MEANWHILE: undefined;
   PASSWORD_CHANGE_REQUIRED: undefined;
+  /** The password link was used, replaced by a newer one, or its account was disabled. */
+  PASSWORD_LINK_INVALID: undefined;
+  PASSWORD_LINK_EXPIRED: { purpose: 'RESET' | 'INVITE' };
 
   // Accounts
   USER_NOT_FOUND: undefined;

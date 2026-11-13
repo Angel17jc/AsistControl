@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
+import { LinkMailer } from './link-mailer';
 import { MAIL_TRANSPORT, type MailTransport, SmtpMailTransport } from './mail-transport';
 
 @Module({
   providers: [
+    LinkMailer,
     {
       provide: MAIL_TRANSPORT,
       inject: [AppConfigService],
@@ -19,6 +21,6 @@ import { MAIL_TRANSPORT, type MailTransport, SmtpMailTransport } from './mail-tr
       },
     },
   ],
-  exports: [MAIL_TRANSPORT],
+  exports: [MAIL_TRANSPORT, LinkMailer],
 })
 export class MailModule {}
