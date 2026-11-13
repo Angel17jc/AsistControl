@@ -16,6 +16,7 @@ const account = (over: Partial<UserRow>): UserRow => ({
   employeeId: null,
   lastLoginAt: null,
   mustChangePassword: false,
+  invitation: null,
   createdAt: '2026-09-01T00:00:00Z',
   employee: null,
   ...over,
@@ -47,7 +48,10 @@ const EMPLOYEES = [
   employee('e2', 'Luis', null),
 ];
 
-function renderPage(role: 'SUPER_ADMIN' | 'ADMIN' = 'SUPER_ADMIN') {
+function renderPage(
+  role: 'SUPER_ADMIN' | 'ADMIN' = 'SUPER_ADMIN',
+  { passwordLinks = false, users = USERS } = {},
+) {
   useAuth.setState({
     status: 'authenticated',
     accessToken: 'token',
@@ -67,10 +71,11 @@ function renderPage(role: 'SUPER_ADMIN' | 'ADMIN' = 'SUPER_ADMIN') {
         : Response.json({ id: 'new' });
     }
     const url = String(input);
+    if (url.startsWith('/api/auth/options')) return Response.json({ passwordLinks });
     if (url.startsWith('/api/users')) {
       return Response.json({
-        data: USERS,
-        meta: { page: 1, pageSize: 20, total: 4, totalPages: 1 },
+        data: users,
+        meta: { page: 1, pageSize: 20, total: users.length, totalPages: 1 },
       });
     }
     if (url.startsWith('/api/employees')) {
@@ -139,6 +144,67 @@ describe('UsersPage', () => {
         body: { email: 'luis@e.local', password, role: 'EMPLOYEE', employeeId: 'e2' },
       }),
     );
+  });
+
+  it('invites by email when the server can send it: nobody else knows the password', async () => {
+    renderPage('SUPER_ADMIN', { passwordLinks: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
+    const form = screen.getByRole('form', { name: 'Nueva cuenta' });
+    await userEvent.type(within(form).getByLabelText('Correo'), 'luis@e.local');
+    await userEvent.click(await within(form).findByRole('button', { name: /Luis Prueba/ }));
+    expect(
+      await within(form).findByRole('radio', { name: /Enviarle una invitación por correo/ }),
+    ).toBeChecked();
+    expect(within(form).queryByLabelText('Contraseña inicial')).toBeNull();
+    await userEvent.click(within(form).getByRole('button', { name: 'Crear cuenta' }));
+
+    await waitFor(() =>
+      expect(sent('POST')).toEqual({
+        url: '/api/users',
+        body: { email: 'luis@e.local', role: 'EMPLOYEE', invite: true, employeeId: 'e2' },
+      }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Invitación enviada a luis@e.local. El enlace vale 72 horas.',
+    );
+  });
+
+  it('can still give a temporary password, for someone without email of their own', async () => {
+    renderPage('SUPER_ADMIN', { passwordLinks: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
+    const form = screen.getByRole('form', { name: 'Nueva cuenta' });
+    await userEvent.click(
+      await within(form).findByRole('radio', { name: /Darle una contraseña temporal/ }),
+    );
+    expect(within(form).getByLabelText('Contraseña inicial')).toBeVisible();
+  });
+
+  it('shows pending and expired invitations and sends a new one', async () => {
+    renderPage('SUPER_ADMIN', {
+      passwordLinks: true,
+      users: [
+        account({
+          id: 'u-new',
+          email: 'nuevo@e.local',
+          invitation: { expiresAt: '2026-11-20T15:00:00Z', expired: false },
+        }),
+        account({
+          id: 'u-old',
+          email: 'viejo@e.local',
+          invitation: { expiresAt: '2026-11-01T15:00:00Z', expired: true },
+        }),
+      ],
+    });
+    expect(
+      within(await rowOf('nuevo@e.local')).getByText(/Invitación enviada · vence el/),
+    ).toBeVisible();
+    const old = await rowOf('viejo@e.local');
+    expect(within(old).getByText('Invitación vencida: reenvíela')).toBeVisible();
+    await userEvent.click(
+      within(old).getByRole('button', { name: 'Reenviar invitación a viejo@e.local' }),
+    );
+    await waitFor(() => expect(sent('POST')?.url).toBe('/api/users/u-old/invitation'));
+    expect(await within(old).findByRole('status')).toHaveTextContent('Invitación reenviada.');
   });
 
   it('asks for an employee only when the role needs one', async () => {

@@ -11,6 +11,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 
@@ -21,12 +22,27 @@ export class CreateUserDto {
   @MaxLength(254)
   email: string;
 
-  @ApiProperty({ minLength: 10, description: 'At least 10 characters, letters and numbers' })
+  @ApiPropertyOptional({
+    minLength: 10,
+    description:
+      'Temporary password, replaced by its owner at first sign-in. Required unless `invite`.',
+  })
+  // With an invitation there is no password: the person chooses it from the email.
+  @ValidateIf((dto: CreateUserDto) => dto.invite !== true)
   @IsString()
   @Matches(PASSWORD_RULE, {
     message: 'password must have at least 10 characters, letters and numbers',
   })
-  password: string;
+  password?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Email the person a link to choose their own password (valid 72 h) instead of giving a ' +
+      'temporary one (ADR 0016).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  invite?: boolean;
 
   @ApiProperty({ enum: ROLES })
   @IsIn(ROLES)
