@@ -7,6 +7,7 @@ import {
 import type { Prisma } from '@prisma/client';
 import { PRIVILEGED_ROLES, type Role, SCOPED_ROLES } from '@asistcontrol/shared';
 import { AuditService } from '../audit/audit.service';
+import { PasswordLinksService } from '../auth/password-links.service';
 import { PasswordService } from '../auth/password.service';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
@@ -158,6 +159,8 @@ export class UsersService {
         where: { userId: id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      // A pending "forgot password" link or invitation would undo it.
+      await PasswordLinksService.retireLinks(tx, id);
       await this.audit.record(
         {
           actorId: actor.id,

@@ -83,6 +83,16 @@ openssl rand -base64 32                               # DEVICE_SECRETS_KEY
   conectado.
 - **Guardar una copia de `.env.production` en un gestor de contraseñas.** Sin `DEVICE_SECRETS_KEY`, un
   respaldo restaurado no puede leer las contraseñas de los marcadores.
+- **Correo (opcional)**: `SMTP_URL` y `MAIL_FROM` encienden los avisos por correo y «olvidé mi
+  contraseña» con invitaciones ([ADR 0016](adr/0016-password-links-by-email.md)). Sin ellos, en
+  producción la pantalla de inicio indica pedir la contraseña a un administrador. Con **Amazon SES**:
+  1. En SES, verificar el dominio o el remitente (`no-reply@empresa.com`).
+  2. En «SMTP settings», crear las credenciales SMTP (no son las claves de acceso de AWS).
+  3. `SMTP_URL=smtp://<usuario SMTP>:<contraseña SMTP>@email-smtp.<región>.amazonaws.com:587`
+     (los caracteres especiales de la contraseña, codificados: `/` → `%2F`, `+` → `%2B`).
+  4. `MAIL_FROM=AsistControl <no-reply@empresa.com>`, con el remitente verificado.
+  5. Mientras la cuenta de SES esté en modo de prueba («sandbox»), solo llegan correos a direcciones
+     verificadas: pedir a AWS el acceso de producción antes de usarlo con todo el personal.
 
 El Compose se niega a arrancar si falta algo, y dice qué:
 

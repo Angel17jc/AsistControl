@@ -51,6 +51,12 @@ const ReportsPage = lazy(() =>
 const RequestsPage = lazy(() =>
   import('./pages/RequestsPage').then((m) => ({ default: m.RequestsPage })),
 );
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import('./pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
+);
 
 /** Route guard. The API enforces permissions; this only avoids rendering pages that would 403. */
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
@@ -78,6 +84,9 @@ export function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Open with or without a session: they come from an emailed link (ADR 0016). */}
+        <Route path="/olvide-contrasena" element={<ForgotPasswordPage />} />
+        <Route path="/restablecer" element={<ResetPasswordPage />} />
         <Route
           element={
             status !== 'authenticated' ? (

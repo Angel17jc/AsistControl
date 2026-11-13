@@ -37,6 +37,12 @@ const TEXTS: { [C in ApiErrorCode]: (params: ApiErrorParams[C]) => string } = {
   PASSWORD_CHANGED_MEANWHILE: () =>
     'La contraseña se cambió desde otra sesión. Vuelva a iniciar sesión.',
   PASSWORD_CHANGE_REQUIRED: () => 'Debe elegir una contraseña nueva antes de continuar.',
+  PASSWORD_LINK_INVALID: () =>
+    'Este enlace ya no sirve: se usó, se pidió uno más nuevo o la cuenta está desactivada.',
+  PASSWORD_LINK_EXPIRED: ({ purpose }) =>
+    purpose === 'INVITE'
+      ? 'Esta invitación venció. Pida a un administrador que le envíe otra.'
+      : 'Este enlace venció. Pida uno nuevo desde «¿Olvidó su contraseña?».',
 
   USER_NOT_FOUND: () => 'No se encontró esa cuenta: puede que ya no exista.',
   SELF_ACCOUNT_CHANGE: () => 'No puede cambiar su propio rol ni desactivar su propia cuenta.',

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -10,7 +11,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { AuthSession } from '@asistcontrol/shared';
+import type { AuthOptions, AuthSession, PasswordLinkInfo } from '@asistcontrol/shared';
 import type { CookieOptions, Request, Response } from 'express';
 import type { AuthenticatedUser, RequestContext } from '../common/auth/authenticated-user';
 import { AllowPendingPasswordChange, CurrentUser, Public, ReqContext } from '../common/decorators';
@@ -18,6 +19,8 @@ import { AppConfigService } from '../config/app-config.service';
 import { AuthService, type IssuedSession } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto, PasswordLinkDto, ResetPasswordDto } from './dto/password-links.dto';
+import { PasswordLinksService } from './password-links.service';
 
 export const REFRESH_COOKIE = 'ac_refresh';
 
@@ -26,6 +29,7 @@ export const REFRESH_COOKIE = 'ac_refresh';
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly links: PasswordLinksService,
     private readonly config: AppConfigService,
   ) {}
 
@@ -103,6 +107,69 @@ export class AuthController {
     @ReqContext() ctx: RequestContext,
   ): Promise<void> {
     return this.auth.changePassword(user, dto.currentPassword, dto.newPassword, ctx);
+  }
+
+  @Public()
+  @Get('options')
+  @ApiOperation({
+    summary: 'What the sign-in page may offer',
+    description: 'passwordLinks: "forgot password" and invitations can reach people (ADR 0016).',
+  })
+  options(): AuthOptions {
+    return { passwordLinks: this.links.available };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.ACCEPTED)
+  // Every call may send an email: low limit per IP, plus one email per account per minute.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Email a link to choose a new password',
+    description:
+      'Always 202 with no body, whether the address has an account or not, so the answer does ' +
+      'not reveal which addresses are registered. The link works once, for 30 minutes.',
+  })
+  @ApiAcceptedResponse({ description: 'If the account exists and is active, a link is on its way' })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @ReqContext() ctx: RequestContext,
+  ): Promise<void> {
+    await this.links.requestReset(dto.email, ctx);
+  }
+
+  @Public()
+  @Post('password-link')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'What a password link opens',
+    description:
+      'The account and purpose of a link, before asking for the new password. POST, so the ' +
+      'token stays out of URLs and logs.',
+  })
+  @ApiOkResponse({ description: '{ email, purpose: RESET | INVITE, expiresAt }' })
+  @ApiBadRequestResponse({ description: 'PASSWORD_LINK_INVALID or PASSWORD_LINK_EXPIRED' })
+  inspectLink(@Body() dto: PasswordLinkDto): Promise<PasswordLinkInfo> {
+    return this.links.inspect(dto.token);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Choose a password with an emailed link',
+    description:
+      'Sets the password, ends every session of the account and invalidates its other links. ' +
+      'Sign in afterwards.',
+  })
+  @ApiNoContentResponse({ description: 'Password set' })
+  @ApiBadRequestResponse({
+    description: 'PASSWORD_LINK_INVALID, PASSWORD_LINK_EXPIRED or a weak password',
+  })
+  resetPassword(@Body() dto: ResetPasswordDto, @ReqContext() ctx: RequestContext): Promise<void> {
+    return this.links.complete(dto.token, dto.newPassword, ctx);
   }
 
   @Get('me')

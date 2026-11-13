@@ -112,7 +112,9 @@ async function withAuthRetry(path: string, options: RequestOptions): Promise<Res
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const res = await withAuthRetry(path, options);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Some answers carry no body on purpose (202 of "olvidé mi contraseña").
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Authenticated file download (CSV reports). */

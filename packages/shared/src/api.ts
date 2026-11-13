@@ -46,6 +46,23 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+/** What the sign-in page may offer, before anyone is signed in. */
+export interface AuthOptions {
+  /** "Olvidé mi contraseña" and invitations work: the server can send (or show) the email. */
+  passwordLinks: boolean;
+}
+
+/** Why a password link was sent (ADR 0016). */
+export const PASSWORD_LINK_PURPOSES = ['RESET', 'INVITE'] as const;
+export type PasswordLinkPurpose = (typeof PASSWORD_LINK_PURPOSES)[number];
+
+/** What a valid password link opens: whose password it sets, and until when. */
+export interface PasswordLinkInfo {
+  email: string;
+  purpose: PasswordLinkPurpose;
+  expiresAt: string;
+}
+
 export interface DashboardSummary {
   date: string;
   timezone: string;

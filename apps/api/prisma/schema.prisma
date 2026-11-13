@@ -54,6 +54,14 @@ enum VacationDayCounting {
   WORKING_DAYS
 }
 
+/// What a password link is for (ADR 0016).
+enum PasswordLinkPurpose {
+  /// "Olvidé mi contraseña": the owner asked for it.
+  RESET
+  /// An administrator created the account and the person chooses their first password.
+  INVITE
+}
+
 /// Delivery of a notification by email (ADR 0011).
 enum EmailStatus {
   PENDING
@@ -185,8 +193,31 @@ model User {
   sessions      Session[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  passwordLinks PasswordLink[]
 
   @@map("users")
+}
+
+/// A single-use link to choose a password, sent by email (ADR 0016). Only the SHA-256 of the
+/// token is kept: the token itself exists only in the email, so reading the database does not
+/// give anyone a usable link.
+model PasswordLink {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  purpose     PasswordLinkPurpose
+  tokenHash   String              @unique @map("token_hash")
+  expiresAt   DateTime            @map("expires_at") @db.Timestamptz(3)
+  /// Set when the link chose a password, or when a newer link or a password change made it
+  /// worthless. A link with this set never works again.
+  usedAt      DateTime?           @map("used_at") @db.Timestamptz(3)
+  /// Who created the account, for an invitation; null when the owner asked for a reset.
+  createdById String?             @map("created_by_id") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("password_links")
 }
 
 /// One row per login. The refresh token rotates in place; presenting an old token revokes the session.

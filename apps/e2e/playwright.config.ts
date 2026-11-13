@@ -95,6 +95,8 @@ export default defineConfig({
         DEVICE_SYNC_INTERVAL_SECONDS: '0',
         ENABLE_MOCK_DEVICES: 'true',
         APP_TIMEZONE: 'America/Guayaquil',
+        // Turns on "olvidé mi contraseña": without SMTP, outside production, links go to the log.
+        APP_PUBLIC_URL: BASE_URL,
         // Signing in is limited to 5 attempts a minute, and the suite signs in far more
         // often than a person would. Rate limiting is covered by the API e2e suite.
         THROTTLE_ENABLED: 'false',

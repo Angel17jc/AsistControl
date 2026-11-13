@@ -25,9 +25,11 @@ x-api-env: &api-env
   ENABLE_MOCK_DEVICES: ${ENABLE_MOCK_DEVICES:-true}
   APP_TIMEZONE: ${APP_TIMEZONE:-America/Guayaquil}
   # Email notifications stay off unless SMTP_URL is set (docs/adr/0011-email-notifications.md).
+  # Without it, password links (ADR 0016) are written to this stack's log instead.
   SMTP_URL: ${SMTP_URL:-}
   MAIL_FROM: ${MAIL_FROM:-}
-  APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+  # Where links in emails point: the web port this stack is published on.
+  APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:${WEB_PORT:-8080}}
   SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
 
 services:
