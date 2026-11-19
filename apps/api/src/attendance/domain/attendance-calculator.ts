@@ -57,11 +57,15 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   });
 
   let workedMs = complete.reduce((sum, s) => sum + (s.out.getTime() - s.in.getTime()), 0);
-  // Time away between punches, approved leave included, as punched.
-  const awayMs = gapsBetween(segments);
-  let breakMs = awayMs;
-  // The pauses people took, without approved leave inside them: a permission is not lunch.
-  const pauseMs = pausesBetween(segments, input.leaves);
+  // Every pause between punches, as punched.
+  let breakMs = gapsBetween(segments);
+  // Only a pause that starts before a fixed shift ends can be lunch: leaving at 17:04 and
+  // coming back at 22:00 is not one. A shift without fixed hours has no such end.
+  const lunchUntil = shift && !shift.flexible ? shift.end : null;
+  // Time away that could be lunch, approved leave included: it was not worked either.
+  const awayMs = lunchPausesMs(segments, lunchUntil);
+  // The same without approved leave inside: a permission is not lunch.
+  const pauseMs = lunchPausesMs(segments, lunchUntil, input.leaves);
   const scheduledBreakMs =
     shift?.breakStart && shift.breakEnd ? shift.breakEnd.getTime() - shift.breakStart.getTime() : 0;
 
@@ -443,13 +447,21 @@ function gapsBetween(segments: WorkSegment[]): number {
   return total;
 }
 
-/** The time between segments that approved leave does not cover: the pauses taken. */
-function pausesBetween(segments: WorkSegment[], leaves: LeaveInterval[]): number {
+/**
+ * The pauses between segments that could be lunch: those starting before `until` (null: any).
+ * With `leaves`, the time approved leave covers is left out.
+ */
+function lunchPausesMs(
+  segments: WorkSegment[],
+  until: Date | null,
+  leaves: LeaveInterval[] = [],
+): number {
   let total = 0;
   for (let i = 1; i < segments.length; i++) {
     const prevOut = segments[i - 1]!.out;
     const nextIn = segments[i]!.in;
     if (!prevOut || !nextIn || nextIn <= prevOut) continue;
+    if (until && prevOut >= until) continue;
     const covered = leaves.reduce((sum, l) => sum + overlapOf(l, prevOut, nextIn), 0);
     total += Math.max(0, nextIn.getTime() - prevOut.getTime() - covered);
   }
