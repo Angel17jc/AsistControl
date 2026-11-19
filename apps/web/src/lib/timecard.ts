@@ -47,6 +47,36 @@ export interface TimecardTotals {
   strayDays: number;
 }
 
+export interface TimecardWeek {
+  /** First and last day of the week the card has, `YYYY-MM-DD`. */
+  from: string;
+  to: string;
+  totals: TimecardTotals;
+}
+
+/** Monday of the week a `YYYY-MM-DD` date falls in. */
+function mondayOf(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  const weekday = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - (weekday === 0 ? 6 : weekday - 1));
+  return date.toISOString().slice(0, 10);
+}
+
+/** A card's days grouped by week, Monday to Sunday, in the order they come. */
+export function weeksOf(records: AttendanceRecordRow[]): TimecardWeek[] {
+  const groups: AttendanceRecordRow[][] = [];
+  for (const r of records) {
+    const current = groups.at(-1);
+    if (current && mondayOf(current[0]!.workDate) === mondayOf(r.workDate)) current.push(r);
+    else groups.push([r]);
+  }
+  return groups.map((days) => ({
+    from: days[0]!.workDate,
+    to: days.at(-1)!.workDate,
+    totals: timecardTotals(days),
+  }));
+}
+
 /** What a time card adds up at the bottom: one employee, a period. */
 export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
   const totals: TimecardTotals = {

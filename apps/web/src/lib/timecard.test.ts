@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { breaksOf, differenceOf, timecardTotals } from './timecard';
+import { breaksOf, differenceOf, timecardTotals, weeksOf } from './timecard';
 import type { AttendanceRecordRow } from './types';
 
 const record = (rest: Partial<AttendanceRecordRow>): AttendanceRecordRow =>
@@ -72,6 +72,30 @@ describe('timecardTotals', () => {
       incomplete: 1,
       strayDays: 1,
     });
+  });
+});
+
+describe('weeksOf', () => {
+  it('groups the days Monday to Sunday and adds up each week', () => {
+    const day = (workDate: string, rest: Partial<AttendanceRecordRow> = {}) =>
+      record({ workDate, ...rest });
+    const weeks = weeksOf([
+      day('2026-09-30', { workedMinutes: 500 }),
+      day('2026-10-02'),
+      // A Sunday belongs to the week that started on Monday.
+      day('2026-10-04', { workedMinutes: 240, expectedMinutes: 0 }),
+      day('2026-10-05', { lateMinutes: 12, workedMinutes: 468 }),
+    ]);
+    expect(weeks.map((w) => [w.from, w.to])).toEqual([
+      ['2026-09-30', '2026-10-04'],
+      ['2026-10-05', '2026-10-05'],
+    ]);
+    expect(weeks[0]!.totals).toMatchObject({
+      workedMinutes: 1220,
+      expectedMinutes: 960,
+      differenceMinutes: 260,
+    });
+    expect(weeks[1]!.totals).toMatchObject({ lateMinutes: 12, differenceMinutes: -12 });
   });
 });
 

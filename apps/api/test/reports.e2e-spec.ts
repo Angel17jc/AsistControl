@@ -139,6 +139,7 @@ describe('Reports in Spanish (e2e)', () => {
       const zip = unzipSync(new Uint8Array(res.body as Buffer));
       const workbook = strFromU8(zip['xl/workbook.xml']!);
       expect(workbook).toContain('name="Asistencia"');
+      expect(workbook).toContain('name="Semanas"');
       expect(workbook).toContain('name="Resumen"');
     });
 

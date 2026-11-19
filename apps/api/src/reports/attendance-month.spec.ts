@@ -27,6 +27,8 @@ const worked = (date: string, stretches: [string | null, string | null][]): Mont
     lateMinutes: 0,
     overtimeMinutes: 0,
     shortMinutes: 0,
+    expectedMinutes: 480,
+    longBreakMinutes: 0,
     anomalies: [],
     isFinal: true,
   };
@@ -174,14 +176,18 @@ describe('buildAttendanceMonth', () => {
         { ...worked('2026-10-05', [['08:00', '17:00']]), workedMinutes: 480 },
         { ...worked('2026-10-06', [['09:00', '17:00']]), workedMinutes: 420, shortMinutes: 60 },
         empty('2026-10-07', 'ABSENT'),
-        empty('2026-10-08', 'ON_LEAVE'),
+        { ...empty('2026-10-08', 'ON_LEAVE'), expectedMinutes: 0 },
       ],
     });
     expect(employees[0]!.totals).toEqual({
       daysWorked: 2,
       workedMinutes: 900,
+      // Three days owed 8 h; the day on leave owed nothing.
+      expectedMinutes: 3 * 480,
+      differenceMinutes: 900 - 3 * 480,
       shortMinutes: 60,
       lateMinutes: 0,
+      longBreakMinutes: 0,
       overtimeMinutes: 0,
       absences: 1,
       incomplete: 0,
@@ -189,11 +195,77 @@ describe('buildAttendanceMonth', () => {
     });
   });
 
-  it('says nothing twice: hours short have their own column, not a note', () => {
+  it('keeps the account of each closed day against what it expected', () => {
+    const today = '2026-10-07';
+    const month = build(
+      {
+        records: [
+          { ...worked('2026-10-05', [['08:00', '17:00']]), workedMinutes: 450 },
+          { ...empty('2026-10-03', 'REST_DAY'), expectedMinutes: 0 },
+          empty('2026-10-06', 'ABSENT'),
+          { ...worked(today, [['08:00', null]]), workedMinutes: 120, isFinal: false },
+        ],
+      },
+      today,
+    );
+    expect(dayOf(month, '2026-10-05').differenceMinutes).toBe(-30);
+    expect(dayOf(month, '2026-10-06').differenceMinutes).toBe(-480);
+    // A rest day nobody worked, a day without a record and today owe nothing yet.
+    expect(dayOf(month, '2026-10-03').differenceMinutes).toBeNull();
+    expect(dayOf(month, '2026-10-04').differenceMinutes).toBeNull();
+    expect(dayOf(month, today).differenceMinutes).toBeNull();
+    expect(month.employees[0]!.totals).toMatchObject({
+      workedMinutes: 570,
+      expectedMinutes: 960,
+      differenceMinutes: -510,
+    });
+  });
+
+  it('adds up each week from Monday to Sunday, cut to the month', () => {
+    const { employees } = build({
+      records: [
+        { ...worked('2026-10-02', [['08:00', '17:00']]), workedMinutes: 500 },
+        { ...worked('2026-10-05', [['08:00', '17:00']]), lateMinutes: 12 },
+        {
+          ...worked('2026-10-11', [['08:00', '12:00']]),
+          status: 'REST_DAY',
+          workedMinutes: 240,
+          expectedMinutes: 0,
+        },
+        { ...worked('2026-10-12', [['08:00', '17:00']]), longBreakMinutes: 25, workedMinutes: 455 },
+      ],
+    });
+    const weeks = employees[0]!.weeks;
+    expect(weeks.map((w) => [w.from, w.to])).toEqual([
+      ['2026-10-01', '2026-10-04'],
+      ['2026-10-05', '2026-10-11'],
+      ['2026-10-12', '2026-10-18'],
+      ['2026-10-19', '2026-10-25'],
+      ['2026-10-26', '2026-10-31'],
+    ]);
+    expect(weeks[0]).toMatchObject({
+      workedMinutes: 500,
+      expectedMinutes: 480,
+      differenceMinutes: 20,
+    });
+    // The Sunday worked counts in its week, all of it over.
+    expect(weeks[1]).toMatchObject({
+      daysWorked: 2,
+      workedMinutes: 720,
+      expectedMinutes: 480,
+      differenceMinutes: 240,
+      lateMinutes: 12,
+    });
+    expect(weeks[2]).toMatchObject({ longBreakMinutes: 25, differenceMinutes: -25 });
+    expect(weeks[3]).toMatchObject({ workedMinutes: 0, expectedMinutes: 0, differenceMinutes: 0 });
+  });
+
+  it('says nothing twice: hours short and long lunches have their own column, not a note', () => {
     const record = {
       ...worked('2026-10-05', [['09:00', '17:00']]),
       shortMinutes: 60,
-      anomalies: ['SHORT_HOURS' as const, 'DUPLICATE_PUNCH' as const],
+      longBreakMinutes: 20,
+      anomalies: ['SHORT_HOURS' as const, 'LONG_BREAK' as const, 'DUPLICATE_PUNCH' as const],
     };
     expect(dayOf(build({ records: [record] }), '2026-10-05').notes).toBe('Marcación duplicada');
   });
@@ -201,7 +273,10 @@ describe('buildAttendanceMonth', () => {
 
 describe('monthRows', () => {
   it('has a column for what the month has, and none for what it does not', () => {
-    const plain = monthRows(build({ records: [worked('2026-10-05', [['08:00', '17:00']])] }));
+    // Without a schedule nothing is expected, so there is no difference to show either.
+    const plain = monthRows(
+      build({ records: [{ ...worked('2026-10-05', [['08:00', '17:00']]), expectedMinutes: 0 }] }),
+    );
     expect(Object.keys(plain[0]!)).toEqual([
       'fecha',
       'dia',
@@ -224,12 +299,17 @@ describe('monthRows', () => {
             lateMinutes: 30,
             overtimeMinutes: 120,
             shortMinutes: 15,
+            workedMinutes: 525,
+            longBreakMinutes: 20,
           },
         ],
       }),
     );
     expect(full[4]).toMatchObject({
       departamento: 'Ventas',
+      horas_esperadas: '8h 00m',
+      diferencia: '+0h 45m',
+      almuerzo_largo: '0h 20m',
       atraso: '0h 30m',
       horas_extra: '2h 00m',
       horas_faltantes: '0h 15m',

@@ -142,11 +142,14 @@ const lastRecordsUrl = () =>
     ),
     'http://x',
   );
-const dates = () =>
+const firstCells = () =>
   screen
     .getAllByRole('row')
     .slice(1)
-    .map((r) => within(r).getAllByRole('cell')[0]!.textContent);
+    .map((r) => within(r).getAllByRole('cell')[0]!.textContent ?? '');
+/** The days of the table, without the lines closing each week. */
+const dates = () => firstCells().filter((text) => !text.startsWith('Semana'));
+const weekLines = () => firstCells().filter((text) => text.startsWith('Semana'));
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
@@ -267,9 +270,40 @@ describe('RecordsTable', () => {
     expect(lastRecordsUrl().searchParams.get('pageSize')).toBe('100');
     expect(dates()).toEqual(['mar, 29 sept', 'mié, 30 sept', 'jue, 1 oct', 'vie, 2 oct']);
     expect(screen.queryByRole('columnheader', { name: 'Empleado' })).not.toBeInTheDocument();
+    // The week closes after its last day, with its own account.
+    expect(weekLines()).toEqual([
+      'Semana mar, 29 sept – vie, 2 oct · Trabajado 21h 04m · Esperado 32h 00m · ' +
+        'Diferencia −10h 56m · Atraso 12 min · Extra 1h 30m',
+    ]);
+    expect(firstCells().at(-1)).toMatch(/^Semana/);
 
     await user.click(screen.getByRole('button', { name: 'Imprimir' }));
     expect(print).toHaveBeenCalled();
+  });
+
+  it('closes each week of a card, and only on a card', async () => {
+    const twoWeeks = [
+      record('2026-10-06', { workedMinutes: 450 }),
+      record('2026-10-05', {}),
+      record('2026-10-02', { longBreakMinutes: 25, workedMinutes: 455 }),
+    ];
+    renderTable('EMPLOYEE', 'e1', twoWeeks);
+    await screen.findByRole('region', { name: 'Tarjeta de tiempo' });
+    expect(firstCells()).toEqual([
+      'vie, 2 oct',
+      'Semana vie, 2 oct – vie, 2 oct · Trabajado 7h 35m · Esperado 8h 00m · ' +
+        'Diferencia −0h 25m · Almuerzo largo 25 min',
+      'lun, 5 oct',
+      'mar, 6 oct',
+      'Semana lun, 5 oct – mar, 6 oct · Trabajado 15h 30m · Esperado 16h 00m · ' +
+        'Diferencia −0h 30m',
+    ]);
+  });
+
+  it('has no week lines in the list of everyone', async () => {
+    renderTable('HR');
+    await screen.findByText('vie, 2 oct');
+    expect(weekLines()).toEqual([]);
   });
 
   it('marks a long lunch, and leaves today out of the account until it closes', async () => {

@@ -3,10 +3,11 @@ import {
   ATTENDANCE_STATUS_LABEL,
   type AttendanceAnomaly,
   type AttendanceStatus,
+  formatDifference,
   formatMinutes,
 } from '@asistcontrol/shared';
 import { DateTime } from 'luxon';
-import { eachDate } from '../common/utils/date-only';
+import { addDays, eachDate } from '../common/utils/date-only';
 
 const MONTHS = [
   'enero',
@@ -25,7 +26,12 @@ const MONTHS = [
 const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'] as const;
 
 /** Said by their own columns, so the notes do not repeat them. */
-const IN_THEIR_OWN_COLUMN = new Set<AttendanceAnomaly>(['SHORT_HOURS', 'OVERTIME', 'LATE_ARRIVAL']);
+const IN_THEIR_OWN_COLUMN = new Set<AttendanceAnomaly>([
+  'SHORT_HOURS',
+  'OVERTIME',
+  'LATE_ARRIVAL',
+  'LONG_BREAK',
+]);
 
 /** A work day as stored, with only what this document reads. */
 export interface MonthRecord {
@@ -41,6 +47,8 @@ export interface MonthRecord {
   lateMinutes: number;
   overtimeMinutes: number;
   shortMinutes: number;
+  expectedMinutes: number;
+  longBreakMinutes: number;
   anomalies: AttendanceAnomaly[];
   isFinal: boolean;
 }
@@ -68,21 +76,40 @@ export interface MonthDay {
   lateMinutes: number;
   overtimeMinutes: number;
   shortMinutes: number;
+  /** What the schedule expected, approved leave taken off; 0 on days off. */
+  expectedMinutes: number;
+  /** Worked minus expected; null while the day is open, and on a day off nobody worked. */
+  differenceMinutes: number | null;
+  longBreakMinutes: number;
   status: string;
   notes: string;
   /** A rest day or holiday nobody worked: it only completes the calendar. */
   off: boolean;
 }
 
-export interface MonthTotals {
+/** What a stretch of days adds up to. Expected hours and the difference count closed days. */
+export interface PeriodTotals {
   daysWorked: number;
   workedMinutes: number;
+  expectedMinutes: number;
+  differenceMinutes: number;
   shortMinutes: number;
   lateMinutes: number;
+  longBreakMinutes: number;
   overtimeMinutes: number;
+}
+
+export interface MonthTotals extends PeriodTotals {
   absences: number;
   incomplete: number;
   leaveDays: number;
+}
+
+/** A week from Monday to Sunday, cut to the days of the document. */
+export interface MonthWeek extends PeriodTotals {
+  /** YYYY-MM-DD, first and last day of the week inside the document. */
+  from: string;
+  to: string;
 }
 
 export interface MonthSheet {
@@ -90,6 +117,7 @@ export interface MonthSheet {
   name: string;
   department: string | null;
   days: MonthDay[];
+  weeks: MonthWeek[];
   totals: MonthTotals;
 }
 
@@ -103,6 +131,9 @@ export interface AttendanceMonth {
   hasLateness: boolean;
   hasOvertime: boolean;
   hasShortHours: boolean;
+  hasLongBreaks: boolean;
+  /** Days with a schedule to compare with: without one there is no expected hour. */
+  hasExpected: boolean;
   hasDepartments: boolean;
 }
 
@@ -128,6 +159,8 @@ export function buildAttendanceMonth(params: {
     hasLateness: days.some((d) => d.lateMinutes > 0),
     hasOvertime: days.some((d) => d.overtimeMinutes > 0),
     hasShortHours: days.some((d) => d.shortMinutes > 0),
+    hasLongBreaks: days.some((d) => d.longBreakMinutes > 0),
+    hasExpected: days.some((d) => d.expectedMinutes > 0),
     hasDepartments: sheets.some((s) => s.department !== null),
   };
 }
@@ -153,6 +186,7 @@ function sheetOf(
     name: employee.name,
     department: employee.department,
     days,
+    weeks: weeksOf(days),
     totals: totalsOf(days, employee.records),
   };
 }
@@ -177,6 +211,9 @@ function dayOf(
       lateMinutes: 0,
       overtimeMinutes: 0,
       shortMinutes: 0,
+      expectedMinutes: 0,
+      differenceMinutes: null,
+      longBreakMinutes: 0,
       // Today may simply not have started; an older day means nothing was ever calculated.
       status: date === today ? 'Sin marcaciones todavía' : 'Sin registro',
       notes: '',
@@ -209,6 +246,9 @@ function dayOf(
     lateMinutes: record.lateMinutes,
     overtimeMinutes: record.overtimeMinutes,
     shortMinutes: record.shortMinutes,
+    expectedMinutes: record.expectedMinutes,
+    differenceMinutes: differenceOf(record),
+    longBreakMinutes: record.longBreakMinutes,
     status: ATTENDANCE_STATUS_LABEL[record.status],
     notes: notes.join(' · '),
     off:
@@ -236,15 +276,55 @@ function pausesOf(segments: MonthRecord['segments']) {
   return { lunch, others: pauses.filter((p) => p !== lunch) };
 }
 
-function totalsOf(days: MonthDay[], records: MonthRecord[]): MonthTotals {
-  const count = (status: AttendanceStatus) => records.filter((r) => r.status === status).length;
+/**
+ * Worked minus expected on a closed day. An open day's hours are not all in yet, and a day off
+ * nobody worked owes nothing and gave nothing.
+ */
+function differenceOf(record: MonthRecord): number | null {
+  if (!record.isFinal) return null;
+  if (record.expectedMinutes === 0 && record.workedMinutes === 0) return null;
+  return record.workedMinutes - record.expectedMinutes;
+}
+
+function periodTotalsOf(days: MonthDay[]): PeriodTotals {
   const sum = (pick: (d: MonthDay) => number) => days.reduce((total, d) => total + pick(d), 0);
   return {
     daysWorked: days.filter((d) => d.entry !== null).length,
     workedMinutes: sum((d) => d.workedMinutes),
+    // Only the days already in the account: the expected hours of today come when it closes.
+    expectedMinutes: sum((d) => (d.differenceMinutes === null ? 0 : d.expectedMinutes)),
+    differenceMinutes: sum((d) => d.differenceMinutes ?? 0),
     shortMinutes: sum((d) => d.shortMinutes),
     lateMinutes: sum((d) => d.lateMinutes),
+    longBreakMinutes: sum((d) => d.longBreakMinutes),
     overtimeMinutes: sum((d) => d.overtimeMinutes),
+  };
+}
+
+/** The days grouped by week, Monday to Sunday, each with what it adds up to. */
+function weeksOf(days: MonthDay[]): MonthWeek[] {
+  const weeks: MonthDay[][] = [];
+  for (const day of days) {
+    const current = weeks.at(-1);
+    if (current && mondayOf(day.date) === mondayOf(current[0]!.date)) current.push(day);
+    else weeks.push([day]);
+  }
+  return weeks.map((week) => ({
+    from: week[0]!.date,
+    to: week.at(-1)!.date,
+    ...periodTotalsOf(week),
+  }));
+}
+
+function mondayOf(isoDate: string): string {
+  const day = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
+  return addDays(isoDate, -(day === 0 ? 6 : day - 1));
+}
+
+function totalsOf(days: MonthDay[], records: MonthRecord[]): MonthTotals {
+  const count = (status: AttendanceStatus) => records.filter((r) => r.status === status).length;
+  return {
+    ...periodTotalsOf(days),
     absences: count('ABSENT'),
     incomplete: count('INCOMPLETE'),
     leaveDays: count('ON_LEAVE'),
@@ -270,8 +350,15 @@ export function monthRows(month: AttendanceMonth) {
       regreso_almuerzo: d.lunchBack,
       salida: d.exit,
       horas_trabajadas: d.entry ? formatMinutes(d.workedMinutes) : null,
+      ...(month.hasExpected
+        ? {
+            horas_esperadas: minutesOrNull(d.expectedMinutes),
+            diferencia: d.differenceMinutes === null ? null : formatDifference(d.differenceMinutes),
+          }
+        : {}),
       ...(month.hasShortHours ? { horas_faltantes: minutesOrNull(d.shortMinutes) } : {}),
       ...(month.hasLateness ? { atraso: minutesOrNull(d.lateMinutes) } : {}),
+      ...(month.hasLongBreaks ? { almuerzo_largo: minutesOrNull(d.longBreakMinutes) } : {}),
       ...(month.hasOvertime ? { horas_extra: minutesOrNull(d.overtimeMinutes) } : {}),
       estado: d.status,
       novedades: d.notes,
