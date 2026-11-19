@@ -204,13 +204,117 @@ describe('calculateAttendance', () => {
       expect(r.workedMinutes).toBe(9 * 60);
     });
 
-    it('flags breaks shorter than the configured minimum', () => {
+    it('flags breaks shorter than the configured minimum, and still takes out the whole lunch', () => {
       const r = run({
         punches: [punch('08:00'), punch('12:00'), punch('12:20'), punch('17:00')],
         policy: { minBreakMinutes: 30 },
       });
-      expect(r.breakMinutes).toBe(20);
+      // 20 minutes punched; the scheduled hour is what lunch takes out of the day.
+      expect(r.breakMinutes).toBe(60);
+      expect(r.workedMinutes).toBe(8 * 60);
       expect(r.anomalies).toContain('SHORT_BREAK');
+    });
+
+    it('keeps the lunch of a half day that ends before it', () => {
+      const r = run({ punches: [punch('08:00'), punch('12:00')] });
+      expect(r.workedMinutes).toBe(4 * 60);
+      expect(r.breakMinutes).toBe(0);
+    });
+
+    it('does not take lunch out again when approved leave covered it', () => {
+      const leave = { id: 'leave', start: t('11:00'), end: t('14:00') };
+      const r = run({
+        punches: [punch('08:00'), punch('11:00'), punch('14:00'), punch('17:00')],
+        leaves: [leave],
+      });
+      expect(r.workedMinutes).toBe(6 * 60);
+    });
+  });
+
+  describe('long lunch', () => {
+    const day = (...hours: string[]) => hours.map((h) => punch(h));
+
+    it('counts every minute past the scheduled lunch once the margin is passed', () => {
+      const r = run({ punches: day('08:00', '12:00', '13:30', '17:00') });
+      expect(r.longBreakMinutes).toBe(30);
+      expect(r.anomalies).toContain('LONG_BREAK');
+      expect(r.workedMinutes).toBe(7 * 60 + 30);
+    });
+
+    it.each([
+      ['within the margin', '13:10', 0],
+      ['one minute past it', '13:11', 11],
+    ])('measures a lunch back %s', (_when, back, long) => {
+      const r = run({ punches: day('08:00', '12:00', back, '17:00') });
+      expect(r.longBreakMinutes).toBe(long);
+      expect(r.anomalies.includes('LONG_BREAK')).toBe(long > 0);
+    });
+
+    it('measures how long it lasted, whatever the hour it was taken', () => {
+      const r = run({ punches: day('08:00', '14:00', '15:20', '17:00') });
+      expect(r.longBreakMinutes).toBe(20);
+    });
+
+    it('adds up every pause of the day', () => {
+      const r = run({ punches: day('08:00', '10:00', '10:20', '12:00', '13:00', '17:00') });
+      expect(r.longBreakMinutes).toBe(20);
+    });
+
+    it('does not count time away on approved leave', () => {
+      const leave = { id: 'leave', start: t('14:00'), end: t('16:00') };
+      const r = run({
+        punches: day('08:00', '12:00', '13:00', '14:00', '16:00', '17:00'),
+        leaves: [leave],
+      });
+      expect(r.longBreakMinutes).toBe(0);
+      expect(r.anomalies).not.toContain('LONG_BREAK');
+    });
+
+    it('is not flagged on a shift without lunch, nor when the company turns it off', () => {
+      const noLunch = { ...DAY_SHIFT, breakStart: null, breakEnd: null };
+      expect(
+        run({ punches: day('08:00', '12:00', '14:00', '17:00'), template: noLunch })
+          .longBreakMinutes,
+      ).toBe(0);
+      const off = run({
+        punches: day('08:00', '12:00', '14:00', '17:00'),
+        policy: { longBreakEnabled: false },
+      });
+      expect(off.longBreakMinutes).toBe(0);
+      expect(off.anomalies).not.toContain('LONG_BREAK');
+    });
+  });
+
+  describe('expected hours', () => {
+    it.each([
+      ['a worked day', [punch('08:00'), punch('17:00')], 8 * 60],
+      ['an absence', [], 8 * 60],
+    ])('expects the scheduled hours on %s', (_what, punches, expected) => {
+      expect(run({ punches }).expectedMinutes).toBe(expected);
+    });
+
+    it('takes approved leave off, but not the lunch inside it', () => {
+      const morning = { id: 'leave', start: t('08:00'), end: t('11:00') };
+      expect(run({ punches: [], leaves: [morning] }).expectedMinutes).toBe(5 * 60);
+      const overLunch = { id: 'leave', start: t('11:00'), end: t('14:00') };
+      expect(run({ punches: [], leaves: [overLunch] }).expectedMinutes).toBe(6 * 60);
+      const allDay = { id: 'leave', start: t('00:00'), end: t('23:59') };
+      expect(run({ punches: [], leaves: [allDay] }).expectedMinutes).toBe(0);
+    });
+
+    it('expects nothing on holidays, rest days or without a schedule', () => {
+      expect(
+        run({ punches: [punch('08:00'), punch('17:00')], isHoliday: true }).expectedMinutes,
+      ).toBe(0);
+      expect(run({ punches: [], template: null }).expectedMinutes).toBe(0);
+      expect(
+        run({ punches: [punch('08:00')], hasSchedule: false, template: null }).expectedMinutes,
+      ).toBe(0);
+    });
+
+    it('expects the reference hours of a flexible shift', () => {
+      const flex = { ...DAY_SHIFT, flexible: true };
+      expect(run({ punches: [], template: flex }).expectedMinutes).toBe(8 * 60);
     });
   });
 

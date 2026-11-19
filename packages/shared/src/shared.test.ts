@@ -4,7 +4,7 @@ import { NOTIFICATION_TYPES } from './domain';
 import { explainDeviceError } from './labels';
 import { notificationTypesFor } from './notifications';
 import { isStrongPassword } from './passwords';
-import { formatMinutes } from './time';
+import { formatDifference, formatMinutes } from './time';
 
 describe('RBAC matrix', () => {
   it('only references declared permissions', () => {
@@ -62,6 +62,15 @@ describe('formatMinutes', () => {
     [-5, '0h 00m'],
     [61, '1h 01m'],
   ])('%i -> %s', (input, expected) => expect(formatMinutes(input)).toBe(expected));
+});
+
+describe('formatDifference', () => {
+  it.each([
+    [0, '0h 00m'],
+    [65, '+1h 05m'],
+    [-30, '−0h 30m'],
+    [-0.4, '0h 00m'],
+  ])('%d -> %s', (input, expected) => expect(formatDifference(input)).toBe(expected));
 });
 
 describe('explainDeviceError', () => {

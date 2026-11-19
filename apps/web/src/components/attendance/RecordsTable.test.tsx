@@ -40,6 +40,8 @@ const record = (workDate: string, rest: Partial<AttendanceRecordRow>): Attendanc
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
     shortMinutes: 0,
+    expectedMinutes: 480,
+    longBreakMinutes: 0,
     anomalies: [],
     isFinal: true,
     employee: { ...ANA, department: { name: 'Ventas' } },
@@ -214,7 +216,7 @@ describe('RecordsTable', () => {
       const card = await screen.findByRole('region', { name: 'Tarjeta de tiempo' });
       expect(card).toHaveTextContent('Horas faltantes');
       expect(card).toHaveTextContent('18h 00m');
-      for (const absent of ['Atrasos', 'Salidas anticipadas', 'Horas extra']) {
+      for (const absent of ['Atrasos', 'Almuerzos largos', 'Salidas anticipadas', 'Horas extra']) {
         expect(card).not.toHaveTextContent(absent);
       }
     });
@@ -250,9 +252,15 @@ describe('RecordsTable', () => {
     const total = (label: string) => within(card).getByText(label).nextElementSibling;
     expect(total('Días trabajados')).toHaveTextContent('3');
     expect(total('Trabajado')).toHaveTextContent('21h 04m');
+    // Four workdays of 8 h; the absence and the missing exit count against it.
+    expect(total('Esperado')).toHaveTextContent('32h 00m');
+    expect(total('Diferencia')).toHaveTextContent('−10h 56m');
     expect(total('Atrasos')).toHaveTextContent('1 · 12 min');
+    expect(total('Almuerzos largos')).toHaveTextContent('—');
     expect(total('Horas extra')).toHaveTextContent('1h 30m');
     expect(total('Ausencias')).toHaveTextContent('1');
+    expect(screen.getByText('vie, 2 oct').closest('tr')).toHaveTextContent('−0h 26m');
+    expect(screen.getByText('jue, 1 oct').closest('tr')).toHaveTextContent('+1h 30m');
 
     // The whole period on one page, oldest day first, without the employee column.
     await waitFor(() => expect(lastRecordsUrl().searchParams.get('employeeId')).toBe('e1'));
@@ -262,6 +270,38 @@ describe('RecordsTable', () => {
 
     await user.click(screen.getByRole('button', { name: 'Imprimir' }));
     expect(print).toHaveBeenCalled();
+  });
+
+  it('marks a long lunch, and leaves today out of the account until it closes', async () => {
+    renderTable('EMPLOYEE', 'e1', [
+      record('2026-10-02', {
+        segments: [
+          { in: '08:00', out: '12:00' },
+          { in: '13:00', out: null },
+        ],
+        workedMinutes: 300,
+        isFinal: false,
+      }),
+      record('2026-10-01', {
+        segments: [
+          { in: '08:00', out: '12:00' },
+          { in: '13:25', out: '17:00' },
+        ],
+        workedMinutes: 455,
+        longBreakMinutes: 25,
+        anomalies: ['LONG_BREAK'],
+      }),
+    ]);
+    const card = await screen.findByRole('region', { name: 'Tarjeta de tiempo' });
+    const total = (label: string) => within(card).getByText(label).nextElementSibling;
+    expect(total('Almuerzos largos')).toHaveTextContent('1 · 25 min');
+    expect(total('Esperado')).toHaveTextContent('8h 00m');
+    expect(total('Diferencia')).toHaveTextContent('−0h 25m');
+    expect(card).toHaveTextContent('El día de hoy entra cuando cierre la jornada.');
+    const long = screen.getByText('jue, 1 oct').closest('tr')!;
+    expect(long).toHaveTextContent('12:00–13:25');
+    expect(long).toHaveTextContent('25 min de más');
+    expect(long).toHaveTextContent('Almuerzo largo');
   });
 
   it('shows an employee their own card', async () => {

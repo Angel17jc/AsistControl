@@ -169,6 +169,7 @@ const FIELD_LABEL: Record<string, string> = {
   lastName: 'Apellidos',
   lateToleranceMinutes: 'Tolerancia de atraso',
   location: 'Ubicación',
+  longBreakToleranceMinutes: 'Margen para volver del almuerzo',
   manufacturer: 'Fabricante',
   maxExtraDays: 'Máximo de días extra',
   minBreakMinutes: 'Almuerzo mínimo',

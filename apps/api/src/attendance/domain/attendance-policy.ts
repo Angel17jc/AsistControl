@@ -32,6 +32,13 @@ export const attendancePolicySchema = z.object({
   autoDeductUnpunchedBreak: z.boolean(),
   /** Breaks shorter than this are flagged (0 disables). */
   minBreakMinutes: z.number().int().min(0).max(240),
+  /**
+   * Flag a lunch that lasts longer than the scheduled one (LONG_BREAK). Measured by how long
+   * it lasted, whatever the hour: many people go to lunch when they can.
+   */
+  longBreakEnabled: z.boolean(),
+  /** Minutes over the scheduled lunch before it counts as long; past it, all of them count. */
+  longBreakToleranceMinutes: z.number().int().min(0).max(240),
   /** Punches earlier than start - margin or later than end + margin are flagged. */
   outOfScheduleMarginMinutes: z.number().int().min(0).max(720),
   /** Window around the shift in which punches belong to that work day. */
@@ -52,6 +59,8 @@ export const DEFAULT_ATTENDANCE_POLICY: AttendancePolicy = Object.freeze({
   punchPairing: 'SEQUENTIAL',
   autoDeductUnpunchedBreak: true,
   minBreakMinutes: 0,
+  longBreakEnabled: true,
+  longBreakToleranceMinutes: 10,
   outOfScheduleMarginMinutes: 180,
   punchWindowBeforeShiftMinutes: 240,
   punchWindowAfterShiftMinutes: 360,

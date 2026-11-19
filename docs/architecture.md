@@ -99,8 +99,8 @@ Decisiones clave:
 1. Filtrar marcaciones a la **ventana** de la jornada (por defecto de 4 h antes del inicio a 6 h después del fin). Así una marcación a las 02:00 pertenece al turno nocturno del día anterior. Una marcación de un día calendario que no cae en su ventana ni en la del turno nocturno anterior (17:05 con un turno de 22:00; 23:30 tras un turno que termina a las 17:00) **no se cuenta, pero no se pierde**: el procesamiento la pasa como `strays` y la jornada de ese día la reporta con la novedad `STRAY_PUNCH`.
 2. **Doble marcación**: marcaciones a menos de `duplicatePunchWindowSeconds` (60 s) de la anterior se ignoran.
 3. **Emparejado** entrada/salida: `SEQUENTIAL` (alterna, robusto frente a quien presiona la tecla equivocada) o `DEVICE_TYPE` (confía en el tipo que reporta el equipo).
-4. Tiempo trabajado, pausas, descuento del almuerzo no marcado (configurable).
-5. Atraso y salida anticipada contra la **presencia esperada**, que se desplaza si hay un permiso aprobado al inicio o al final del turno.
+4. Tiempo trabajado, pausas y almuerzo. Si la jornada pasó por la hora del almuerzo, se descuenta **el almuerzo completo** aunque no se haya marcado o se haya marcado más corto (lo que falte hasta la hora programada; un permiso aprobado cuenta como tiempo fuera). El **almuerzo largo** (`LONG_BREAK`, `longBreakMinutes`) se mide por duración, no por hora, porque cada persona almuerza cuando puede: la suma de las pausas sin permiso menos el almuerzo programado; pasado el margen se cuentan todos los minutos.
+5. Atraso y salida anticipada contra la **presencia esperada**, que se desplaza si hay un permiso aprobado al inicio o al final del turno. Las **horas esperadas** del día (`expectedMinutes`) son las del turno sin el almuerzo, menos lo que cubran los permisos aprobados; 0 en feriados y días libres. Con ellas la tarjeta de tiempo muestra la diferencia entre lo trabajado y lo esperado.
 6. Horas extra según `AFTER_SHIFT_END` o `EXCESS_WORKED_TIME`, con umbral mínimo. En día libre o feriado todo lo trabajado es extra de ese tipo.
 7. Estado final y **novedades** (`LATE_ARRIVAL`, `MISSING_CHECK_OUT`, `OUT_OF_SCHEDULE_PUNCH`, `STRAY_PUNCH`, …).
 
@@ -110,20 +110,22 @@ Decisiones clave:
 
 Todas viven en `SystemSetting["attendance.policy"]` (editable vía `PATCH /api/settings/attendance-policy`, auditado) y los turnos pueden sobrescribir tolerancias:
 
-| Parámetro                             | Por defecto       | Significado                                                         |
-| ------------------------------------- | ----------------- | ------------------------------------------------------------------- |
-| `lateToleranceMinutes`                | 5                 | Minutos de gracia; superados, el atraso cuenta completo             |
-| `earlyLeaveToleranceMinutes`          | 0                 | Gracia para salida anticipada                                       |
-| `overtimeEnabled`                     | `true`            | La empresa paga horas extra; apagado, no se calculan ni se proponen |
-| `overtimeThresholdMinutes`            | 15                | Mínimo para reconocer horas extra                                   |
-| `overtimeBasis`                       | `AFTER_SHIFT_END` | O `EXCESS_WORKED_TIME` (compensa atrasos primero)                   |
-| `countEarlyArrivalAsOvertime`         | `false`           | Llegar antes cuenta como extra                                      |
-| `punchPairing`                        | `SEQUENTIAL`      | O `DEVICE_TYPE`                                                     |
-| `autoDeductUnpunchedBreak`            | `true`            | Descontar del almuerzo lo que no se marcó                           |
-| `minBreakMinutes`                     | 0                 | Almuerzo mínimo (0 = no se controla)                                |
-| `duplicatePunchWindowSeconds`         | 60                | Ventana de doble marcación                                          |
-| `outOfScheduleMarginMinutes`          | 180               | Margen para marcar "fuera de horario"                               |
-| `punchWindowBefore/AfterShiftMinutes` | 240 / 360         | Ventana de pertenencia de marcaciones                               |
+| Parámetro                             | Por defecto       | Significado                                                          |
+| ------------------------------------- | ----------------- | -------------------------------------------------------------------- |
+| `lateToleranceMinutes`                | 5                 | Minutos de gracia; superados, el atraso cuenta completo              |
+| `earlyLeaveToleranceMinutes`          | 0                 | Gracia para salida anticipada                                        |
+| `overtimeEnabled`                     | `true`            | La empresa paga horas extra; apagado, no se calculan ni se proponen  |
+| `overtimeThresholdMinutes`            | 15                | Mínimo para reconocer horas extra                                    |
+| `overtimeBasis`                       | `AFTER_SHIFT_END` | O `EXCESS_WORKED_TIME` (compensa atrasos primero)                    |
+| `countEarlyArrivalAsOvertime`         | `false`           | Llegar antes cuenta como extra                                       |
+| `punchPairing`                        | `SEQUENTIAL`      | O `DEVICE_TYPE`                                                      |
+| `autoDeductUnpunchedBreak`            | `true`            | Descontar el almuerzo completo aunque se marque menos o no se marque |
+| `minBreakMinutes`                     | 0                 | Almuerzo mínimo (0 = no se controla)                                 |
+| `longBreakEnabled`                    | `true`            | Señalar el almuerzo que dura más que el programado                   |
+| `longBreakToleranceMinutes`           | 10                | Margen para volver del almuerzo; superado, cuenta completo           |
+| `duplicatePunchWindowSeconds`         | 60                | Ventana de doble marcación                                           |
+| `outOfScheduleMarginMinutes`          | 180               | Margen para marcar "fuera de horario"                                |
+| `punchWindowBefore/AfterShiftMinutes` | 240 / 360         | Ventana de pertenencia de marcaciones                                |
 
 > **Sobre legislación laboral.** Ningún valor asume la ley de Ecuador ni de otro país. Recargos de horas suplementarias/extraordinarias, límites semanales o jornada nocturna legal deben configurarse o implementarse como políticas explícitas y documentadas (ver roadmap). Los feriados del seed son **datos de ejemplo**.
 

@@ -452,6 +452,8 @@ function summarize(result: CalculationResult) {
     earlyLeaveMinutes: result.earlyLeaveMinutes,
     overtimeMinutes: result.overtimeMinutes,
     shortMinutes: result.shortMinutes,
+    expectedMinutes: result.expectedMinutes,
+    longBreakMinutes: result.longBreakMinutes,
     anomalies: result.anomalies,
     isFinal: result.isFinal,
   };
@@ -473,6 +475,8 @@ function toRecordData(result: CalculationResult, shift: ResolvedShift | null) {
     earlyLeaveMinutes: result.earlyLeaveMinutes,
     overtimeMinutes: result.overtimeMinutes,
     shortMinutes: result.shortMinutes,
+    expectedMinutes: result.expectedMinutes,
+    longBreakMinutes: result.longBreakMinutes,
     anomalies: result.anomalies,
     segments: result.segments.map((s) => ({
       in: s.in?.toISOString() ?? null,

@@ -7,10 +7,11 @@ import {
   ANOMALY_LABEL,
   formatDate,
   formatDateWithYear,
+  formatDifference,
   formatMinutes,
   formatTime,
 } from '../../lib/format';
-import { breaksOf, timecardTotals } from '../../lib/timecard';
+import { breaksOf, differenceOf, timecardTotals } from '../../lib/timecard';
 import type { AttendanceRecordRow, EmployeeRow } from '../../lib/types';
 import { useAuth } from '../../stores/auth';
 import { ATTENDANCE_STATUS } from '../status';
@@ -77,6 +78,8 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
   const showLate = fixedHours || rows.some((r) => r.lateMinutes > 0);
   const showShort = rows.some((r) => r.shortMinutes > 0);
   const showExtra = rows.some((r) => r.overtimeMinutes > 0);
+  // A card keeps the account of each day against what the schedule expected.
+  const showDifference = !!cardOf && rows.some((r) => r.expectedMinutes > 0);
 
   return (
     <Card>
@@ -133,6 +136,7 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
               'Almuerzo',
               'Salida',
               'Trabajado',
+              ...(showDifference ? ['Diferencia'] : []),
               ...(showShort ? ['Faltan'] : []),
               ...(showLate ? ['Atraso'] : []),
               ...(showExtra ? ['Extra'] : []),
@@ -184,6 +188,11 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
                   )}
                 </Td>
                 <Td className="tabular whitespace-nowrap">{formatMinutes(r.workedMinutes)}</Td>
+                {showDifference && (
+                  <Td className="tabular whitespace-nowrap">
+                    <Difference record={r} />
+                  </Td>
+                )}
                 {showShort && (
                   <Td className="tabular whitespace-nowrap">
                     {r.shortMinutes > 0 ? formatMinutes(r.shortMinutes) : '—'}
@@ -234,15 +243,36 @@ const entryOf = (r: AttendanceRecordRow) => (r.segments.length > 0 ? r.segments[
 const exitOf = (r: AttendanceRecordRow) =>
   r.segments.length > 0 ? r.segments.at(-1)!.out : r.lastOut;
 
+/** Worked minus expected, with the day's expected hours on hover. */
+function Difference({ record }: { record: AttendanceRecordRow }) {
+  const difference = differenceOf(record);
+  if (difference === null) return '—';
+  return (
+    <span
+      className={difference < 0 ? 'text-warning' : undefined}
+      title={`Esperado: ${formatMinutes(record.expectedMinutes)}`}
+    >
+      {formatDifference(difference)}
+    </span>
+  );
+}
+
 /** Lunch and other pauses as punched, or the scheduled lunch deducted without punches. */
 function Breaks({ record }: { record: AttendanceRecordRow }) {
   const breaks = breaksOf(record.segments);
   if (breaks.length > 0) {
-    return breaks.map((b) => (
-      <p key={b.out}>
-        {formatTime(b.out)}–{formatTime(b.back)}
-      </p>
-    ));
+    return (
+      <>
+        {breaks.map((b) => (
+          <p key={b.out}>
+            {formatTime(b.out)}–{formatTime(b.back)}
+          </p>
+        ))}
+        {record.longBreakMinutes > 0 && (
+          <p className="text-xs text-warning">{record.longBreakMinutes} min de más</p>
+        )}
+      </>
+    );
   }
   if (record.breakMinutes > 0) {
     return (
@@ -270,6 +300,7 @@ function TimecardHeader({
 }) {
   const t = timecardTotals(records);
   const fixedHours = records.some((r) => r.scheduledStart);
+  const hasExpected = records.some((r) => r.expectedMinutes > 0);
   return (
     <section aria-label="Tarjeta de tiempo" className="border-b border-line px-5 py-4">
       <h2 className="text-sm font-semibold text-ink-1">
@@ -284,15 +315,26 @@ function TimecardHeader({
           .filter(Boolean)
           .join(' · ')}
       </p>
-      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <Total label="Días trabajados">{t.daysWorked}</Total>
         <Total label="Trabajado">{formatMinutes(t.workedMinutes)}</Total>
+        {hasExpected && (
+          <>
+            <Total label="Esperado">{formatMinutes(t.expectedMinutes)}</Total>
+            <Total label="Diferencia">{formatDifference(t.differenceMinutes)}</Total>
+          </>
+        )}
         {t.shortMinutes > 0 && (
           <Total label="Horas faltantes">{formatMinutes(t.shortMinutes)}</Total>
         )}
         {(fixedHours || t.lateDays > 0) && (
           <Total label="Atrasos">
             {t.lateDays > 0 ? `${t.lateDays} · ${t.lateMinutes} min` : '—'}
+          </Total>
+        )}
+        {(fixedHours || t.longBreakDays > 0) && (
+          <Total label="Almuerzos largos">
+            {t.longBreakDays > 0 ? `${t.longBreakDays} · ${t.longBreakMinutes} min` : '—'}
           </Total>
         )}
         {(fixedHours || t.earlyLeaveMinutes > 0) && (
@@ -305,6 +347,13 @@ function TimecardHeader({
         )}
         <Total label="Ausencias">{t.absences}</Total>
       </dl>
+      {hasExpected && (
+        <p className="mt-3 text-xs text-ink-3">
+          Esperado es lo que pide el horario, menos los permisos aprobados. Diferencia es lo
+          trabajado menos lo esperado.
+          {t.openDays > 0 && ' El día de hoy entra cuando cierre la jornada.'}
+        </p>
+      )}
       {t.overtimeMinutes > 0 && (
         <p className="mt-3 text-xs text-ink-3">
           Las horas extra son las calculadas; se aprueban en Solicitudes.
