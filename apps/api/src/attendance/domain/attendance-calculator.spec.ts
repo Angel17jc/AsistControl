@@ -231,6 +231,32 @@ describe('calculateAttendance', () => {
     });
   });
 
+  describe('a return after the work day', () => {
+    const day = (...hours: string[]) => hours.map((h) => punch(h));
+
+    it('still takes lunch out, and counts the evening hours as worked', () => {
+      const r = run({ punches: day('08:00', '17:00', '19:00', '21:00') });
+      expect(r.workedMinutes).toBe(10 * 60);
+      expect(r.longBreakMinutes).toBe(0);
+      expect(r.anomalies).not.toContain('LONG_BREAK');
+    });
+
+    it('is not a long lunch when the evening punch leaves the day open', () => {
+      // As seen in the demo: lunch 12:00-13:02, out at 17:04 and a lone punch at 22:08.
+      const r = run({ punches: day('08:32', '12:00', '13:02', '17:04', '22:08') });
+      expect(r.status).toBe('INCOMPLETE');
+      expect(r.longBreakMinutes).toBe(0);
+      expect(r.anomalies).not.toContain('LONG_BREAK');
+    });
+
+    it('does not apply to a shift without fixed hours, where a late lunch is a lunch', () => {
+      const flex = { ...DAY_SHIFT, breakStart: '13:00', breakEnd: '14:00', flexible: true };
+      const r = run({ punches: day('09:00', '18:00', '19:00', '20:00'), template: flex });
+      expect(r.workedMinutes).toBe(10 * 60);
+      expect(r.breakMinutes).toBe(60);
+    });
+  });
+
   describe('long lunch', () => {
     const day = (...hours: string[]) => hours.map((h) => punch(h));
 
