@@ -44,8 +44,10 @@ describe('Attendance corrections, leave and reports (e2e)', () => {
     expect(r).toMatchObject({
       status: 'PRESENT',
       workedMinutes: 484,
+      expectedMinutes: 480,
       lateMinutes: 0,
       breakMinutes: 60,
+      longBreakMinutes: 0,
     });
     expect(
       await prisma.auditLog.count({

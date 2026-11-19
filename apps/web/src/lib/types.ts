@@ -38,6 +38,10 @@ export interface AttendanceRecordRow {
   overtimeMinutes: number;
   /** Hours missing from a closed day of a shift without fixed hours. */
   shortMinutes: number;
+  /** Hours the schedule expected that day, approved leave taken off; 0 on days off. */
+  expectedMinutes: number;
+  /** Minutes the punched lunch went over the scheduled one, once past the margin. */
+  longBreakMinutes: number;
   anomalies: AttendanceAnomaly[];
   isFinal: boolean;
   employee: {
@@ -305,6 +309,8 @@ export interface AttendancePolicy {
   punchPairing: 'SEQUENTIAL' | 'DEVICE_TYPE';
   autoDeductUnpunchedBreak: boolean;
   minBreakMinutes: number;
+  longBreakEnabled: boolean;
+  longBreakToleranceMinutes: number;
   outOfScheduleMarginMinutes: number;
   punchWindowBeforeShiftMinutes: number;
   punchWindowAfterShiftMinutes: number;

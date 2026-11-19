@@ -4,6 +4,7 @@ export {
   ANOMALY_LABEL,
   LEAVE_TYPE_LABEL as LEAVE_LABEL,
   PUNCH_TYPE_LABEL as PUNCH_LABEL,
+  formatDifference,
   formatMinutes,
 } from '@asistcontrol/shared';
 

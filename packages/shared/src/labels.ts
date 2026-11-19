@@ -38,6 +38,7 @@ export const ANOMALY_LABEL: Record<AttendanceAnomaly, string> = {
   WORKED_ON_HOLIDAY: 'Trabajó en feriado',
   STRAY_PUNCH: 'Marcación fuera de jornada',
   SHORT_HOURS: 'Menos horas de las esperadas',
+  LONG_BREAK: 'Almuerzo largo',
 };
 
 export const PUNCH_TYPE_LABEL: Record<PunchType, string> = {

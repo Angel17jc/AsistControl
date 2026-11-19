@@ -116,6 +116,19 @@ describe('Shifts without fixed hours (e2e)', () => {
     expect(day.anomalies).toContain('SHORT_HOURS');
   });
 
+  it('keeps the account of a lunch that lasted too long, whatever the hour', async () => {
+    // Out at 12:00, back at 13:30: half an hour past the hour of lunch, beyond the margin.
+    const date = '2026-09-15';
+    await punches(fx.teammate.id, date, ['08:00', '12:00', '13:30', '17:00']);
+    const day = await dayOf(fx.teammate.id, date);
+    expect(day).toMatchObject({
+      workedMinutes: 7 * 60 + 30,
+      expectedMinutes: 8 * 60,
+      longBreakMinutes: 30,
+    });
+    expect(day.anomalies).toContain('LONG_BREAK');
+  });
+
   describe('when the company does not pay overtime', () => {
     const features = (token: string) =>
       http().get('/api/settings/features').set(bearer(token)).expect(200);

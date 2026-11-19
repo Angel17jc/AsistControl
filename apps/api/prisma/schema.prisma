@@ -134,6 +134,8 @@ enum AttendanceAnomaly {
   STRAY_PUNCH
   /// A shift without fixed hours: the day was closed with fewer hours than expected.
   SHORT_HOURS
+  /// The punched lunch lasted longer than the scheduled one plus the company's margin.
+  LONG_BREAK
 }
 
 enum SyncStatus {
@@ -500,6 +502,10 @@ model AttendanceRecord {
   overtimeMinutes   Int                 @default(0) @map("overtime_minutes")
   /// Hours missing from a closed day of a flexible shift.
   shortMinutes      Int                 @default(0) @map("short_minutes")
+  /// Hours the schedule expected that day, approved leave taken off: what totals compare with.
+  expectedMinutes   Int                 @default(0) @map("expected_minutes")
+  /// Minutes the punched lunch went over the scheduled one, once past the margin.
+  longBreakMinutes  Int                 @default(0) @map("long_break_minutes")
   anomalies         AttendanceAnomaly[]
   /// Worked intervals [{in, out}] in chronological order.
   segments          Json                @default("[]")

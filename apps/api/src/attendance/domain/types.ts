@@ -76,6 +76,10 @@ export interface CalculationResult {
   overtimeKind: OvertimeKind | null;
   /** Hours missing from a closed day of a flexible shift. */
   shortMinutes: number;
+  /** Hours the schedule expected that day, approved leave taken off; 0 on days off. */
+  expectedMinutes: number;
+  /** Minutes the punched lunch went over the scheduled one, once past the margin. */
+  longBreakMinutes: number;
   /** Punches ignored as double presses. */
   ignoredPunchIds: string[];
   /** False while the work day window is still open: results may still change. */

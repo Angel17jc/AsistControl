@@ -13,12 +13,30 @@ export function breaksOf(
   return breaks;
 }
 
+/**
+ * Worked minus expected on a closed day; null while the day is still open (its hours are not
+ * all in yet) or on a day off nobody worked.
+ */
+export function differenceOf(r: AttendanceRecordRow): number | null {
+  if (!r.isFinal) return null;
+  if (r.expectedMinutes === 0 && r.workedMinutes === 0) return null;
+  return r.workedMinutes - r.expectedMinutes;
+}
+
 export interface TimecardTotals {
   /** Days with at least one entry. */
   daysWorked: number;
   workedMinutes: number;
+  /** What the schedule expected on the closed days, approved leave taken off. */
+  expectedMinutes: number;
+  /** Worked minus expected on the closed days. */
+  differenceMinutes: number;
+  /** Days still open: they are not in the expected hours nor in the difference yet. */
+  openDays: number;
   lateDays: number;
   lateMinutes: number;
+  longBreakDays: number;
+  longBreakMinutes: number;
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
   shortMinutes: number;
@@ -34,8 +52,13 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
   const totals: TimecardTotals = {
     daysWorked: 0,
     workedMinutes: 0,
+    expectedMinutes: 0,
+    differenceMinutes: 0,
+    openDays: 0,
     lateDays: 0,
     lateMinutes: 0,
+    longBreakDays: 0,
+    longBreakMinutes: 0,
     earlyLeaveMinutes: 0,
     overtimeMinutes: 0,
     shortMinutes: 0,
@@ -44,16 +67,22 @@ export function timecardTotals(records: AttendanceRecordRow[]): TimecardTotals {
     strayDays: 0,
   };
   for (const r of records) {
-    if (r.firstIn) totals.daysWorked++;
+    totals.daysWorked += Number(!!r.firstIn);
     totals.workedMinutes += r.workedMinutes;
-    if (r.lateMinutes > 0) totals.lateDays++;
+    // An open day's hours are not all in yet: it enters the account when it closes.
+    totals.openDays += Number(!r.isFinal);
+    totals.expectedMinutes += r.isFinal ? r.expectedMinutes : 0;
+    totals.differenceMinutes += r.isFinal ? r.workedMinutes - r.expectedMinutes : 0;
+    totals.lateDays += Number(r.lateMinutes > 0);
     totals.lateMinutes += r.lateMinutes;
+    totals.longBreakDays += Number(r.longBreakMinutes > 0);
+    totals.longBreakMinutes += r.longBreakMinutes;
     totals.earlyLeaveMinutes += r.earlyLeaveMinutes;
     totals.overtimeMinutes += r.overtimeMinutes;
     totals.shortMinutes += r.shortMinutes;
-    if (r.status === 'ABSENT') totals.absences++;
-    if (r.status === 'INCOMPLETE') totals.incomplete++;
-    if (r.anomalies.includes('STRAY_PUNCH')) totals.strayDays++;
+    totals.absences += Number(r.status === 'ABSENT');
+    totals.incomplete += Number(r.status === 'INCOMPLETE');
+    totals.strayDays += Number(r.anomalies.includes('STRAY_PUNCH'));
   }
   return totals;
 }

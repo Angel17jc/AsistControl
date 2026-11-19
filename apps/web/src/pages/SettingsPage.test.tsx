@@ -20,6 +20,8 @@ const POLICY: AttendancePolicy = {
   punchPairing: 'SEQUENTIAL',
   autoDeductUnpunchedBreak: true,
   minBreakMinutes: 0,
+  longBreakEnabled: true,
+  longBreakToleranceMinutes: 10,
   outOfScheduleMarginMinutes: 180,
   punchWindowBeforeShiftMinutes: 240,
   punchWindowAfterShiftMinutes: 360,
@@ -79,10 +81,21 @@ describe('SettingsPage', () => {
     const form = await policyForm();
     expect(within(form).getByLabelText('Tolerancia de atraso (min)')).toHaveValue(5);
     expect(within(form).getByLabelText('Entradas y salidas')).toHaveValue('SEQUENTIAL');
-    expect(
-      within(form).getByLabelText('Descontar el almuerzo programado si no se marcó'),
-    ).toBeChecked();
+    expect(within(form).getByLabelText('Descontar el almuerzo completo')).toBeChecked();
+    expect(within(form).getByLabelText('Señalar el almuerzo largo')).toBeChecked();
+    expect(within(form).getByLabelText('Margen para volver del almuerzo (min)')).toHaveValue(10);
     expect(screen.getByText(/America\/Guayaquil/)).toBeVisible();
+  });
+
+  it('asks for the lunch margin only while long lunches are flagged', async () => {
+    renderPage();
+    const form = await policyForm();
+    await userEvent.click(within(form).getByLabelText('Señalar el almuerzo largo'));
+    expect(within(form).queryByLabelText('Margen para volver del almuerzo (min)')).toBeNull();
+
+    await userEvent.click(within(form).getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(sent('PATCH')).toBeDefined());
+    expect(sent('PATCH')!.body).toEqual({ longBreakEnabled: false });
   });
 
   it('saves only the rules that changed', async () => {

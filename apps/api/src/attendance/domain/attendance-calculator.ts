@@ -33,12 +33,17 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   if (ignored.length > 0) anomalies.add('DUPLICATE_PUNCH');
   if (input.strays?.length) anomalies.add('STRAY_PUNCH');
 
+  // What the day owes: an absence keeps it, so totals show the hours missing.
+  const expectedMinutes =
+    shift && day.dayType === 'WORKDAY' ? expectedWorkMinutes(shift, input.leaves) : 0;
+
   if (kept.length === 0) {
     return {
       ...emptyResult(isFinal),
       anomalies: [...anomalies],
       ignoredPunchIds: ignored.map((p) => p.id),
       status: statusWithoutPunches(input),
+      expectedMinutes,
     };
   }
 
@@ -52,14 +57,23 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
   });
 
   let workedMs = complete.reduce((sum, s) => sum + (s.out.getTime() - s.in.getTime()), 0);
-  let breakMs = gapsBetween(segments);
+  // Time away between punches, approved leave included, as punched.
+  const awayMs = gapsBetween(segments);
+  let breakMs = awayMs;
+  // The pauses people took, without approved leave inside them: a permission is not lunch.
+  const pauseMs = pausesBetween(segments, input.leaves);
+  const scheduledBreakMs =
+    shift?.breakStart && shift.breakEnd ? shift.breakEnd.getTime() - shift.breakStart.getTime() : 0;
 
   if (shift?.breakStart && shift.breakEnd && policy.autoDeductUnpunchedBreak) {
     const { breakStart, breakEnd } = shift;
-    const workedThroughBreak = complete.some((s) => s.in <= breakStart && s.out >= breakEnd);
-    if (workedThroughBreak) {
-      // A lunch punched at another hour already is the lunch: only what is missing of it goes.
-      const unpunched = Math.max(0, breakEnd.getTime() - breakStart.getTime() - breakMs);
+    // The day went through lunchtime: the whole scheduled lunch is taken out, whatever hour it
+    // was eaten and however short it was punched. A half day before or after lunch keeps it,
+    // and so does time away on approved leave (it was not worked either).
+    const spansBreak =
+      complete.length > 0 && complete[0]!.in <= breakStart && complete.at(-1)!.out >= breakEnd;
+    if (spansBreak) {
+      const unpunched = Math.max(0, scheduledBreakMs - awayMs);
       workedMs -= unpunched;
       breakMs += unpunched;
     }
@@ -67,8 +81,9 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
 
   const workedMinutes = Math.max(0, Math.floor(workedMs / MINUTE_MS));
   const breakMinutes = Math.floor(breakMs / MINUTE_MS);
+  // Judged on what was punched, before the rest of the lunch is taken out.
   if (shift?.breakStart && policy.minBreakMinutes > 0 && complete.length >= 2) {
-    if (breakMinutes < policy.minBreakMinutes) anomalies.add('SHORT_BREAK');
+    if (Math.floor(awayMs / MINUTE_MS) < policy.minBreakMinutes) anomalies.add('SHORT_BREAK');
   }
 
   const firstIn = segments.find((s) => s.in !== null)?.in ?? null;
@@ -108,7 +123,20 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
       overtimeMinutes: overtime,
       overtimeKind: overtime > 0 ? kind : null,
       shortMinutes: 0,
+      expectedMinutes,
+      longBreakMinutes: 0,
     };
+  }
+
+  // A lunch longer than the scheduled one, measured by how long it lasted: people go when they
+  // can. Past the margin every minute over counts, as with a late arrival.
+  let longBreakMinutes = 0;
+  if (policy.longBreakEnabled && scheduledBreakMs > 0) {
+    const over = Math.floor((pauseMs - scheduledBreakMs) / MINUTE_MS);
+    if (over > policy.longBreakToleranceMinutes) {
+      longBreakMinutes = over;
+      anomalies.add('LONG_BREAK');
+    }
   }
 
   const { expectedStart, expectedEnd } = expectedPresence(shift, input.leaves);
@@ -170,6 +198,8 @@ export function calculateAttendance(input: CalculationInput): CalculationResult 
     overtimeMinutes,
     overtimeKind: overtimeMinutes > 0 ? 'REGULAR' : null,
     shortMinutes,
+    expectedMinutes,
+    longBreakMinutes,
   };
 }
 
@@ -310,6 +340,15 @@ function missingMinutes(
   leaves: LeaveInterval[],
   workedMinutes: number,
 ): number {
+  const missing = expectedWorkMinutes(shift, leaves) - workedMinutes;
+  return missing > shift.earlyLeaveToleranceMinutes ? missing : 0;
+}
+
+/**
+ * The hours a shift expects, less the approved leave inside them (lunch excluded): a day of
+ * permission expects nothing, a two-hour errand two hours less.
+ */
+export function expectedWorkMinutes(shift: ResolvedShift, leaves: LeaveInterval[]): number {
   const onLeaveMs = leaves.reduce(
     (sum, l) =>
       sum +
@@ -317,8 +356,7 @@ function missingMinutes(
       (shift.breakStart && shift.breakEnd ? overlapOf(l, shift.breakStart, shift.breakEnd) : 0),
     0,
   );
-  const missing = scheduledWorkMinutes(shift) - Math.floor(onLeaveMs / MINUTE_MS) - workedMinutes;
-  return missing > shift.earlyLeaveToleranceMinutes ? missing : 0;
+  return Math.max(0, scheduledWorkMinutes(shift) - Math.floor(onLeaveMs / MINUTE_MS));
 }
 
 function overlapOf(interval: { start: Date; end: Date }, from: Date, to: Date): number {
@@ -376,6 +414,8 @@ function emptyResult(isFinal: boolean): Omit<CalculationResult, 'status'> {
     overtimeMinutes: 0,
     overtimeKind: null,
     shortMinutes: 0,
+    expectedMinutes: 0,
+    longBreakMinutes: 0,
     ignoredPunchIds: [],
     isFinal,
   };
@@ -399,6 +439,19 @@ function gapsBetween(segments: WorkSegment[]): number {
     const prevOut = segments[i - 1]!.out;
     const nextIn = segments[i]!.in;
     if (prevOut && nextIn) total += Math.max(0, nextIn.getTime() - prevOut.getTime());
+  }
+  return total;
+}
+
+/** The time between segments that approved leave does not cover: the pauses taken. */
+function pausesBetween(segments: WorkSegment[], leaves: LeaveInterval[]): number {
+  let total = 0;
+  for (let i = 1; i < segments.length; i++) {
+    const prevOut = segments[i - 1]!.out;
+    const nextIn = segments[i]!.in;
+    if (!prevOut || !nextIn || nextIn <= prevOut) continue;
+    const covered = leaves.reduce((sum, l) => sum + overlapOf(l, prevOut, nextIn), 0);
+    total += Math.max(0, nextIn.getTime() - prevOut.getTime() - covered);
   }
   return total;
 }
