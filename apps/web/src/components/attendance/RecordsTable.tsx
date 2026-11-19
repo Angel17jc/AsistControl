@@ -1,7 +1,7 @@
 import { ATTENDANCE_STATUSES, type PaginatedResponse } from '@asistcontrol/shared';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Printer } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { api } from '../../lib/api';
 import {
   ANOMALY_LABEL,
@@ -11,7 +11,13 @@ import {
   formatMinutes,
   formatTime,
 } from '../../lib/format';
-import { breaksOf, differenceOf, timecardTotals } from '../../lib/timecard';
+import {
+  type TimecardWeek,
+  breaksOf,
+  differenceOf,
+  timecardTotals,
+  weeksOf,
+} from '../../lib/timecard';
 import type { AttendanceRecordRow, EmployeeRow } from '../../lib/types';
 import { useAuth } from '../../stores/auth';
 import { ATTENDANCE_STATUS } from '../status';
@@ -80,6 +86,23 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
   const showExtra = rows.some((r) => r.overtimeMinutes > 0);
   // A card keeps the account of each day against what the schedule expected.
   const showDifference = !!cardOf && rows.some((r) => r.expectedMinutes > 0);
+  const head = [
+    'Fecha',
+    ...(cardOf ? [] : ['Empleado']),
+    'Estado',
+    ...(fixedHours ? ['Horario'] : []),
+    'Entrada',
+    'Almuerzo',
+    'Salida',
+    'Trabajado',
+    ...(showDifference ? ['Diferencia'] : []),
+    ...(showShort ? ['Faltan'] : []),
+    ...(showLate ? ['Atraso'] : []),
+    ...(showExtra ? ['Extra'] : []),
+    'Novedades',
+  ];
+  // A card closes each week with what it added up to, Monday to Sunday.
+  const weekEnding = new Map(cardOf ? weeksOf(rows).map((w) => [w.to, w]) : []);
 
   return (
     <Card>
@@ -126,90 +149,78 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
       {error && <ErrorState error={error} />}
       {data && (
         <>
-          <Table
-            head={[
-              'Fecha',
-              ...(cardOf ? [] : ['Empleado']),
-              'Estado',
-              ...(fixedHours ? ['Horario'] : []),
-              'Entrada',
-              'Almuerzo',
-              'Salida',
-              'Trabajado',
-              ...(showDifference ? ['Diferencia'] : []),
-              ...(showShort ? ['Faltan'] : []),
-              ...(showLate ? ['Atraso'] : []),
-              ...(showExtra ? ['Extra'] : []),
-              'Novedades',
-            ]}
-            empty={rows.length === 0}
-          >
+          <Table head={head} empty={rows.length === 0}>
             {rows.map((r) => (
-              <tr key={r.id}>
-                <Td className="whitespace-nowrap text-ink-2">{formatDate(r.workDate)}</Td>
-                {!cardOf && (
+              <Fragment key={r.id}>
+                <tr>
+                  <Td className="whitespace-nowrap text-ink-2">{formatDate(r.workDate)}</Td>
+                  {!cardOf && (
+                    <Td>
+                      <p className="font-medium">
+                        {r.employee.lastName} {r.employee.firstName}
+                      </p>
+                      <p className="text-xs text-ink-3">
+                        {r.employee.department?.name ?? r.employee.employeeCode}
+                      </p>
+                    </Td>
+                  )}
                   <Td>
-                    <p className="font-medium">
-                      {r.employee.lastName} {r.employee.firstName}
-                    </p>
-                    <p className="text-xs text-ink-3">
-                      {r.employee.department?.name ?? r.employee.employeeCode}
-                    </p>
+                    <StatusBadge tone={ATTENDANCE_STATUS[r.status].tone}>
+                      {ATTENDANCE_STATUS[r.status].label}
+                    </StatusBadge>
+                    {!r.isFinal && (
+                      <p
+                        className="mt-1 text-xs text-ink-3"
+                        title="La ventana de la jornada aún no cierra; puede cambiar si llegan más marcaciones"
+                      >
+                        provisional
+                      </p>
+                    )}
                   </Td>
-                )}
-                <Td>
-                  <StatusBadge tone={ATTENDANCE_STATUS[r.status].tone}>
-                    {ATTENDANCE_STATUS[r.status].label}
-                  </StatusBadge>
-                  {!r.isFinal && (
-                    <p
-                      className="mt-1 text-xs text-ink-3"
-                      title="La ventana de la jornada aún no cierra; puede cambiar si llegan más marcaciones"
-                    >
-                      provisional
-                    </p>
+                  {fixedHours && (
+                    <Td className="tabular whitespace-nowrap text-ink-2">
+                      {r.scheduledStart
+                        ? `${formatTime(r.scheduledStart)}–${formatTime(r.scheduledEnd)}`
+                        : '—'}
+                    </Td>
                   )}
-                </Td>
-                {fixedHours && (
-                  <Td className="tabular whitespace-nowrap text-ink-2">
-                    {r.scheduledStart
-                      ? `${formatTime(r.scheduledStart)}–${formatTime(r.scheduledEnd)}`
-                      : '—'}
+                  <Td className="tabular">{formatTime(entryOf(r))}</Td>
+                  <Td className="tabular whitespace-nowrap">
+                    <Breaks record={r} />
                   </Td>
-                )}
-                <Td className="tabular">{formatTime(entryOf(r))}</Td>
-                <Td className="tabular whitespace-nowrap">
-                  <Breaks record={r} />
-                </Td>
-                <Td className="tabular whitespace-nowrap">
-                  {formatTime(exitOf(r))}
-                  {r.earlyLeaveMinutes > 0 && (
-                    <p className="text-xs text-warning">{r.earlyLeaveMinutes} min antes</p>
+                  <Td className="tabular whitespace-nowrap">
+                    {formatTime(exitOf(r))}
+                    {r.earlyLeaveMinutes > 0 && (
+                      <p className="text-xs text-warning">{r.earlyLeaveMinutes} min antes</p>
+                    )}
+                  </Td>
+                  <Td className="tabular whitespace-nowrap">{formatMinutes(r.workedMinutes)}</Td>
+                  {showDifference && (
+                    <Td className="tabular whitespace-nowrap">
+                      <Difference record={r} />
+                    </Td>
                   )}
-                </Td>
-                <Td className="tabular whitespace-nowrap">{formatMinutes(r.workedMinutes)}</Td>
-                {showDifference && (
-                  <Td className="tabular whitespace-nowrap">
-                    <Difference record={r} />
+                  {showShort && (
+                    <Td className="tabular whitespace-nowrap">
+                      {r.shortMinutes > 0 ? formatMinutes(r.shortMinutes) : '—'}
+                    </Td>
+                  )}
+                  {showLate && (
+                    <Td className="tabular">{r.lateMinutes > 0 ? `${r.lateMinutes} min` : '—'}</Td>
+                  )}
+                  {showExtra && (
+                    <Td className="tabular">
+                      {r.overtimeMinutes > 0 ? formatMinutes(r.overtimeMinutes) : '—'}
+                    </Td>
+                  )}
+                  <Td className="text-xs text-ink-2">
+                    {r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · ') || '—'}
                   </Td>
+                </tr>
+                {weekEnding.has(r.workDate) && (
+                  <WeekRow week={weekEnding.get(r.workDate)!} columns={head.length} />
                 )}
-                {showShort && (
-                  <Td className="tabular whitespace-nowrap">
-                    {r.shortMinutes > 0 ? formatMinutes(r.shortMinutes) : '—'}
-                  </Td>
-                )}
-                {showLate && (
-                  <Td className="tabular">{r.lateMinutes > 0 ? `${r.lateMinutes} min` : '—'}</Td>
-                )}
-                {showExtra && (
-                  <Td className="tabular">
-                    {r.overtimeMinutes > 0 ? formatMinutes(r.overtimeMinutes) : '—'}
-                  </Td>
-                )}
-                <Td className="text-xs text-ink-2">
-                  {r.anomalies.map((a) => ANOMALY_LABEL[a]).join(' · ') || '—'}
-                </Td>
-              </tr>
+              </Fragment>
             ))}
           </Table>
           {!cardOf && (
@@ -242,6 +253,35 @@ export function RecordsTable({ from, to }: { from: string; to: string }) {
 const entryOf = (r: AttendanceRecordRow) => (r.segments.length > 0 ? r.segments[0]!.in : r.firstIn);
 const exitOf = (r: AttendanceRecordRow) =>
   r.segments.length > 0 ? r.segments.at(-1)!.out : r.lastOut;
+
+/** The line closing a week on a card: worked, expected, the difference and what to look at. */
+function WeekRow({ week, columns }: { week: TimecardWeek; columns: number }) {
+  const t = week.totals;
+  const parts = [
+    `Trabajado ${formatMinutes(t.workedMinutes)}`,
+    ...(t.expectedMinutes > 0 || t.differenceMinutes !== 0
+      ? [
+          `Esperado ${formatMinutes(t.expectedMinutes)}`,
+          `Diferencia ${formatDifference(t.differenceMinutes)}`,
+        ]
+      : []),
+    ...(t.lateMinutes > 0 ? [`Atraso ${t.lateMinutes} min`] : []),
+    ...(t.longBreakMinutes > 0 ? [`Almuerzo largo ${t.longBreakMinutes} min`] : []),
+    ...(t.shortMinutes > 0 ? [`Faltan ${formatMinutes(t.shortMinutes)}`] : []),
+    ...(t.overtimeMinutes > 0 ? [`Extra ${formatMinutes(t.overtimeMinutes)}`] : []),
+  ];
+  return (
+    <tr className="bg-surface-2">
+      <td colSpan={columns} className="px-4 py-2 text-xs text-ink-2">
+        <span className="font-semibold text-ink-1">
+          Semana {formatDate(week.from)} – {formatDate(week.to)}
+        </span>
+        {' · '}
+        <span className="tabular">{parts.join(' · ')}</span>
+      </td>
+    </tr>
+  );
+}
 
 /** Worked minus expected, with the day's expected hours on hover. */
 function Difference({ record }: { record: AttendanceRecordRow }) {

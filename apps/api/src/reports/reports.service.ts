@@ -200,6 +200,8 @@ export class ReportsService {
         lateMinutes: r.lateMinutes,
         overtimeMinutes: r.overtimeMinutes,
         shortMinutes: r.shortMinutes,
+        expectedMinutes: r.expectedMinutes,
+        longBreakMinutes: r.longBreakMinutes,
         anomalies: r.anomalies,
         isFinal: r.isFinal,
       });
@@ -275,7 +277,9 @@ export class ReportsService {
         salida: time(r.lastOut),
         horas_trabajadas: formatMinutes(r.workedMinutes),
         minutos_trabajados: r.workedMinutes,
+        minutos_esperados: r.expectedMinutes,
         minutos_atraso: r.lateMinutes,
+        minutos_almuerzo_largo: r.longBreakMinutes,
         minutos_salida_anticipada: r.earlyLeaveMinutes,
         minutos_faltantes: r.shortMinutes,
         ...(overtimeEnabled ? { minutos_extra: r.overtimeMinutes } : {}),
@@ -310,9 +314,12 @@ export class ReportsService {
           status: true,
           firstIn: true,
           workedMinutes: true,
+          expectedMinutes: true,
           lateMinutes: true,
+          longBreakMinutes: true,
           earlyLeaveMinutes: true,
           shortMinutes: true,
+          isFinal: true,
         },
       }),
       this.prisma.overtimeRecord.findMany({
@@ -328,6 +335,10 @@ export class ReportsService {
         own.filter((r) => statuses.includes(r.status)).length;
       const sum = (pick: (r: (typeof own)[number]) => number) =>
         own.reduce((s, r) => s + pick(r), 0);
+      // The account of the closed days: an open one enters when its hours are all in.
+      const closed = own.filter((r) => r.isFinal);
+      const expected = closed.reduce((s, r) => s + r.expectedMinutes, 0);
+      const workedClosed = closed.reduce((s, r) => s + r.workedMinutes, 0);
       return {
         mes: range.from.slice(0, 7),
         codigo: e.employeeCode,
@@ -341,7 +352,10 @@ export class ReportsService {
         jornadas_incompletas: count('INCOMPLETE'),
         minutos_trabajados: sum((r) => r.workedMinutes),
         horas_trabajadas: formatMinutes(sum((r) => r.workedMinutes)),
+        minutos_esperados: expected,
+        minutos_diferencia: workedClosed - expected,
         minutos_atraso: sum((r) => r.lateMinutes),
+        minutos_almuerzo_largo: sum((r) => r.longBreakMinutes),
         minutos_salida_anticipada: sum((r) => r.earlyLeaveMinutes),
         minutos_faltantes: sum((r) => r.shortMinutes),
         ...(overtimeEnabled

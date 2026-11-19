@@ -33,6 +33,8 @@ const month = (name = 'Vera Ñáñez, Ana'): AttendanceMonth =>
             lateMinutes: 0,
             overtimeMinutes: 0,
             shortMinutes: 60,
+            expectedMinutes: 480,
+            longBreakMinutes: 0,
             anomalies: ['SHORT_HOURS'],
             isFinal: true,
           },
@@ -58,12 +60,23 @@ function sheetsOf(file: Buffer) {
 }
 
 describe('attendanceMonthXlsx', () => {
-  it('writes the days on one sheet and the totals on another, in Spanish', async () => {
+  it('writes the days, the weeks and the totals on their own sheets, in Spanish', async () => {
     const { names, all } = sheetsOf(await attendanceMonthXlsx(month()));
-    expect(names).toEqual(['Asistencia', 'Resumen']);
-    for (const text of ['Entrada', 'Salida almuerzo', 'Regreso almuerzo', 'Horas faltantes']) {
+    expect(names).toEqual(['Asistencia', 'Semanas', 'Resumen']);
+    for (const text of [
+      'Entrada',
+      'Salida almuerzo',
+      'Regreso almuerzo',
+      'Horas faltantes',
+      'Horas esperadas',
+      'Diferencia',
+      'Desde',
+      'Hasta',
+    ]) {
       expect(all).toContain(text);
     }
+    // Worked 7 h of the 8 expected: the sign stays, as text.
+    expect(all).toContain('\u22121:00');
     expect(all).toContain('Vera Ñáñez, Ana');
     expect(all).toContain('Días trabajados');
   });
@@ -81,6 +94,7 @@ describe('attendanceMonthXlsx', () => {
     const { all } = sheetsOf(await attendanceMonthXlsx(month()));
     expect(all).not.toContain('Horas extra');
     expect(all).not.toContain('Atraso');
+    expect(all).not.toContain('Almuerzo largo');
     expect(all).not.toContain('Departamento');
   });
 
@@ -125,6 +139,14 @@ describe('attendanceMonthPdf', () => {
     };
     const file = await attendanceMonthPdf({ ...one, employees: [employee] });
     expect(pagesOf(file)).toBeGreaterThan(1);
+  });
+
+  it('keeps a month of fixed hours on one page, with its weeks, totals and signatures', async () => {
+    // As the pilot company reads it: lateness, long lunches and the difference, no overtime.
+    const one = month();
+    const fixedHours = { ...one, hasLateness: true, hasLongBreaks: true };
+    expect(fixedHours.hasExpected).toBe(true);
+    expect(pagesOf(await attendanceMonthPdf(fixedHours))).toBe(1);
   });
 
   it('still writes a document for a month without people', async () => {
